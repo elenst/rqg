@@ -253,6 +253,9 @@ if ($basedirs[1] eq '' and $basedirs[0] ne '') {
     # We need at least one server anyway
     $basedirs[1] = $basedirs[0];
 }
+if ($vardirs[1] eq '' and $vardirs[0] ne '') {
+    $vardirs[1] = $vardirs[0];
+}
 
 foreach (2..3) {
     # If servers 2 and 3 are defined through vardirs, use the default basedir for them
@@ -266,7 +269,9 @@ foreach (2..3) {
 # but does not define separate vardirs)
 
 foreach my $i (1..3) {
+    next unless $basedirs[$i] or $vardirs[$i];
     foreach my $j ($i+1..3) {
+        next unless $basedirs[$j] or $vardirs[$j];
         if ($basedirs[$i] eq $basedirs[$j] and $vardirs[$i] eq $vardirs[$j]) {
             croak("Please specify either different --basedir[$i]/--basedir[$j] or different --vardir[$i]/--vardir[$j] in order to start two MySQL servers");
         }
