@@ -23,6 +23,7 @@
 
 #    7 - Error on rename of './test/tr.TRN~' to './test/tr.TRN' (Errcode: 2 - No such file or directory)
 # 1044 - (ER_DBACCESS_DENIED_ERROR): Access denied for user '%s'@'%s' to database '%-.192s'
+# 1099 - (ER_TABLE_NOT_LOCKED_FOR_WRITE): Table '%-.192s' was locked with a READ lock and can't be updated
 # 1100 - (ER_TABLE_NOT_LOCKED): Table '%-.192s' was not locked with LOCK TABLES
 # 1146 - (ER_NO_SUCH_TABLE): Table '%-.192s.%-.192s' doesn't exist
 # 1347 - (ER_WRONG_OBJECT): '%-.192s.%-.192s' is not %s
@@ -39,14 +40,14 @@
 # ERROR 1360 for DROP TRIGGER IF EXISTS is also because of one of these two problems
 
 query_init_add:
-    CREATE TABLE IF NOT EXISTS tlog (
+    CREATE TABLE IF NOT EXISTS test.tlog (
       pk INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
       dt TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), 
       tbl VARCHAR(16), 
       tp ENUM('BEFORE','AFTER'), 
       op ENUM('INSERT','UPDATE','DELETE'),
       fld BLOB
-    ); CREATE TABLE IF NOT EXISTS tlog2 (
+    ); CREATE TABLE IF NOT EXISTS test.tlog2 (
         log_id INT NOT NULL,
         dt TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
         val BLOB NOT NULL DEFAULT '_'
@@ -60,14 +61,14 @@ query_add:
 ;
 
 mdev6112_create_log_trigger:
-    /* QProp.ERROR_1100 */ mdev6112_create_clause mdev6112_trigger_name mdev6112_before_after INSERT ON tlog FOR EACH ROW mdev6112_precedes_follows INSERT INTO tlog2 VALUES ( NEW.`pk`, NOW(), NEW.`fld` );
+    /* QProp.ERROR_1099 QProp.ERROR_1100 */ mdev6112_create_clause test. mdev6112_trigger_name mdev6112_before_after INSERT ON test.tlog FOR EACH ROW mdev6112_precedes_follows INSERT INTO test.tlog2 VALUES ( NEW.`pk`, NOW(), NEW.`fld` );
 
 # While we are here, add something for MDEV-8605
 mdev6112_create_log2_trigger:
-    /* QProp.ERROR_1100 */ mdev6112_create_clause mdev6112_trigger_name BEFORE INSERT ON tlog2 FOR EACH ROW mdev6112_precedes_follows SET NEW.`val` = IFNULL(NEW.`val`,'');
+    /* QProp.ERROR_1099 QProp.ERROR_1100 */ mdev6112_create_clause test. mdev6112_trigger_name BEFORE INSERT ON test.tlog2 FOR EACH ROW mdev6112_precedes_follows SET NEW.`val` = IFNULL(NEW.`val`,'');
 
 mdev6112_create_trigger:
-    /* QProp.ERROR_1100 */ mdev6112_create_clause mdev6112_trigger_name mdev6112_before_after mdev6112_ins_upd_del ON /* QProp.ERROR_1361 QProp.ERROR_1347 */ mdev6112_table FOR EACH ROW mdev6112_precedes_follows INSERT INTO tlog (tbl,tp,op) VALUES ( { "'$last_table','$tp','$op'," . ($op eq 'DELETE' ? 'OLD' : 'NEW') } . _field );
+    /* QProp.ERROR_1100 */ mdev6112_create_clause mdev6112_last_database . mdev6112_trigger_name mdev6112_before_after mdev6112_ins_upd_del ON /* QProp.ERROR_1361 QProp.ERROR_1347 */ mdev6112_table FOR EACH ROW mdev6112_precedes_follows INSERT INTO tlog (tbl,tp,op) VALUES ( { "'$last_table','$tp','$op'," . ($op eq 'DELETE' ? 'OLD' : 'NEW') } . _field );
 
 mdev6112_trigger_name:
     # ER_SERVER_LOST can happen on any query if the connection is killed.
@@ -79,12 +80,15 @@ mdev6112_table:
 
 mdev6112_database:
       /* QProp.ERROR_1146 */
-    | { $last_database }
+    | mdev6112_last_database
 ;
 
+mdev6112_last_database:
+    { $last_database or $last_database = 'test' } ;
+
 mdev6112_drop_trigger:
-      /* QProp.ERROR_1100 */ /* QProp.ERROR_1360 */ DROP TRIGGER mdev6112_trigger_name
-    | /* QProp.ERROR_1100 */ /* QProp.ERROR_1360 */ DROP TRIGGER IF EXISTS mdev6112_trigger_name
+      /* QProp.ERROR_1099 QProp.ERROR_1100 */ /* QProp.ERROR_1360 */ DROP TRIGGER mdev6112_trigger_name
+    | /* QProp.ERROR_1099 QProp.ERROR_1100 */ /* QProp.ERROR_1360 */ DROP TRIGGER IF EXISTS mdev6112_trigger_name
 ;
     
 mdev6112_create_clause:
