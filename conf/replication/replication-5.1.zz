@@ -18,7 +18,6 @@
 $tables = {
         rows => [0, 1, 10, 100],
         partitions => [ undef , 'KEY (pk) PARTITIONS 2' ],
-        engines => [ undef, 'MyISAM', 'InnoDB' ],
 	pk => [ undef, 'int auto_increment' ]
 };
 

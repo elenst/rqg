@@ -223,6 +223,7 @@ sub startServer {
                    " MASTER_PORT = ".$self->master->port.",".
                    " MASTER_HOST = '127.0.0.1',".
                    " MASTER_USER = 'root',".
+		   " MASTER_DELAY = 30,".
                    " MASTER_CONNECT_RETRY = 1" . $master_use_gtid);
     
 	$slave_dbh->do("START SLAVE");
