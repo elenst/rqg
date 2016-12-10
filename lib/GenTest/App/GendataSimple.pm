@@ -149,18 +149,18 @@ sub gen_table {
 		CREATE TABLE $name (
 			pk INTEGER AUTO_INCREMENT,
 			col_int_nokey INTEGER $nullability,
-			col_int_key INTEGER $nullability,
+			col_int_key INTEGER AS (col_int_nokey * 2) VIRTUAL,
 
-			col_date_key DATE $nullability,
+			col_date_key DATE AS (DATE_SUB(col_date_nokey, INTERVAL 1 DAY)) VIRTUAL,
 			col_date_nokey DATE $nullability,
 
-			col_time_key TIME $nullability,
+			col_time_key TIME AS (TIME(col_time_nokey)) VIRTUAL,
 			col_time_nokey TIME $nullability,
 
-			col_datetime_key DATETIME $nullability,
+			col_datetime_key DATETIME AS (DATE_ADD(col_datetime_nokey, INTERVAL 1 HOUR)) VIRTUAL,
 			col_datetime_nokey DATETIME $nullability,
 
-			col_varchar_key VARCHAR($varchar_length) $nullability,
+			col_varchar_key VARCHAR($varchar_length) AS (CONCAT('virt-',col_varchar_nokey)) VIRTUAL,
 			col_varchar_nokey VARCHAR($varchar_length) $nullability,
 
 			PRIMARY KEY (pk),
