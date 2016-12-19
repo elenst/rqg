@@ -38,7 +38,7 @@ $tables = {
 };
 
 $fields = {
-	types => [ 'int' ],
+	types => [ 'int', 'int as (col_int) virtual' ],
 	indexes => [ 'key', undef ]
 };
 
