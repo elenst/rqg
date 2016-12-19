@@ -37,6 +37,7 @@ use constant GDS_SQLTRACE => 3;
 use constant GDS_NOTNULL => 4;
 use constant GDS_ROWS => 5;
 use constant GDS_VARCHAR_LENGTH => 6;
+use constant GDS_VCOLS => 7;
 
 use constant GDS_DEFAULT_ROWS => [0, 1, 20, 100, 1000, 0, 1, 20, 100];
 use constant GDS_DEFAULT_NAMES => ['A', 'B', 'C', 'D', 'E', 'AA', 'BB', 'CC', 'DD'];
@@ -51,7 +52,8 @@ sub new {
         'sqltrace' => GDS_SQLTRACE,
 	'notnull' => GDS_NOTNULL,
 	'rows' => GDS_ROWS,
-        'varchar_length' => GDS_VARCHAR_LENGTH
+        'varchar_length' => GDS_VARCHAR_LENGTH,
+        'vcols' => GDS_VCOLS,
     },@_);
 
     if (not defined $self->[GDS_DSN]) {
@@ -71,6 +73,10 @@ sub dsn {
 
 sub engine {
     return $_[0]->[GDS_ENGINE];
+}
+
+sub vcols {
+    return $_[0]->[GDS_VCOLS];
 }
 
 sub views {
@@ -132,6 +138,7 @@ sub gen_table {
     my $varchar_length = $self->varcharLength();
 
     my $engine = $self->engine();
+    my $vcols = $self->vcols();
     my $views = $self->views();
 
 	if (
@@ -149,18 +156,18 @@ sub gen_table {
 		CREATE TABLE $name (
 			pk INTEGER AUTO_INCREMENT,
 			col_int_nokey INTEGER $nullability,
-			col_int_key INTEGER AS (col_int_nokey * 2) VIRTUAL,
+			col_int_key INTEGER AS (col_int_nokey * 2) $vcols,
 
-			col_date_key DATE AS (DATE_SUB(col_date_nokey, INTERVAL 1 DAY)) VIRTUAL,
+			col_date_key DATE AS (DATE_SUB(col_date_nokey, INTERVAL 1 DAY)) $vcols,
 			col_date_nokey DATE $nullability,
 
-			col_time_key TIME AS (TIME(col_time_nokey)) VIRTUAL,
+			col_time_key TIME AS (TIME(col_time_nokey)) $vcols,
 			col_time_nokey TIME $nullability,
 
-			col_datetime_key DATETIME AS (DATE_ADD(col_datetime_nokey, INTERVAL 1 HOUR)) VIRTUAL,
+			col_datetime_key DATETIME AS (DATE_ADD(col_datetime_nokey, INTERVAL 1 HOUR)) $vcols,
 			col_datetime_nokey DATETIME $nullability,
 
-			col_varchar_key VARCHAR($varchar_length) AS (CONCAT('virt-',col_varchar_nokey)) VIRTUAL,
+			col_varchar_key VARCHAR($varchar_length) AS (CONCAT('virt-',col_varchar_nokey)) $vcols,
 			col_varchar_nokey VARCHAR($varchar_length) $nullability,
 
 			PRIMARY KEY (pk),
