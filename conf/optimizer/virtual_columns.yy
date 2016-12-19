@@ -62,8 +62,8 @@ create_table:
 		v1 field_type AS ( virtual_expr ) /*executor1 PERSISTENT */ /*executor2 VIRTUAL */ ,
 		v2 field_type AS ( virtual_expr ) /*executor1 PERSISTENT */ /*executor2 VIRTUAL */ ,
 		v3 field_type AS ( virtual_expr ) /*executor1 PERSISTENT */ /*executor2 VIRTUAL */ ,
-		v4 field_type AS ( virtual_expr ) /*executor1 PERSISTENT */ /*executor2 VIRTUAL */
-		/*executor1 , KEY (v3), KEY (v4) */
+		v4 field_type AS ( virtual_expr ) /*executor1 PERSISTENT */ /*executor2 VIRTUAL */ ,
+		KEY (v3), KEY (v4)
 	);
 
 null:
