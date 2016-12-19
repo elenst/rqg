@@ -152,35 +152,65 @@ sub gen_table {
 		### http://bugs.mysql.com/bug.php?id=47125
 
 		$executor->execute("DROP TABLE /*! IF EXISTS */ $name");
-		$executor->execute("
-		CREATE TABLE $name (
-			pk INTEGER AUTO_INCREMENT,
-			col_int_nokey INTEGER $nullability,
-			col_int_key INTEGER AS (col_int_nokey * 2) $vcols,
+        if ($vcols) {
+            $executor->execute("
+            CREATE TABLE $name (
+                pk INTEGER AUTO_INCREMENT,
+                col_int_nokey INTEGER $nullability,
+                col_int_key INTEGER AS (col_int_nokey * 2) $vcols,
 
-			col_date_key DATE AS (DATE_SUB(col_date_nokey, INTERVAL 1 DAY)) $vcols,
-			col_date_nokey DATE $nullability,
+                col_date_key DATE AS (DATE_SUB(col_date_nokey, INTERVAL 1 DAY)) $vcols,
+                col_date_nokey DATE $nullability,
 
-			col_time_key TIME AS (TIME(col_time_nokey)) $vcols,
-			col_time_nokey TIME $nullability,
+                col_time_key TIME AS (TIME(col_time_nokey)) $vcols,
+                col_time_nokey TIME $nullability,
 
-			col_datetime_key DATETIME AS (DATE_ADD(col_datetime_nokey, INTERVAL 1 HOUR)) $vcols,
-			col_datetime_nokey DATETIME $nullability,
+                col_datetime_key DATETIME AS (DATE_ADD(col_datetime_nokey, INTERVAL 1 HOUR)) $vcols,
+                col_datetime_nokey DATETIME $nullability,
 
-			col_varchar_key VARCHAR($varchar_length) AS (CONCAT('virt-',col_varchar_nokey)) $vcols,
-			col_varchar_nokey VARCHAR($varchar_length) $nullability,
+                col_varchar_key VARCHAR($varchar_length) AS (CONCAT('virt-',col_varchar_nokey)) $vcols,
+                col_varchar_nokey VARCHAR($varchar_length) $nullability,
 
-			PRIMARY KEY (pk),
-			KEY (col_int_key),
-			KEY (col_date_key),
-			KEY (col_time_key),
-			KEY (col_datetime_key),
-			KEY (col_varchar_key, col_int_key)
-		) ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
-						   # For tables named like CC and CCC, start auto_increment with some offset. This provides better test coverage since
-						   # joining such tables on PK does not produce only 1-to-1 matches.
-			);
-		
+                PRIMARY KEY (pk),
+                KEY (col_int_key),
+                KEY (col_date_key),
+                KEY (col_time_key),
+                KEY (col_datetime_key),
+                KEY (col_varchar_key, col_int_key)
+            ) ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
+                               # For tables named like CC and CCC, start auto_increment with some offset. This provides better test coverage since
+                               # joining such tables on PK does not produce only 1-to-1 matches.
+                );
+        } else {
+            $executor->execute("
+            CREATE TABLE $name (
+                pk INTEGER AUTO_INCREMENT,
+                col_int_nokey INTEGER $nullability,
+                col_int_key INTEGER,
+
+                col_date_key DATE,
+                col_date_nokey DATE $nullability,
+
+                col_time_key TIME,
+                col_time_nokey TIME $nullability,
+
+                col_datetime_key DATETIME,
+                col_datetime_nokey DATETIME $nullability,
+
+                col_varchar_key VARCHAR($varchar_length),
+                col_varchar_nokey VARCHAR($varchar_length) $nullability,
+
+                PRIMARY KEY (pk),
+                KEY (col_int_key),
+                KEY (col_date_key),
+                KEY (col_time_key),
+                KEY (col_datetime_key),
+                KEY (col_varchar_key, col_int_key)
+            ) ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
+                               # For tables named like CC and CCC, start auto_increment with some offset. This provides better test coverage since
+                               # joining such tables on PK does not produce only 1-to-1 matches.
+                );
+        }
     } elsif ($executor->type == DB_POSTGRES) {
         say("Creating ".$executor->getName()." table $name, size $size rows");
     
