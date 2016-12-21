@@ -43,6 +43,8 @@ use constant GDS_VCOLS => 7;
 use constant GDS_DEFAULT_ROWS => [0, 1, 20, 100, 1000, 0, 1, 20, 100];
 use constant GDS_DEFAULT_NAMES => ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9'];
 
+my $prng;
+
 sub new {
     my $class = shift;
 
@@ -99,7 +101,7 @@ sub varcharLength {
 sub run {
     my ($self) = @_;
     
-    my $prng = GenTest::Random->new( seed => 0 );
+    $prng = GenTest::Random->new( seed => 0 );
 
     my $executor = GenTest::Executor->newFromDSN($self->dsn());
     if ($executor->type != DB_MYSQL) {
@@ -126,6 +128,41 @@ sub run {
     return STATUS_OK;
 }
 
+sub random_null {
+    return $prng->uint16(0,1) ? 'NULL' : 'NOT NULL' ;
+}
+sub random_unsigned {
+    return $prng->uint16(0,1) ? 'UNSIGNED' : undef ;
+}
+sub random_zerofill {
+    return $prng->uint16(0,1) ? 'ZEROFILL' : undef ;
+}
+sub random_int_type {
+    return $prng->arrayElement(['TINYINT','SMALLINT','MEDIUMINT','INT','BIGINT']);
+}
+sub random_float_type {
+    return $prng->uint16(0,1) ? 'FLOAT' : 'DOUBLE' ;
+}
+sub random_char_type {
+    return $prng->uint16(0,1) ? 'CHAR' : 'BINARY' ;
+}
+sub random_varchar_type {
+    return $prng->uint16(0,1) ? 'VARCHAR' : 'VARBINARY' ;
+}
+sub random_enum_type {
+    return ($prng->uint16(0,1) ? 'ENUM' : 'SET') . "('','a','b','c','d','e','f','foo','bar')" ;
+}
+sub random_blob_type {
+    return $prng->arrayElement(['TINYBLOB','TINYTEXT','BLOB','TEXT','MEDIUMBLOB', 'MEDIUMTEXT', 'LONGBLOB', 'LONGTEXT']);
+}
+sub random_pk_variation {
+    return $prng->uint16(0,1) ? 'INTEGER AUTO_INCREMENT' : 'SERIAL';
+}
+sub random_or_predefined_vcol_kind {
+    return (vcols() eq '' ? ($prng->uint16(0,1) ? 'PERSISTENT' : 'VIRTUAL') : vcols());
+}
+
+
 sub gen_table {
     my ($self, $executor, $name, $size, $prng) = @_;
 
@@ -141,41 +178,8 @@ sub gen_table {
     
     my ($nullable, $precision);
     
-    sub random_null {
-        return $prng->uint16(0,1) ? 'NULL' : 'NOT NULL' ;
-    }
-    sub random_unsigned {
-        return $prng->uint16(0,1) ? 'UNSIGNED' : undef ;
-    }
-    sub random_zerofill {
-        return $prng->uint16(0,1) ? 'ZEROFILL' : undef ;
-    }
-    sub random_int_type {
-        return $prng->arrayElement(['TINYINT','SMALLINT','MEDIUMINT','INT','BIGINT']);
-    }
-    sub random_float_type {
-        return $prng->uint16(0,1) ? 'FLOAT' : 'DOUBLE' ;
-    }
-    sub random_char_type {
-        return $prng->uint16(0,1) ? 'CHAR' : 'BINARY' ;
-    }
-    sub random_varchar_type {
-        return $prng->uint16(0,1) ? 'VARCHAR' : 'VARBINARY' ;
-    }
-    sub random_enum_type {
-        return ($prng->uint16(0,1) ? 'ENUM' : 'SET') . "('','a','b','c','d','e','f','foo','bar')" ;
-    }
-    sub random_blob_type {
-        return $prng->arrayElement(['TINYBLOB','TINYTEXT','BLOB','TEXT','MEDIUMBLOB', 'MEDIUMTEXT', 'LONGBLOB', 'LONGTEXT']);
-    }
-    sub random_pk_variation {
-        return $prng->uint16(0,1) ? 'INTEGER AUTO_INCREMENT' : 'SERIAL'
-    }
-    sub random_or_predefined_vcol_kind {
-        return ($vcols eq '' ? ($prng->uint16(0,1) ? 'PERSISTENT' : 'VIRTUAL') : $vcols);
-    }
-
     # column_name => [ type, length, unsigned, zerofill, nullability, default, virtual ]
+
     my %columns = (
         pk      => [    random_pk_variation(),
                         undef,
@@ -394,7 +398,8 @@ sub gen_table {
     $executor->execute("DROP TABLE /*! IF EXISTS */ $name");
     my $create_stmt = "CREATE TABLE $name ( \n";
     my @column_list = ();
-    foreach my $c (keys %columns) {
+    my $columns= $prng->shuffleArray([sort keys %columns]);
+    foreach my $c (@$columns) {
         my $coldef= $columns{$c};
         unless ($c eq 'pk' or defined $coldef->[6]) {
             push @column_list, $c;
