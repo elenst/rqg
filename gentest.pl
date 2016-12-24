@@ -158,6 +158,7 @@ my $config = GenTest::Properties->new(
               'servers',
               'multi-master',
               'annotate-rules',
+              'upgrade-test',
               'restart-timeout'],
     help => \&help);
 
