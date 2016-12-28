@@ -22,30 +22,6 @@ $tables = {
           engines => [ 'MyISAM', 'Innodb' ] ,
           pk => [ undef ] , 
           partitions => [
-                          "RANGE COLUMNS(col_int_signed, col_varchar_5_utf8)
-                          ( PARTITION p0 VALUES LESS THAN (5, 'm'), 
-                          PARTITION p1 VALUES LESS THAN (10, 'za' ))",
-                          "RANGE COLUMNS(col_int_signed, col_varchar_512_cp932)
-                          SUBPARTITION BY HASH( TO_SECONDS(`col_datetime`))
-                          SUBPARTITIONS 3 (
-                          PARTITION p0 VALUES LESS THAN (2, 'b'),
-                          PARTITION p1 VALUES LESS THAN (4, 'd'),
-                          PARTITION p2 VALUES LESS THAN (10,'za'))",
-                          "RANGE COLUMNS(col_varchar_256_cp932, col_varchar_512_latin1)
-                          SUBPARTITION BY HASH(YEAR(`col_datetime`))
-                          SUBPARTITIONS 2 (
-                          PARTITION p0 VALUES LESS THAN ('m','m'),
-                          PARTITION p1 VALUES LESS THAN ('za','za'))",
-                          "RANGE COLUMNS(col_varchar_256_cp932, col_varchar_512_latin1)
-                          SUBPARTITION BY KEY(col_date)
-                          SUBPARTITIONS 4 (
-                          PARTITION p0 VALUES LESS THAN ('m','m'),
-                          PARTITION p1 VALUES LESS THAN ('za','za'))",
-                          "RANGE COLUMNS(col_varchar_256_utf8, col_varchar_512_utf8)
-                          SUBPARTITION BY LINEAR KEY(`col_datetime`)
-                          SUBPARTITIONS 2 (
-                          PARTITION p0 VALUES LESS THAN ('m','m'),
-                          PARTITION p1 VALUES LESS THAN ('za','za'))",
                           "LIST COLUMNS(col_int_signed)
                            SUBPARTITION BY KEY(col_varchar_256_utf8)
                            SUBPARTITIONS 4 (
@@ -54,7 +30,10 @@ $tables = {
                                                   9,NULL),
                            PARTITION p1 VALUES IN (2,4,
                                                   6,8,
-                                                  0))",
+                                                  0),
+                           PARTITION pdef DEFAULT
+
+                           )",
                           "LIST COLUMNS(col_int_signed)
                            SUBPARTITION BY LINEAR KEY(col_varchar_512_latin1)
                            SUBPARTITIONS 4 (
@@ -63,7 +42,9 @@ $tables = {
                                                   9,NULL),
                            PARTITION p1 VALUES IN (2,4,
                                                   6,8,
-                                                  0))",
+                                                  0),
+                           PARTITION pdef DEFAULT
+                           )",
                           "LIST COLUMNS(col_int_signed)
                            SUBPARTITION BY LINEAR HASH( TO_SECONDS(`col_date`))
                            SUBPARTITIONS 4 (
@@ -72,7 +53,9 @@ $tables = {
                                                   9,NULL),
                            PARTITION p1 VALUES IN (2,4,
                                                   6,8,
-                                                  0))" ,
+                                                  0),
+                           PARTITION pdef DEFAULT
+                           )" ,
                           "LIST COLUMNS(col_int_signed)
                           SUBPARTITION BY HASH( TO_SECONDS(`col_date`))
                           SUBPARTITIONS 2 (
@@ -81,7 +64,9 @@ $tables = {
                                                  5, 6,
                                                  7, 8,
                                                  9, 0,
-                                                 NULL))",
+                                                 NULL),
+                           PARTITION pdef DEFAULT
+                           )" ,
                           "LIST COLUMNS(col_int_signed)
                           SUBPARTITION BY HASH( TO_SECONDS(`col_date`))
                           SUBPARTITIONS 2 (
@@ -90,7 +75,9 @@ $tables = {
                                                  3, 4,
                                                  5, 6,
                                                  7, 8,
-                                                 9))",
+                                                 9),
+                           PARTITION pdef DEFAULT
+                           )" ,
                           "LIST COLUMNS(col_int_signed, col_varchar_5_utf8)
                           ( PARTITION p0 VALUES IN (
                          (1,'a'),(1,'b'),(1,'c'),
@@ -192,7 +179,10 @@ $tables = {
                          (0,'p'),(0,'q'),(0,'r'),
                          (0,'s'),(0,'t'),(0,'u'),
                          (0,'v'),(0,'w'),(0,'x'),
-                         (0,'y'),(0,'z'),(0,NULL)))" ]
+                         (0,'y'),(0,'z'),(0,NULL),
+                           PARTITION pdef DEFAULT
+                           ))"
+                         ]
 };
 
 

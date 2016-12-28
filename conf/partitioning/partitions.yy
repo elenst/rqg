@@ -277,10 +277,20 @@ partition_name_comb:
 	p2,p3,p1    |
 	p3,p1       |
 	p0,p2       |
-	p0,p3       ;
+	p0,p3,pdef  |
+	p0,pdef     |
+	pdef,p1,p2  |
+	p0,p1,p2,p3,pdef |
+	p1,pdef,p2       |
+	pdef,p1,p2,p3    |
+	p2,pdef       |
+	pdef,p3,p1    |
+	pdef,p1       |
+	p0,p2,pdef       |
+	p0,p3,pdef       ;
 
 partition_name:
-	p0 | p1 | p2 | p3 ;
+	p0 | p1 | p2 | p3 | pdef;
 
 enable_disable:
 	ENABLE | DISABLE ;
@@ -293,6 +303,10 @@ engine:
 
 partition:
 	partition_by_range |
+	partition_by_list  |
+	partition_by_list  |
+	partition_by_list  |
+	partition_by_list  |
 	partition_by_list  |
 	partition_by_hash  |
 	partition_by_key   ;
@@ -320,7 +334,8 @@ partition_by_list:
 		PARTITION p0 VALUES IN ( shift_digit, NULL ),
 		PARTITION p1 VALUES IN ( shift_digit, shift_digit, shift_digit ),
 		PARTITION p2 VALUES IN ( shift_digit, shift_digit, shift_digit ),
-		PARTITION p3 VALUES IN ( shift_digit, shift_digit, shift_digit )
+		PARTITION p3 VALUES IN ( shift_digit, shift_digit, shift_digit ),
+        PARTITION pdef DEFAULT
 	);
 
 populate_digits:

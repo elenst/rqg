@@ -313,7 +313,7 @@ linear:
 
 partition_by_list:
 	{ our $nb_parts_var= $prng->int($nb_parts-9,$nb_parts); return undef }
-        PARTITION BY LIST ( _field ) ( list ) ;
+        PARTITION BY LIST ( _field ) ( list, PARTITION p4 DEFAULT ) ;
 
 list:
 
@@ -323,7 +323,7 @@ list:
 # Common elements used in SQL statements
 
 partition_count:
-	{ return $prng->int(1,3) } ;
+	{ return $prng->int(1,4) } ;
 
 _field:
         `col_int_nokey` | `col_int_nokey` ;

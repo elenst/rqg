@@ -142,7 +142,7 @@ partition_name_list:
 	partition_name_list;
 
 partition_name:
-	p0 | p1 | p2 | p3 ;
+	p0 | p1 | p2 | p3 | pdef;
 
 enable_disable:
 	ENABLE | DISABLE ;
@@ -156,6 +156,13 @@ engine:
 partition:
 	|
 	partition_by_range |
+	partition_by_list |
+	partition_by_list |
+	partition_by_list |
+	partition_by_list |
+	partition_by_list |
+	partition_by_list |
+	partition_by_list |
 	partition_by_list |
 	partition_by_hash |
 	partition_by_key
@@ -184,7 +191,8 @@ partition_by_list:
 		PARTITION p0 VALUES IN ( shift_digit, NULL ),
 		PARTITION p1 VALUES IN ( shift_digit, shift_digit, shift_digit ),
 		PARTITION p2 VALUES IN ( shift_digit, shift_digit, shift_digit ),
-		PARTITION p3 VALUES IN ( shift_digit, shift_digit, shift_digit )
+		PARTITION p3 VALUES IN ( shift_digit, shift_digit, shift_digit ),
+        PARTITION pdef DEFAULT
 	);
 
 populate_digits:
