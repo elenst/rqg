@@ -455,11 +455,12 @@ sub startServer {
 
     # In seconds, timeout for the server to start updating error log
     # after the server startup command has been launched
-    my $start_wait_timeout= 20;
+    my $start_wait_timeout= 30;
 
-    # In seconds, timeout for the server to stay silent without
-    # creating a pid file
-    my $start_inactivity_timeout= 20;
+    # In seconds, timeout for the server to create pid file
+    # after it has started updating the error log
+    # (before the server is considered hanging)
+    my $startup_timeout= 600;
     
     if (osWindows) {
         my $proc;
@@ -496,7 +497,7 @@ sub startServer {
         if ($self->[MYSQLD_VALGRIND]) {
             my $val_opt ="";
             $start_wait_timeout= 60;
-            $start_inactivity_timeout= 60;
+            $startup_timeout= 1200;
             if (defined $self->[MYSQLD_VALGRIND_OPTIONS]) {
                 $val_opt = join(' ',@{$self->[MYSQLD_VALGRIND_OPTIONS]});
             }
@@ -511,13 +512,13 @@ sub startServer {
             my $waits= 0;
             my $errlog_last_update_time= (stat($errorlog))[9] || 0;
             my $errlog_update= 0;
-            my $start_wait_timeout= int($start_wait_timeout / $wait_time); # Convert into the number of waits
+            my $pid;
+            my $wait_end= time() + $start_wait_timeout;
 
             # After we've launched server startup, we'll wait for max $start_wait_timeout seconds
             # for the server to start updating the error log
-            while (!-f $self->pidfile and $waits < $start_wait_timeout ) {
+            while (!-f $self->pidfile and time() < $wait_end ) {
                 Time::HiRes::sleep($wait_time);
-                $waits++;
                 $errlog_update= ( (stat($errorlog))[9] > $errlog_last_update_time);
                 last if $errlog_update;
             }
@@ -530,37 +531,52 @@ sub startServer {
 
             # If we are here, server has started updating the error log. 
             # It can be doing some lengthy startup before creating the pid file,
-            # but as long as it keeps updating the log we'll wait.
-
-            $errlog_last_update_time= (stat($errorlog))[9];
-            while (!-f $self->pidfile) {
-                Time::HiRes::sleep($wait_time);
-                if (time() > $errlog_last_update_time + $start_inactivity_timeout) {
-                    say("ERROR: server stopped updating the error log for over $start_inactivity_timeout seconds, and has not created pid file");
-                    sayFile($self->errorlog);
-                    # In case server has hung, we'll try to SIGABRT it to produce a coredump.
-                    # We don't have a pid file, but since the server has updated the error log, it should have printed
-                    # its pid into the log
-                    my $pid;
-                    open(ERRLOG,$self->errorlog) || croak("Could not open the error log");
-                    while (<ERRLOG>) {
-                        next unless /mysqld\s\(.*?\)\sstarting\sas\sprocess\s(\d+)/;
-                        # There can be several starting lines, we are interested in the last one,
-                        # so won't leave until we read everything
-                        $pid= $1;
-                    }
-                    if ($pid) {
-                        say("Sending final SIGABRT to process with pid $pid...");
-                        kill 'ABRT', $pid;
-                    }
-                    return DBSTATUS_FAILURE;
+            # but we can already get the pid from the error log record
+            # [Note] <path>/mysqld (mysqld <version>) starting as process <pid> ...
+            # We need the latest line of this kind
+            
+            unless (open(ERRLOG, $self->errorlog)) {
+                say("ERROR: could not open the error log " . $self->errorlog);
+                return DBSTATUS_FAILURE;
+            }
+            while (<ERRLOG>) {
+                if (/\[Note\]\s+\S+?\/mysqld\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
+                    $pid= $1;
                 }
+            }
+            close(ERRLOG);
+            unless (defined $pid) {
+                say("ERROR: could not find the pid in the error log");
+                return DBSTATUS_FAILURE;
+            }
+
+            # Now we know the pid and can monitor it along with the pid file,
+            # to avoid unnecessary waiting if the server goes down
+            $wait_end= time() + $startup_timeout;
+            
+            while (!-f $self->pidfile and time() < $wait_end) {
+                Time::HiRes::sleep($wait_time);
+                last unless kill(0, $pid);
+            }
+            
+            if (!-f $self->pidfile) {
+                sayFile($self->errorlog);
+                if (! kill(0, $pid)) {
+                    say("ERROR: server disappeared after having started with pid $pid");
+                } else {
+                    say("ERROR: timeout $startup_timeout has passed and the server still has not created the pid file, assuming it has hung, sending final SIGABRT to pid $pid...");
+                    kill 'ABRT', $pid;
+                }
+                return DBSTATUS_FAILURE;
             }
 
             # We should only get here if the pid file was created
             my $pidfile = $self->pidfile;
-            my $pid = `cat \"$pidfile\"`;
-            $pid =~ m/([0-9]+)/;
+            my $pid_from_file = `cat \"$pidfile\"`;
+            $pid_from_file =~ s/.*?([0-9]+).*/$1/;
+            if ($pid != $pid_from_file) {
+                say("WARNING: pid extracted from the error log ($pid) is different from the pid in the pidfile ($pid_from_file). Assuming the latter is correct");
+            }
             $self->[MYSQLD_SERVERPID] = int($1);
         } else {
             exec("$command >> \"$errorlog\"  2>&1") || croak("Could not start mysql server");
