@@ -1,7 +1,8 @@
 #!/usr/bin/perl
 
 # Copyright (c) 2010, 2012, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2013, Monty Program Ab.
+# Copyright (c) 2013, Monty Program Ab
+# Copyright (C) 2016 MariaDB Corporatin Ab
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -75,7 +76,7 @@ my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
     $notnull, $logfile, $logconf, $report_tt_logdir, $querytimeout, $no_mask,
     $short_column_names, $strict_fields, $freeze_time, $wait_debugger, @debug_server,
     $skip_gendata, $skip_shutdown, $galera, $use_gtid, $genconfig, $annotate_rules,
-    $restart_timeout, $gendata_advanced);
+    $restart_timeout, $gendata_advanced, $upgrade_test);
 
 my $gendata=''; ## default simple gendata
 
@@ -171,7 +172,9 @@ my $opt_result = GetOptions(
     'use-gtid=s' => \$use_gtid,
     'use_gtid=s' => \$use_gtid,
     'annotate_rules' => \$annotate_rules,
-    'annotate-rules' => \$annotate_rules
+    'annotate-rules' => \$annotate_rules,
+    'upgrade-test' => \$upgrade_test,
+    'upgrade_test' => \$upgrade_test
 );
 
 if (defined $logfile && defined $logger) {
@@ -396,9 +399,9 @@ if ($rpl_mode ne '') {
                                                config => $cnf_array_ref,
                                                user => $user
     );
-    
+
     my $status = $rplsrv->startServer();
-    
+
     if ($status > DBSTATUS_OK) {
         stopServers($status);
         if (osWindows()) {
@@ -458,6 +461,58 @@ if ($rpl_mode ne '') {
         $i++;
     }
 
+} elsif ($upgrade_test) {
+
+    # server0 is the "old" server (before upgrade).
+    # We will initialize and start it now
+    $server[0] = DBServer::MySQL::MySQLd->new(basedir => $basedirs[1],
+                                                       vardir => $vardirs[1],
+                                                       debug_server => $debug_server[0],
+                                                       port => $ports[0],
+                                                       start_dirty => $start_dirty,
+                                                       valgrind => $valgrind,
+                                                       valgrind_options => \@valgrind_options,
+                                                       server_options => $mysqld_options[0],
+                                                       general_log => 1,
+                                                       config => $cnf_array_ref,
+                                                       user => $user);
+
+    my $status = $server[0]->startServer;
+
+    if ($status > DBSTATUS_OK) {
+        stopServers($status);
+        if (osWindows()) {
+            say(system("dir ".unix2winPath($server[0]->datadir)));
+        } else {
+            say(system("ls -l ".$server[0]->datadir));
+        }
+        say("ERROR: Could not start the old server in the upgrade test");
+        exit_test(STATUS_CRITICAL_FAILURE);
+    }
+
+    $dsns[0] = $server[0]->dsn($database,$user);
+
+    if ((defined $dsns[0]) && (defined $engine[0])) {
+        my $dbh = DBI->connect($dsns[0], undef, undef, { mysql_multi_statements => 1, RaiseError => 1 } );
+        $dbh->do("SET GLOBAL default_storage_engine = '$engine[0]'");
+    }
+
+    # server1 is the "new" server (after upgrade).
+    # We will initialize it, but won't start it yet
+    $server[1] = DBServer::MySQL::MySQLd->new(basedir => $basedirs[2],
+                                                       vardir => $vardirs[1], # Same vardir as for the first server!
+                                                       debug_server => $debug_server[1],
+                                                       port => $ports[0],     # Same port as for the first server!
+                                                       start_dirty => 1,
+                                                       valgrind => $valgrind,
+                                                       valgrind_options => \@valgrind_options,
+                                                       server_options => $mysqld_options[1],
+                                                       general_log => 1,
+                                                       config => $cnf_array_ref,
+                                                       user => $user);
+
+    $dsns[1] = $server[1]->dsn($database,$user);
+
 } else {
 
     foreach my $server_id (0..2) {
@@ -484,7 +539,8 @@ if ($rpl_mode ne '') {
             } else {
                 say(system("ls -l ".$server[$server_id]->datadir));
             }
-            croak("Could not start all servers");
+            say("ERROR: Could not start all servers");
+            exit_test(STATUS_CRITICAL_FAILURE);
         }
         
         if ( ($server_id == 0) || ($rpl_mode eq '') ) {
@@ -569,7 +625,8 @@ my $gentestProps = GenTest::Properties->new(
               'servers',
               'multi-master',
               'annotate-rules',
-              'restart-timeout'
+              'restart-timeout',
+              'upgrade-test'
 ]
     );
 
@@ -646,6 +703,7 @@ $gentestProps->property('multi-master', 1) if (defined $galera and scalar(@dsns)
 $gentestProps->debug_server(\@debug_server) if @debug_server;
 $gentestProps->servers(\@server) if @server;
 $gentestProps->property('annotate-rules',$annotate_rules) if defined $annotate_rules;
+$gentestProps->property('upgrade-test',1) if $upgrade_test;
 
 
 # Push the number of "worker" threads into the environment.
@@ -660,7 +718,7 @@ say("GenTest exited with exit status ".status2text($gentest_result)." ($gentest_
 # otherwise if the test is replication/with two servers compare the 
 # server dumps for any differences else if there are no failures exit with success.
 
-if (($gentest_result == STATUS_OK) && ($rpl_mode || (defined $basedirs[2]) || (defined $basedirs[3]) || $galera)) {
+if (($gentest_result == STATUS_OK) && !$upgrade_test && ($rpl_mode || (defined $basedirs[2]) || (defined $basedirs[3]) || $galera)) {
 #
 # Compare master and slave, or all masters
 #
@@ -793,6 +851,8 @@ $0 - Run a complete random query generation test, including server start with re
                       Useful for debugging query generation, otherwise makes the query look ugly and barely readable.
     --wait-for-debugger: Pause and wait for keypress after server startup to allow attaching a debugger to the server process.
     --restart-timeout: If the server has gone away, do not fail immediately, but wait to see if it restarts (it might be a part of the test)
+    --upgrade-test : enable Upgrade reporter and treat server1 and server2 as old/new server, correspondingly. After the test flow
+                     on server1, server2 will be started on the same datadir, and the upgrade consistency will be checked
     --help      : This help message
 
     If you specify --basedir1 and --basedir2 or --vardir1 and --vardir2, two servers will be started and the results from the queries
