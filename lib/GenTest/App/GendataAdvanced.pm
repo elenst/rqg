@@ -159,7 +159,7 @@ sub random_pk_variation {
     return $prng->uint16(0,1) ? 'INTEGER AUTO_INCREMENT' : 'SERIAL';
 }
 sub random_or_predefined_vcol_kind {
-    return (vcols() eq '' ? ($prng->uint16(0,1) ? 'PERSISTENT' : 'VIRTUAL') : vcols());
+    return ($_[0]->vcols() eq '' ? ($prng->uint16(0,1) ? 'PERSISTENT' : 'VIRTUAL') : $_[0]->vcols());
 }
 
 
@@ -296,7 +296,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_bit) '.random_or_predefined_vcol_kind()
+                                'AS (col_bit) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_int}= [   random_int_type(),
                                 $prng->uint16(0,64),
@@ -304,7 +304,7 @@ sub gen_table {
                                 random_zerofill(),
                                 undef,
                                 undef,
-                                'AS (col_int) '.random_or_predefined_vcol_kind()
+                                'AS (col_int) '.$self->random_or_predefined_vcol_kind()
                             ];
         my $precision = $prng->uint16(0,65);
         my $scale = $prng->uint16(0,($precision<=38?$precision:38));
@@ -314,7 +314,7 @@ sub gen_table {
                                 random_zerofill(),
                                 undef,
                                 undef,
-                                'AS (col_dec) '.random_or_predefined_vcol_kind()
+                                'AS (col_dec) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_date}= [  'DATE',
                                 undef,
@@ -322,7 +322,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_date) '.random_or_predefined_vcol_kind()
+                                'AS (col_date) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_datetime}= ['DATETIME',
                                 $prng->uint16(0,6),
@@ -330,7 +330,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_datetime) '.random_or_predefined_vcol_kind()
+                                'AS (col_datetime) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_timestamp}= ['TIMESTAMP',
                                 $prng->uint16(0,6),
@@ -338,7 +338,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_timestamp) '.random_or_predefined_vcol_kind()
+                                'AS (col_timestamp) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_time}= [  'TIME',
                                 $prng->uint16(0,6),
@@ -346,7 +346,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_time) '.random_or_predefined_vcol_kind()
+                                'AS (col_time) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_year}= [  'YEAR',
                                 undef,
@@ -354,7 +354,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_year) '.random_or_predefined_vcol_kind()
+                                'AS (col_year) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_char}= [  random_char_type(),
                                 $prng->uint16(0,255),
@@ -362,7 +362,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_char) '.random_or_predefined_vcol_kind()
+                                'AS (col_char) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_varchar}= [random_varchar_type(),
                                 $prng->uint16(0,4096),
@@ -370,7 +370,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_varchar) '.random_or_predefined_vcol_kind()
+                                'AS (col_varchar) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_blob}= [  random_blob_type(),
                                 undef,
@@ -378,7 +378,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_blob) '.random_or_predefined_vcol_kind()
+                                'AS (col_blob) '.$self->random_or_predefined_vcol_kind()
                             ];
         $columns{vcol_enum}= [  random_enum_type(),
                                 undef,
@@ -386,7 +386,7 @@ sub gen_table {
                                 undef,
                                 undef,
                                 undef,
-                                'AS (col_enum) '.random_or_predefined_vcol_kind()
+                                'AS (col_enum) '.$self->random_or_predefined_vcol_kind()
                             ];
     }
 
@@ -424,6 +424,23 @@ sub gen_table {
         } else {
             $executor->execute('CREATE VIEW view_'.$name.' AS SELECT * FROM '.$name);
         }
+    }
+    
+    my $number_of_indexes= $prng->uint16(2,8);
+    foreach (1..$number_of_indexes) {
+        my $number_of_columns= $prng->uint16(1,4);
+        # TODO: make it conditional depending on the version -- keys %columns vs @column_list
+        my $cols= $prng->shuffleArray([keys %columns]);
+        my @cols= @$cols[1..$number_of_columns];
+        foreach my $i (0..$#cols) {
+            my $c= $cols[$i];
+            my $tp= $columns{$c}->[0];
+            if ($tp eq 'TINYBLOB' or $tp eq 'TINYTEXT' or $tp eq 'BLOB' or $tp eq 'TEXT' or $tp eq 'MEDIUMBLOB' or $tp eq 'MEDIUMTEXT' or $tp eq 'LONGBLOB' or $tp eq 'LONGTEXT' or $tp eq 'CHAR' or $tp eq 'VARCHAR' or $tp eq 'BINARY' or $tp eq 'VARBINARY') {
+                my $length= ( $columns{$c}->[1] and $columns{$c}->[1] < 64 ) ? $columns{$c}->[1] : 64;
+                $cols[$i] = "$c($length)";
+            }
+        }
+        $executor->execute("ALTER TABLE $name ADD " . ($prng->uint16(0,5) ? 'INDEX' : 'UNIQUE') . "(". join(',',@cols) . ")");
     }
 
     my @values;
@@ -520,28 +537,12 @@ sub gen_table {
         ## We do one insert per 500 rows for speed
         if ($row % 500 == 0 || $row == $size) {
             my $insert_result = $executor->execute("
-            INSERT /*! IGNORE */ INTO $name (" . join(",",@column_list).") VALUES" . join(",",@values));
+            INSERT IGNORE INTO $name (" . join(",",@column_list).") VALUES" . join(",",@values));
             return $insert_result->status() if $insert_result->status() != STATUS_OK;
             @values = ();
         }
     }
     $executor->execute("COMMIT");
-    my $number_of_indexes= $prng->uint16(2,8);
-    foreach (1..$number_of_indexes) {
-        my $number_of_columns= $prng->uint16(1,4);
-        # TODO: make it conditional depending on the version -- keys %columns vs @column_list
-        my $cols= $prng->shuffleArray([keys %columns]);
-        my @cols= @$cols[1..$number_of_columns];
-        foreach my $i (0..$#cols) {
-            my $c= $cols[$i];
-            my $tp= $columns{$c}->[0];
-            if ($tp eq 'TINYBLOB' or $tp eq 'TINYTEXT' or $tp eq 'BLOB' or $tp eq 'TEXT' or $tp eq 'MEDIUMBLOB' or $tp eq 'MEDIUMTEXT' or $tp eq 'LONGBLOB' or $tp eq 'LONGTEXT' or $tp eq 'CHAR' or $tp eq 'VARCHAR' or $tp eq 'BINARY' or $tp eq 'VARBINARY') {
-                my $length= ( $columns{$c}->[1] and $columns{$c}->[1] < 64 ) ? $columns{$c}->[1] : 64;
-                $cols[$i] = "$c($length)";
-            }
-        }
-        $executor->execute("ALTER TABLE $name ADD INDEX(". join(',',@cols) . ")");
-    }
     return STATUS_OK;
 }
 
