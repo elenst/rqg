@@ -471,7 +471,6 @@ sub workerProcess {
 sub doGenData {
     my $self = shift;
 
-    return STATUS_OK if not defined $self->config->gendata();
     return STATUS_OK if defined $self->config->property('start-dirty');
 
     my $i = -1;
@@ -503,7 +502,7 @@ sub doGenData {
                rows => $self->config->rows,
                varchar_length => $self->config->property('varchar-length')
             )->run();
-        } else {
+        } elsif (defined $self->config->gendata()) {
             $gendata_result = GenTest::App::Gendata->new(
                spec_file => $self->config->gendata,
                dsn => $dsn,
