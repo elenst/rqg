@@ -539,10 +539,28 @@ sub startServer {
                 say("ERROR: could not open the error log " . $self->errorlog);
                 return DBSTATUS_FAILURE;
             }
-            while (<ERRLOG>) {
-                if (/\[Note\]\s+\S+?\/mysqld\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
-                    $pid= $1;
+            # In case the file is being slowly updated (e.g. with valgrind),
+            # and pid is not the first line which was printed (again, as with valgrind),
+            # we don't want to reach the EOF and exit too quickly.
+            # So, first we read the whole file till EOF, and if we haven't found the PID,
+            # we'll wait for the file to be updated further.
+            # TODO: There are still two problems at least:
+            # - if on whatever reason server doesn't print the PID into the error log,
+            #   we'll keep waiting forever;
+            # - if it's not the first start in this error log, so our protection against
+            #   quitting too quickly won't work -- we'll read a wrong (old) PID and will leave.
+            # And of course it won't work on Windows, but the new-style server start is generally
+            # not reliable there and needs to be fixed.
+            
+            for (;;) {
+                while (<ERRLOG>) {
+                    if (/\[Note\]\s+\S+?\/mysqld\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
+                        $pid= $1;
+                    }
                 }
+                last if $pid;
+                sleep 1;
+                seek ERRLOG, 0, 1;    # this clears the EOF flag
             }
             close(ERRLOG);
             unless (defined $pid) {
