@@ -36,6 +36,7 @@ use GenTest::Properties;
 use GenTest::Constants;
 use GenTest::App::Gendata;
 use GenTest::App::GendataSimple;
+use GenTest::App::GendataAdvanced;
 use GenTest::IPC::Channel;
 use GenTest::IPC::Process;
 use GenTest::ErrorFilter;
@@ -165,6 +166,7 @@ sub run {
     # Cache metadata and other info that may be needed later
     my @log_files_to_report;
     foreach my $i (0..2) {
+        last if $self->config->property('upgrade-test') and $i>0;
         next if $self->config->dsn->[$i] eq '';
         next if $self->config->dsn->[$i] !~ m{mysql}sio;
         my $metadata_executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
@@ -179,6 +181,8 @@ sub run {
         
         # Guessing the error log file name relative to datadir (lacking safer methods).
         my $datadir_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'datadir'");
+        croak("FATAL ERROR: Failed to retrieve datadir") unless $datadir_result;
+
         my $errorlog;
         foreach my $errorlog_path (
             "../log/master.err",  # MTRv1 regular layout
@@ -216,7 +220,7 @@ sub run {
     my $errorfilter = GenTest::ErrorFilter->new(channel => $self->channel());
     my $errorfilter_p = GenTest::IPC::Process->new(object => $errorfilter);
     if (!osWindows()) {
-        $errorfilter_p->start($self->config->servers);
+        $errorfilter_p->start($self->config->property('upgrade-test') ? [$self->config->servers->[0]] : $self->config->servers);
     }
 
     my $reporter_pid = $self->reportingProcess();
@@ -406,6 +410,7 @@ sub workerProcess {
 
     my @executors;
     foreach my $i (0..2) {
+        last if $self->config->property('upgrade-test') and $i>0;
         next if $self->config->dsn->[$i] eq '';
         my $executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
         $executor->sqltrace($self->config->sqltrace);
@@ -466,17 +471,18 @@ sub workerProcess {
 sub doGenData {
     my $self = shift;
 
-    return STATUS_OK if not defined $self->config->gendata();
     return STATUS_OK if defined $self->config->property('start-dirty');
 
     my $i = -1;
     foreach my $dsn (@{$self->config->dsn}) {
         $i++;
+        last if $self->config->property('upgrade-test') and $i>0;
         next if $dsn eq '';
         my $gendata_result;
-        if ($self->config->gendata eq '') {
-            $gendata_result = GenTest::App::GendataSimple->new(
+        if (defined $self->config->property('gendata-advanced')) {
+            $gendata_result = GenTest::App::GendataAdvanced->new(
                dsn => $dsn,
+               vcols => (defined $self->config->property('vcols') ? ${$self->config->property('vcols')}[$i] : undef),
                views => ${$self->config->views}[$i],
                engine => ${$self->config->engine}[$i],
                sqltrace=> $self->config->sqltrace,
@@ -484,7 +490,22 @@ sub doGenData {
                rows => $self->config->rows,
                varchar_length => $self->config->property('varchar-length')
             )->run();
-        } else {
+        }
+
+        next if not defined $self->config->gendata();
+
+        if ($self->config->gendata eq '') {
+            $gendata_result = GenTest::App::GendataSimple->new(
+               dsn => $dsn,
+               vcols => (defined $self->config->property('vcols') ? ${$self->config->property('vcols')}[$i] : undef),
+               views => ${$self->config->views}[$i],
+               engine => ${$self->config->engine}[$i],
+               sqltrace=> $self->config->sqltrace,
+               notnull => $self->config->notnull,
+               rows => $self->config->rows,
+               varchar_length => $self->config->property('varchar-length')
+            )->run();
+        } elsif (defined $self->config->gendata()) {
             $gendata_result = GenTest::App::Gendata->new(
                spec_file => $self->config->gendata,
                dsn => $dsn,
@@ -611,6 +632,17 @@ sub initReporters {
                 or $self->config->reporters->[$i] eq '';
         }
     }
+    if ($self->config->property('upgrade-test')) {
+        push @{$self->config->reporters}, 'Upgrade';
+    }
+    elsif ($#{$self->config->reporters} > -1) {
+        foreach (@{$self->config->reporters}) {
+            if ($_ eq 'Upgrade') {
+                 say("WARNING: Upgrade reporter is requested, but --upgrade-test option is not set, the behavior is undefined");
+                 last;
+            }
+        }
+    }
 
     say("Reporters: ".($#{$self->config->reporters} > -1 ? join(', ', @{$self->config->reporters}) : "(none)"));
     
@@ -618,6 +650,7 @@ sub initReporters {
     
     # pass option debug server to the reporter, for detecting the binary type.
     foreach my $i (0..2) {
+        last if $self->config->property('upgrade-test') and $i>0;
         next if $self->config->dsn->[$i] eq '';
         foreach my $reporter (@{$self->config->reporters}) {
             my $add_result = $reporter_manager->addReporter($reporter, {

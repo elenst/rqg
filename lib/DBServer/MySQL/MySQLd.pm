@@ -30,6 +30,7 @@ use strict;
 
 use Carp;
 use Data::Dumper;
+use File::Basename qw(dirname);
 use File::Path qw(mkpath rmtree);
 
 use constant MYSQLD_BASEDIR => 0;
@@ -62,6 +63,8 @@ use constant MYSQLD_TMPDIR => 25;
 use constant MYSQLD_CONFIG_CONTENTS => 26;
 use constant MYSQLD_CONFIG_FILE => 27;
 use constant MYSQLD_USER => 28;
+use constant MYSQLD_MAJOR_VERSION => 29;
+use constant MYSQLD_CLIENT_BINDIR => 30;
 
 use constant MYSQLD_PID_FILE => "mysql.pid";
 use constant MYSQLD_ERRORLOG_FILE => "mysql.err";
@@ -149,6 +152,7 @@ sub new {
                                           osWindows()?["client/Debug","client/RelWithDebInfo","client/Release","bin"]:["client","bin"],
                                           osWindows()?"mysqldump.exe":"mysqldump");
 
+    $self->[MYSQLD_CLIENT_BINDIR] = dirname($self->[MYSQLD_DUMPER]);
 
     ## Check for CMakestuff to get hold of source dir:
 
@@ -198,7 +202,6 @@ sub new {
     #                   osWindows()?"libmysql.dll":osMac()?"libmysqlclient.dylib":"libmysqlclient.so");
     
     $self->[MYSQLD_STDOPTS] = ["--basedir=".$self->basedir,
-                               "--datadir=".$self->datadir,
                                $self->_messages,
                                "--character-sets-dir=".$self->[MYSQLD_CHARSETS],
                                "--tmpdir=".$self->tmpdir];    
@@ -219,12 +222,20 @@ sub basedir {
     return $_[0]->[MYSQLD_BASEDIR];
 }
 
+sub clientBindir {
+    return $_[0]->[MYSQLD_CLIENT_BINDIR];
+}
+
 sub sourcedir {
     return $_[0]->[MYSQLD_SOURCEDIR];
 }
 
 sub datadir {
     return $_[0]->[MYSQLD_DATADIR];
+}
+
+sub setDatadir {
+    $_[0]->[MYSQLD_DATADIR] = $_[1];
 }
 
 sub vardir {
@@ -268,6 +279,10 @@ sub socketfile {
 
 sub pidfile {
     return $_[0]->vardir."/".MYSQLD_PID_FILE;
+}
+
+sub pid {
+    return $_[0]->[MYSQLD_SERVERPID];
 }
 
 sub logfile {
@@ -352,6 +367,8 @@ sub createMysqlBase  {
 
     my $boot_options = [$defaults];
     push @$boot_options, @{$self->[MYSQLD_STDOPTS]};
+    push @$boot_options, "--datadir=".$self->datadir; # Could not add to STDOPTS, because datadir could have changed
+
 
     if ($self->_olderThan(5,6,3)) {
         push(@$boot_options,"--loose-skip-innodb --default-storage-engine=MyISAM") ;
@@ -421,6 +438,7 @@ sub startServer {
     my $command = $self->generateCommand([@defaults],
                                          $self->[MYSQLD_STDOPTS],
                                          ["--core-file",
+                                          "--datadir=".$self->datadir,  # Could not add to STDOPTS, because datadir could have changed
                                           "--max-allowed-packet=128Mb",	# Allow loading bigger blobs
                                           "--port=".$self->port,
                                           "--socket=".$self->socketfile,
@@ -434,6 +452,15 @@ sub startServer {
     unlink($self->pidfile);
     
     my $errorlog = $self->vardir."/".MYSQLD_ERRORLOG_FILE;
+
+    # In seconds, timeout for the server to start updating error log
+    # after the server startup command has been launched
+    my $start_wait_timeout= 30;
+
+    # In seconds, timeout for the server to create pid file
+    # after it has started updating the error log
+    # (before the server is considered hanging)
+    my $startup_timeout= 600;
     
     if (osWindows) {
         my $proc;
@@ -469,6 +496,8 @@ sub startServer {
     } else {
         if ($self->[MYSQLD_VALGRIND]) {
             my $val_opt ="";
+            $start_wait_timeout= 60;
+            $startup_timeout= 1200;
             if (defined $self->[MYSQLD_VALGRIND_OPTIONS]) {
                 $val_opt = join(' ',@{$self->[MYSQLD_VALGRIND_OPTIONS]});
             }
@@ -480,18 +509,92 @@ sub startServer {
         if ($self->[MYSQLD_AUXPID]) {
             ## Wait for the pid file to have been created
             my $wait_time = 0.2;
-            my $waits = 0;
-            while (!-f $self->pidfile && $waits < 600) {
+            my $waits= 0;
+            my $errlog_last_update_time= (stat($errorlog))[9] || 0;
+            my $errlog_update= 0;
+            my $pid;
+            my $wait_end= time() + $start_wait_timeout;
+
+            # After we've launched server startup, we'll wait for max $start_wait_timeout seconds
+            # for the server to start updating the error log
+            while (!-f $self->pidfile and time() < $wait_end ) {
                 Time::HiRes::sleep($wait_time);
-                $waits++;
+                $errlog_update= ( (stat($errorlog))[9] > $errlog_last_update_time);
+                last if $errlog_update;
             }
+
+            if (!$errlog_update) {
+                say("ERROR: server has not started updating the error log withing $start_wait_timeout sec. timeout, and has not created pid file");
+                sayFile($self->errorlog);
+                return DBSTATUS_FAILURE;
+            }
+
+            # If we are here, server has started updating the error log. 
+            # It can be doing some lengthy startup before creating the pid file,
+            # but we can already get the pid from the error log record
+            # [Note] <path>/mysqld (mysqld <version>) starting as process <pid> ...
+            # We need the latest line of this kind
+            
+            unless (open(ERRLOG, $self->errorlog)) {
+                say("ERROR: could not open the error log " . $self->errorlog);
+                return DBSTATUS_FAILURE;
+            }
+            # In case the file is being slowly updated (e.g. with valgrind),
+            # and pid is not the first line which was printed (again, as with valgrind),
+            # we don't want to reach the EOF and exit too quickly.
+            # So, first we read the whole file till EOF, and if we haven't found the PID,
+            # we'll wait for the file to be updated further.
+            # TODO: There are still two problems at least:
+            # - if on whatever reason server doesn't print the PID into the error log,
+            #   we'll keep waiting forever;
+            # - if it's not the first start in this error log, so our protection against
+            #   quitting too quickly won't work -- we'll read a wrong (old) PID and will leave.
+            # And of course it won't work on Windows, but the new-style server start is generally
+            # not reliable there and needs to be fixed.
+            
+            for (;;) {
+                while (<ERRLOG>) {
+                    if (/\[Note\]\s+\S+?\/mysqld\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
+                        $pid= $1;
+                    }
+                }
+                last if $pid;
+                sleep 1;
+                seek ERRLOG, 0, 1;    # this clears the EOF flag
+            }
+            close(ERRLOG);
+            unless (defined $pid) {
+                say("ERROR: could not find the pid in the error log");
+                return DBSTATUS_FAILURE;
+            }
+
+            # Now we know the pid and can monitor it along with the pid file,
+            # to avoid unnecessary waiting if the server goes down
+            $wait_end= time() + $startup_timeout;
+            
+            while (!-f $self->pidfile and time() < $wait_end) {
+                Time::HiRes::sleep($wait_time);
+                last unless kill(0, $pid);
+            }
+            
             if (!-f $self->pidfile) {
                 sayFile($self->errorlog);
-                croak("Could not start mysql server, waited ".($waits*$wait_time)." seconds for pid file");
+                if (! kill(0, $pid)) {
+                    say("ERROR: server disappeared after having started with pid $pid");
+                } else {
+                    say("ERROR: timeout $startup_timeout has passed and the server still has not created the pid file, assuming it has hung, sending final SIGABRT to pid $pid...");
+                    kill 'ABRT', $pid;
+                }
+                return DBSTATUS_FAILURE;
             }
+
+            # We should only get here if the pid file was created
             my $pidfile = $self->pidfile;
-            my $pid = `cat \"$pidfile\"`;
-            $pid =~ m/([0-9]+)/;
+            my $pid_from_file = `cat \"$pidfile\"`;
+            $pid_from_file =~ s/.*?([0-9]+).*/$1/;
+            if ($pid != $pid_from_file) {
+                say("WARNING: pid extracted from the error log ($pid) is different from the pid in the pidfile ($pid_from_file). Assuming the latter is correct");
+            }
             $self->[MYSQLD_SERVERPID] = int($1);
         } else {
             exec("$command >> \"$errorlog\"  2>&1") || croak("Could not start mysql server");
@@ -761,6 +864,18 @@ sub version {
         $self->[MYSQLD_VERSION] = $ver;
     }
     return $self->[MYSQLD_VERSION];
+}
+
+sub majorVersion {
+    my($self) = @_;
+
+    if (not defined $self->[MYSQLD_MAJOR_VERSION]) {
+        my $ver= $self->version;
+        if ($ver =~ /(\d+\.\d+)/) {
+            $self->[MYSQLD_MAJOR_VERSION]= $ver;
+        }
+    }
+    return $self->[MYSQLD_MAJOR_VERSION];
 }
 
 sub printInfo {
