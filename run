@@ -1,0 +1,22 @@
+#!/bin/sh
+
+if [ $# -lt 2 ]
+then
+  echo
+  echo "  Usage:"
+  echo "  . ./run <basedir> <vardir>"
+  echo
+else
+  perl ./runall-new.pl \
+--threads=1 \
+--duration=600 \
+--queries=100M \
+--grammar=mdev11779.yy \
+--skip-gendata \
+--gendata-advanced  \
+--reporters=Backtrace,CrashRestart \
+--restart-timeout=20 \
+--engine=MyISAM \
+--basedir=$1 \
+--vardir=$2
+fi
