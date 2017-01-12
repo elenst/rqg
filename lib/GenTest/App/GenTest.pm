@@ -491,6 +491,9 @@ sub doGenData {
                varchar_length => $self->config->property('varchar-length')
             )->run();
         }
+
+        next if not defined $self->config->gendata();
+
         if ($self->config->gendata eq '') {
             $gendata_result = GenTest::App::GendataSimple->new(
                dsn => $dsn,
