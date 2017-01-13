@@ -55,6 +55,9 @@ my $vardir;
 sub report {
     my $reporter = shift;
     
+    my $upgrade_mode= $reporter->properties->property('upgrade-test');
+    say("The test will perform server upgrade in '".$upgrade_mode."' mode");
+
     # If the test run is not properly configured, the module can be 
     # called more than once. Produce an error if it happens
     
@@ -102,21 +105,32 @@ sub report {
     # Save the major version of the old server
     my $major_version_old= $server->majorVersion;
     
-    say("Shutting down the old server...");
-
     $pid= $server->pid();
-    kill(15, $pid);
 
-    foreach (1..60) {
-        last if not kill(0, $pid);
-        sleep 1;
+    if ($upgrade_mode eq 'normal')
+    {
+        say("Shutting down the old server...");
+        kill(15, $pid);
+        foreach (1..60) {
+            last if not kill(0, $pid);
+            sleep 1;
+        }
+    }
+    else
+    {
+        say("Killing the old server...");
+        kill(9, $pid);
+        foreach (1..60) {
+            last if not kill(0, $pid);
+            sleep 1;
+        }
     }
     if (kill(0, $pid)) {
-        say("ERROR: could not shut down the old server with pid $pid; sending SIGBART to get a stack trace");
+        say("ERROR: could not shut down/kill the old server with pid $pid; sending SIGBART to get a stack trace");
         kill('ABRT', $pid);
         return STATUS_SERVER_DEADLOCKED;
     } else {
-        say("Old server with pid $pid has been shut down");
+        say("Old server with pid $pid has been shut down/killed");
     }
 
     my $datadir = $server->datadir;

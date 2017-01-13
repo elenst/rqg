@@ -79,7 +79,6 @@ my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
     $restart_timeout, $gendata_advanced, $upgrade_test);
 
 my $gendata=''; ## default simple gendata
-
 my $genconfig=''; # if template is not set, the server will be run with --no-defaults
 
 my $threads = my $default_threads = 10;
@@ -173,8 +172,8 @@ my $opt_result = GetOptions(
     'use_gtid=s' => \$use_gtid,
     'annotate_rules' => \$annotate_rules,
     'annotate-rules' => \$annotate_rules,
-    'upgrade-test' => \$upgrade_test,
-    'upgrade_test' => \$upgrade_test
+    'upgrade-test:s' => \$upgrade_test,
+    'upgrade_test:s' => \$upgrade_test
 );
 
 if (defined $logfile && defined $logger) {
@@ -461,7 +460,12 @@ if ($rpl_mode ne '') {
         $i++;
     }
 
-} elsif ($upgrade_test) {
+} elsif (defined $upgrade_test) {
+
+    # There are 'normal' and 'crash' modes.
+    # 'normal' will be used by default
+    $upgrade_test= 'normal' if $upgrade_test !~ /crash/i;
+    $upgrade_test= lc($upgrade_test);
 
     # server0 is the "old" server (before upgrade).
     # We will initialize and start it now
@@ -703,7 +707,7 @@ $gentestProps->property('multi-master', 1) if (defined $galera and scalar(@dsns)
 $gentestProps->debug_server(\@debug_server) if @debug_server;
 $gentestProps->servers(\@server) if @server;
 $gentestProps->property('annotate-rules',$annotate_rules) if defined $annotate_rules;
-$gentestProps->property('upgrade-test',1) if $upgrade_test;
+$gentestProps->property('upgrade-test',$upgrade_test) if $upgrade_test;
 
 
 # Push the number of "worker" threads into the environment.
