@@ -202,6 +202,8 @@ sub report {
         return $upgrade_status;
     } elsif ($server->majorVersion eq $major_version_old) {
         say("New server started successfully after the minor upgrade");
+    } elsif ($reporter->serverVariable('innodb_read_only')) {
+        say("New server is running with innodb_read_only=1, skipping mysql_upgrade");
     } else {
         my $mysql_upgrade= $server->clientBindir.'/'.(osWindows() ? 'mysql_upgrade.exe' : 'mysql_upgrade');
         say("New server started successfully after the major upgrade, running mysql_upgrade now using the command:");
