@@ -555,7 +555,7 @@ sub startServer {
                 sayFile($errorlog);
                 return DBSTATUS_FAILURE;
             }
-            
+
             if (!$pid)
             {
                 # If we are here, server has started updating the error log. 
@@ -585,7 +585,7 @@ sub startServer {
                 
                 TAIL:
                 for (;;) {
-                    while (!eof($errlog_fh)) {
+                    do {
                         $_= readline $errlog_fh;
                         if (/\[Note\]\s+\S+?\/mysqld\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
                             $pid= $1;
@@ -594,7 +594,7 @@ sub startServer {
                         elsif (! /^== /) {
                             last TAIL;
                         }
-                    }
+                    } until (eof($errlog_fh));
                     sleep 1;
                     seek ERRLOG, 0, 1;    # this clears the EOF flag
                 }
