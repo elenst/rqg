@@ -165,6 +165,7 @@ sub report {
     # check for critical errors in the log (e.g. server crashed or
     # an engine cannot initialize)
 
+    my @errors = ();
     open(UPGRADE, $errorlog);
 
     while (<UPGRADE>) {
@@ -184,6 +185,11 @@ sub report {
             ($_ =~ m{exception}sio)
         ) {
             $upgrade_status = STATUS_UPGRADE_FAILURE;
+        } elsif (
+            ($_ =~ m{[ERROR] InnoDB:}sio)
+        ) {
+            $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status == STATUS_OK;
+            push @errors, $_;
         }
     }
 
@@ -197,7 +203,12 @@ sub report {
         }
     }
 
-    if ($upgrade_status != STATUS_OK) {
+    if ($upgrade_status == STATUS_POSSIBLE_FAILURE) {
+        say("WARNING: Upgrade produced suspicious messages (see below), but we will allow it to continue");
+        say("---ERRORS-------------------------");
+        foreach(@errors) { say($_) };
+        say("----------------------------------");
+    } elsif ($upgrade_status != STATUS_OK) {
         say("ERROR: Upgrade has apparently failed.");
         return $upgrade_status;
     } elsif ($server->majorVersion eq $major_version_old) {
