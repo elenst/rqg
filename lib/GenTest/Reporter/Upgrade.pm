@@ -173,8 +173,7 @@ sub report {
         $_ =~ s{[\r\n]}{}siog;
         if (
             ($_ =~ m{\[ERROR\]}sio) ||
-            ($_ =~ m{InnoDB:\s+Error:}sio) ||
-            ($_ =~ m{^InnoDB:}sio)
+            ($_ =~ m{InnoDB:\s+Error:}sio)
         ) {
             push @errors, $_;
             # InnoDB errors are likely to mean something nasty,
@@ -233,11 +232,11 @@ sub report {
         say("New server started successfully after the major upgrade, running mysql_upgrade now using the command:");
         my $cmd= "\"$mysql_upgrade\" --host=127.0.0.1 --port=".$server->port." --user=root --password=''";
         say($cmd);
-        $upgrade_status = system("$cmd");
-        if ($upgrade_status != STATUS_OK) {
+        my $res= system("$cmd");
+        if ($res != STATUS_OK) {
             say("ERROR: mysql_upgrade has failed");
             sayFile($errorlog);
-            return $upgrade_status;
+            return $res;
         }
         say("mysql_upgrade has finished successfully, now the server should be ready to work");
     }
@@ -269,7 +268,8 @@ sub report {
     # Phase 3 - dump the server again and compare dumps
     #
     dump_database($reporter,$server,$dbh,'new');
-    return compare_dumps();
+    my $res= compare_dumps();
+    return ($upgrade_status > $res ? $upgrade_status : $res);
 }
     
     
