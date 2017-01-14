@@ -171,7 +171,19 @@ sub report {
 
     while (<UPGRADE>) {
         $_ =~ s{[\r\n]}{}siog;
-        push @errors, $_ if ($_ =~ m{\[ERROR\]}sio);
+        if (
+            ($_ =~ m{\[ERROR\]}sio) ||
+            ($_ =~ m{InnoDB:\s+Error:}sio) ||
+            ($_ =~ m{^InnoDB:}sio)
+        ) {
+            push @errors, $_;
+            # InnoDB errors are likely to mean something nasty,
+            # so we'll raise the flag
+            if ($_ =~ m{InnoDB}so) {
+                $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status == STATUS_OK;
+            }
+        }
+
         if ($_ =~ m{registration as a STORAGE ENGINE failed.}sio) {
             $upgrade_status = STATUS_UPGRADE_FAILURE;
         } elsif ($_ =~ m{ready for connections}sio) {
@@ -186,10 +198,6 @@ sub report {
             ($_ =~ m{exception}sio)
         ) {
             $upgrade_status = STATUS_UPGRADE_FAILURE;
-        } elsif (
-            ($_ =~ m{\[ERROR\]\s+InnoDB:}sio)
-        ) {
-            $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status == STATUS_OK;
         }
     }
 
@@ -201,20 +209,22 @@ sub report {
         say("----------------------------------");
     }
 
-    if ($upgrade_status == STATUS_OK) {
-        $dbh = DBI->connect($server->dsn);
-        if (not defined $dbh) {
-            say("ERROR: Could not connect to the new server after upgrade");
-            $upgrade_status= STATUS_UPGRADE_FAILURE;
+    if ($upgrade_status != STATUS_OK) {
+        if ($upgrade_status == STATUS_POSSIBLE_FAILURE) {
+            say("WARNING: Upgrade produced suspicious messages (see above), but we will allow it to continue");
+        } else {
+            say("ERROR: Upgrade has apparently failed.");
+            return $upgrade_status;
         }
     }
 
-    if ($upgrade_status == STATUS_POSSIBLE_FAILURE) {
-        say("WARNING: Upgrade produced suspicious messages (see above), but we will allow it to continue");
-    } elsif ($upgrade_status != STATUS_OK) {
-        say("ERROR: Upgrade has apparently failed.");
-        return $upgrade_status;
-    } elsif ($server->majorVersion eq $major_version_old) {
+    $dbh = DBI->connect($server->dsn);
+    if (not defined $dbh) {
+        say("ERROR: Could not connect to the new server after upgrade");
+        return STATUS_UPGRADE_FAILURE;
+    }
+
+    if ($server->majorVersion eq $major_version_old) {
         say("New server started successfully after the minor upgrade");
     } elsif ($reporter->serverVariable('innodb_read_only')) {
         say("New server is running with innodb_read_only=1, skipping mysql_upgrade");
