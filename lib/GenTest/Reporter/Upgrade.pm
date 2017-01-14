@@ -165,12 +165,13 @@ sub report {
     # check for critical errors in the log (e.g. server crashed or
     # an engine cannot initialize)
 
-    my @errors = ();
+    my @errors= ();
+
     open(UPGRADE, $errorlog);
 
     while (<UPGRADE>) {
         $_ =~ s{[\r\n]}{}siog;
-        say($_) if ($_ =~ m{\[ERROR\]}sio);
+        push @errors, $_ if ($_ =~ m{\[ERROR\]}sio);
         if ($_ =~ m{registration as a STORAGE ENGINE failed.}sio) {
             $upgrade_status = STATUS_UPGRADE_FAILURE;
         } elsif ($_ =~ m{ready for connections}sio) {
@@ -186,14 +187,19 @@ sub report {
         ) {
             $upgrade_status = STATUS_UPGRADE_FAILURE;
         } elsif (
-            ($_ =~ m{[ERROR] InnoDB:}sio)
+            ($_ =~ m{\[ERROR\]\s+InnoDB:}sio)
         ) {
             $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status == STATUS_OK;
-            push @errors, $_;
         }
     }
 
     close(UPGRADE);
+
+    if (@errors) {
+        say("-- ERRORS IN THE LOG -------------");
+        foreach(@errors) { say($_) };
+        say("----------------------------------");
+    }
 
     if ($upgrade_status == STATUS_OK) {
         $dbh = DBI->connect($server->dsn);
@@ -204,10 +210,7 @@ sub report {
     }
 
     if ($upgrade_status == STATUS_POSSIBLE_FAILURE) {
-        say("WARNING: Upgrade produced suspicious messages (see below), but we will allow it to continue");
-        say("---ERRORS-------------------------");
-        foreach(@errors) { say($_) };
-        say("----------------------------------");
+        say("WARNING: Upgrade produced suspicious messages (see above), but we will allow it to continue");
     } elsif ($upgrade_status != STATUS_OK) {
         say("ERROR: Upgrade has apparently failed.");
         return $upgrade_status;
