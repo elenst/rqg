@@ -334,6 +334,13 @@ sub addServerOptions {
     push(@{$self->[MYSQLD_SERVER_OPTIONS]}, @$opts);
 }
 
+sub printServerOptions {
+    my $self = shift;
+    foreach (@{$self->[MYSQLD_SERVER_OPTIONS]}) {
+        say("    $_");
+    }
+}
+
 sub createMysqlBase  {
     my ($self) = @_;
     

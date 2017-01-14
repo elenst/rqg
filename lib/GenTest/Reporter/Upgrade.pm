@@ -57,6 +57,13 @@ sub report {
     
     my $upgrade_mode= $reporter->properties->property('upgrade-test');
     say("The test will perform server upgrade in '".$upgrade_mode."' mode");
+    say("-- Old server info: --");
+    say($reporter->properties->servers->[0]->version());
+    $reporter->properties->servers->[0]->printServerOptions();
+    say("-- New server info: --");
+    say($reporter->properties->servers->[1]->version());
+    $reporter->properties->servers->[1]->printServerOptions();
+    say("----------------------");
 
     # If the test run is not properly configured, the module can be 
     # called more than once. Produce an error if it happens
