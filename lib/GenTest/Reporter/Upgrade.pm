@@ -109,6 +109,8 @@ sub report {
     
     dump_database($reporter,$server,$dbh,'old');
 
+#    sleep(10);
+
     # Save the major version of the old server
     my $major_version_old= $server->majorVersion;
     
@@ -233,7 +235,7 @@ sub report {
 
     if ($server->majorVersion eq $major_version_old) {
         say("New server started successfully after the minor upgrade");
-    } elsif ($reporter->serverVariable('innodb_read_only')) {
+    } elsif ($server->serverVariable('innodb_read_only') and (uc($server->serverVariable('innodb_read_only')) eq 'ON' or $server->serverVariable('innodb_read_only') eq '1') ) {
         say("New server is running with innodb_read_only=1, skipping mysql_upgrade");
     } else {
         my $mysql_upgrade= $server->clientBindir.'/'.(osWindows() ? 'mysql_upgrade.exe' : 'mysql_upgrade');
@@ -244,7 +246,7 @@ sub report {
         if ($res != STATUS_OK) {
             say("ERROR: mysql_upgrade has failed");
             sayFile($errorlog);
-            return $res;
+            return STATUS_UPGRADE_FAILURE;
         }
         say("mysql_upgrade has finished successfully, now the server should be ready to work");
     }
