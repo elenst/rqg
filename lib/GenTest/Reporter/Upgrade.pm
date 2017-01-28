@@ -46,6 +46,7 @@ use Data::Dumper;
 use IPC::Open2;
 use File::Copy;
 use POSIX;
+use GenTest::Reporter::Backtrace;
 
 use DBServer::MySQL::MySQLd;
 
@@ -164,6 +165,7 @@ sub report {
 
     if ($upgrade_status != STATUS_OK) {
         say("ERROR: New server failed to start");
+        GenTest::Reporter::Backtrace::report($reporter);
         return STATUS_UPGRADE_FAILURE;
     }
     
@@ -279,6 +281,7 @@ sub report {
     #
     dump_database($reporter,$server,$dbh,'new');
     my $res= compare_dumps();
+    GenTest::Reporter::Backtrace::report($reporter);
     return ($upgrade_status > $res ? $upgrade_status : $res);
 }
     
