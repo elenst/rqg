@@ -36,14 +36,18 @@ sub report {
 }
 
 sub nativeReport {
-	my $reporter = shift;
+    my ($reporter, $type) = @_;
+
+    # $type is REPORTER_TYPE_SUCCESS, REPORTER_TYPE_CRASH, etc.
+    # We want to search for coredump anyway, but we'll only warn about
+    # their absence if a crash occurred.
 
 	my $datadir = $reporter->serverVariable('datadir');
 	say("datadir is $datadir");
 
 	my $binary = $reporter->serverInfo('binary');
 	say("binary is $binary");
-	
+
 	my $bindir = $reporter->serverInfo('bindir');
 	say("bindir is $bindir");
 
@@ -52,13 +56,21 @@ sub nativeReport {
 	$core = </cores/core.$pid> if $^O eq 'darwin';
 	$core = <$datadir/vgcore*> if defined $reporter->properties->valgrind;
 	$core = File::Spec->rel2abs($core);
-	(-f $core) ? say("core is $core") : say("WARNING: Core file not found!");
+
+	if (-f $core) {
+        say("core is $core")
+    } else {
+        if ($type & REPORTER_TYPE_CRASH) {
+            say("WARNING: Core file not found!");
+        }
+        return STATUS_OK;
+    }
 
 	my @commands;
 
 	if (osWindows()) {
 		$bindir =~ s{/}{\\}sgio;
-		my $cdb_cmd = "!sym prompts off; !analyze -v; .ecxr; !for_each_frame dv /t;~*k;q";		
+		my $cdb_cmd = "!sym prompts off; !analyze -v; .ecxr; !for_each_frame dv /t;~*k;q";
 		push @commands, 'cdb -i "'.$bindir.'" -y "'.$bindir.';srv*C:\\cdb_symbols*http://msdl.microsoft.com/download/symbols" -z "'.$datadir.'\mysqld.dmp" -lines -c "'.$cdb_cmd.'"';
     } elsif (osSolaris()) {
         ## We don't want to run gdb on solaris since it may core-dump
@@ -73,7 +85,6 @@ sub nativeReport {
         `echo | dbx - $core 2>&1` =~ m/Corefile specified executable: "([^"]+)"/;
         if ($1) {
             ## We do apparently have a working dbx
-            
             # First, identify all threads
             my @threads = `echo threads | dbx $binary $core 2>&1` =~ m/t@\d+/g;
 
@@ -98,7 +109,7 @@ sub nativeReport {
 		push @commands, "gdb --batch --se=$binary --core=$core --command=backtrace.gdb";
 		push @commands, "gdb --batch --se=$binary --core=$core --command=backtrace-all.gdb";
 	}
-	
+
 	my @debugs;
 
 	foreach my $command (@commands) {
@@ -126,7 +137,7 @@ sub callbackReport {
 }
 
 sub type {
-	return REPORTER_TYPE_CRASH | REPORTER_TYPE_DEADLOCK;
+	return REPORTER_TYPE_ALWAYS;
 }
 
 1;
