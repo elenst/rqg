@@ -113,6 +113,7 @@ sub report {
 
     # Save the major version of the old server
     my $major_version_old= $server->majorVersion;
+    my $version_numeric_old= $server->versionNumeric();
     
     $pid= $server->pid();
 
@@ -278,6 +279,10 @@ sub report {
     # Phase 3 - dump the server again and compare dumps
     #
     dump_database($reporter,$server,$dbh,'new');
+
+    my $version_numeric_new= $server->versionNumeric();
+    normalize_dumps($version_numeric_old,$version_numeric_new);
+
     my $res= compare_dumps();
     return ($upgrade_status > $res ? $upgrade_status : $res);
 }
@@ -334,6 +339,34 @@ sub compare_dumps {
 		say("No differences were found between old and new server contents.");
     }
     return $status;
+}
+
+# There are some known expected differences in dump structure between versions.
+# We need to normalize the dumps to avoid false positives
+sub normalize_dumps {
+    my ($old_ver,$new_ver) = @_;
+
+    # In 10.2 SHOW CREATE TABLE output changed:
+    # - blob and text columns got the "DEFAULT" clause;
+    # - default numeric values lost single quote marks
+    # Let's update pre-10.2 dumps to match it
+
+    if ($old_ver le '100201' and $new_ver ge '100201') {
+        move("$vardir/server_schema_old.dump","$vardir/server_schema_old.dump.orig");
+        open(DUMP1,"$vardir/server_schema_old.dump.orig");
+        open(DUMP2,">$vardir/server_schema_old.dump");
+        while (<DUMP1>) {
+            # `k` int(10) unsigned NOT NULL DEFAULT '0' => `k` int(10) unsigned NOT NULL DEFAULT 0
+            s/(DEFAULT\s+)\'(\d+)\'(,?)$/${1}${2}${3}/;
+            # `col_blob` blob NOT NULL => `col_blob` blob NOT NULL DEFAULT '',
+            s/(\s+(?:blob|text|mediumblob|mediumtext|longblob|longtext|tinyblob|tinytext)(\s+)NOT\sNULL)(,)?$/${1}${2}DEFAULT${2}\'\'${3}/;
+            # `col_blob` text => `col_blob` text DEFAULT NULL,
+            s/(\s)(blob|text|mediumblob|mediumtext|longblob|longtext|tinyblob|tinytext)(,)?$/${1}${2}${1}DEFAULT${1}NULL${3}/;
+            print DUMP2 $_;
+        }
+        close(DUMP1);
+        close(DUMP2);
+    }
 }
 
 sub type {
