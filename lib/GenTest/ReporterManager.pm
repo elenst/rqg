@@ -60,7 +60,7 @@ sub report {
 
 	foreach my $reporter (@{$manager->reporters()}) {
 		if ($reporter->type() & $desired_type) {
-			my @reporter_results = $reporter->report();
+			my @reporter_results = $reporter->report($desired_type);
 			my $reporter_result = shift @reporter_results;
 			push @incidents, @reporter_results if $#reporter_results > -1;
 			$max_result = $reporter_result if $reporter_result > $max_result;
