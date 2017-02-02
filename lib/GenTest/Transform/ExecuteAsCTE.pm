@@ -85,7 +85,8 @@ my $parens_template =
 # either a simple fragment without brackets
 # or something in round brackets
 #my $part_select_template = qr{[^()]+|$parens_template}xi;
-my $part_select_template = qr{$parens_template|$comment_template|$single_quotes_template|$double_quotes_template|[^();'"$comment_boundaries]+|;}xi;
+#my $part_select_template = qr{$parens_template|$comment_template|$single_quotes_template|$double_quotes_template|[^();'"$comment_boundaries]+|;}xi;
+my $part_select_template = qr{$parens_template|$comment_template|$single_quotes_template|$double_quotes_template|[^();'"]+|;}xi;
 
 sub convert_selects_to_cte 
 {
@@ -102,6 +103,11 @@ sub convert_selects_to_cte
         # Token here is either a part of the query without brackets, 
         # or something in round brackets
         my $token = $1;
+
+        # Remove extra brackets (e.g. ((SELECT 1)) and such).
+        # MDEV-10060 makes them a syntax error, and in general they are not needed
+        if ($token =~ /\(\s*\(.*\)\s*\)/) { say "HERE: suspect for double brackets: $token" };
+        while ($token =~ s/\(($parens_template)\)/$1/g) {};
 
         # If the fragment starts with SELECT, we'll start collecting the complete SELECT
         # (we assume there had been no CTEs before transformation, 
