@@ -189,7 +189,10 @@ sub report {
             # InnoDB errors are likely to mean something nasty,
             # so we'll raise the flag;
             # but ignore erros about innodb_table_stats at this point
-            if ($_ =~ m{InnoDB}so and $_ !~ m{innodb_table_stats}so) {
+            if ($_ =~ m{InnoDB}so
+                and $_ !~ m{innodb_table_stats}so
+                and $_ !~ m{ib_buffer_pool' for reading: No such file or directory}so
+            ) {
                 $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status == STATUS_OK;
             }
         }
