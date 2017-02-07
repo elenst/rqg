@@ -361,8 +361,12 @@ sub normalize_dumps {
         while (<DUMP1>) {
             # `k` int(10) unsigned NOT NULL DEFAULT '0' => `k` int(10) unsigned NOT NULL DEFAULT 0
             s/(DEFAULT\s+)\'(\d+)\'(,?)$/${1}${2}${3}/;
+
             # `col_blob` blob NOT NULL => `col_blob` blob NOT NULL DEFAULT '',
-            s/(\s+(?:blob|text|mediumblob|mediumtext|longblob|longtext|tinyblob|tinytext)(\s+)NOT\sNULL)(,)?$/${1}${2}DEFAULT${2}\'\'${3}/;
+            # This part is conditional, see MDEV-12006. For upgrade from 10.1, a text column does not get a default value
+            if ($old_ver lt '100101') {
+                s/(\s+(?:blob|text|mediumblob|mediumtext|longblob|longtext|tinyblob|tinytext)(\s+)NOT\sNULL)(,)?$/${1}${2}DEFAULT${2}\'\'${3}/;
+            }
             # `col_blob` text => `col_blob` text DEFAULT NULL,
             s/(\s)(blob|text|mediumblob|mediumtext|longblob|longtext|tinyblob|tinytext)(,)?$/${1}${2}${1}DEFAULT${1}NULL${3}/;
             print DUMP2 $_;
