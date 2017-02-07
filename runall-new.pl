@@ -773,6 +773,8 @@ sub stopServers {
     say("Stopping server(s)...");
     if ($rpl_mode ne '') {
         $rplsrv->stopServer($status);
+    } elsif (defined $upgrade_test) {
+        $server[1]->stopServer;
     } else {
         foreach my $srv (@server) {
             if ($srv) {
