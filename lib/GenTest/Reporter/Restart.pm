@@ -47,7 +47,7 @@ sub monitor {
 	# Do not restart in the first 20 seconds after the test flow started
 	return STATUS_OK if (time() < $reporter->reporterStartTime() + 20);
 
-	my $server = $reporter->properties->servers->[0];
+	my $server = $reporter->properties->servers->[1];
 	my $status;
 	my $vardir = $server->vardir();
 	my $datadir = $server->datadir();
@@ -55,7 +55,7 @@ sub monitor {
 
 	# First, check that the server is still available 
 	# (or it might happen that it crashed on its own, and by restarting it we will hide the problem)
-	my $dbh = DBI->connect($reporter->dsn());
+	my $dbh = DBI->connect($server->dsn());
 
 	unless ($dbh) {
 		say("Restart reporter: ERROR: Could not connect to the server before shutdown. Status will be set to STATUS_SERVER_CRASHED");
@@ -64,17 +64,20 @@ sub monitor {
 
 	say("Restart reporter: Shutting down the server ...");
 	$status = $server->stopServer();
-	my $pid = $reporter->serverInfo('pid');
+	my $pid = $server->serverpid();
 
 	foreach (1..30) {
 		last if not kill(0, $pid);
 		sleep 1;
 	}
-	$dbh = DBI->connect($reporter->dsn(),'','',{PrintError=>0}) ;
+	$dbh = DBI->connect($server->dsn(),'','',{PrintError=>0}) ;
 	if ($dbh) {
 		say("Restart reporter: ERROR: Still can connect to the server, shutdown failed. Status will be set to ENVIRONMENT_FAILURE");
 		return STATUS_ENVIRONMENT_FAILURE;
 	}
+    
+#    # TODO: REMOVE!!!!
+    system("chmod 400 $datadir/*.index");
 
 	say("Restart reporter: Restarting the server ...");
 	my $status = $server->startServer();
@@ -84,7 +87,7 @@ sub monitor {
 		return $status;
 	}
 
-	$dbh = DBI->connect($reporter->dsn());
+	$dbh = DBI->connect($server->dsn());
 
 	unless ($dbh) {
 		say("Restart reporter: ERROR: Could not connect to the restarted server. Status will be set to ENVIRONMENT_FAILURE");

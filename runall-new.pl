@@ -2,7 +2,7 @@
 
 # Copyright (c) 2010, 2012, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab
-# Copyright (C) 2016 MariaDB Corporatin Ab
+# Copyright (c) 2017, MariaDB Corporation Ab
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -24,6 +24,7 @@
 use lib 'lib';
 use lib "$ENV{RQG_HOME}/lib";
 use Carp;
+use Switch;
 use strict;
 use GenTest;
 use GenTest::BzrInfo;
@@ -41,42 +42,42 @@ eval
 {
     require Log::Log4perl;
     Log::Log4perl->import();
-    $logger = Log::Log4perl->get_logger('randgen.gentest');
+    $logger= Log::Log4perl->get_logger('randgen.gentest');
 };
 
 $| = 1;
 if (osWindows()) {
-    $SIG{CHLD} = "IGNORE";
+    $SIG{CHLD}= "IGNORE";
 }
 
 if (defined $ENV{RQG_HOME}) {
     if (osWindows()) {
-        $ENV{RQG_HOME} = $ENV{RQG_HOME}.'\\';
+        $ENV{RQG_HOME}= $ENV{RQG_HOME}.'\\';
     } else {
-        $ENV{RQG_HOME} = $ENV{RQG_HOME}.'/';
+        $ENV{RQG_HOME}= $ENV{RQG_HOME}.'/';
     }
 }
 
 use Getopt::Long;
+Getopt::Long::Configure("pass_through");
 use GenTest::Constants;
 use DBI;
 use Cwd;
 
-my $database = 'test';
-my $user = 'rqg';
-my @dsns;
+my $database= 'test';
+my $user= 'rqg';
 
-my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
+my ($gendata, $rpl_mode,
     @engine, $help, $debug, @validators, @reporters, @transformers, 
-    $grammar_file, $skip_recursive_rules,
+    $skip_recursive_rules,
     @redefine_files, $seed, $mask, $mask_level, $mem, $rows,
-    $varchar_len, $xml_output, $valgrind, @valgrind_options, @vcols, @views,
+    $varchar_len, $xml_output, $valgrind, @valgrind_options,
     $start_dirty, $filter, $build_thread, $sqltrace, $testname,
     $report_xml_tt, $report_xml_tt_type, $report_xml_tt_dest,
     $notnull, $logfile, $logconf, $report_tt_logdir, $querytimeout, $no_mask,
     $short_column_names, $strict_fields, $freeze_time, $wait_debugger, @debug_server,
     $skip_gendata, $skip_shutdown, $galera, $use_gtid, $genconfig, $annotate_rules,
-    $restart_timeout, $gendata_advanced, $upgrade_test);
+    $restart_timeout, $gendata_advanced, $upgrade_test, $rpl_topology);
 
 my $gendata=''; ## default simple gendata
 my $genconfig=''; # if template is not set, the server will be run with --no-defaults
@@ -87,35 +88,10 @@ my $duration = my $default_duration = 3600;
 
 my @ARGV_saved = @ARGV;
 
-my $opt_result = GetOptions(
-    'mysqld=s@' => \$mysqld_options[0],
-    'mysqld1=s@' => \$mysqld_options[1],
-    'mysqld2=s@' => \$mysqld_options[2],
-    'mysqld3=s@' => \$mysqld_options[3],
-    'basedir=s' => \$basedirs[0],
-    'basedir1=s' => \$basedirs[1],
-    'basedir2=s' => \$basedirs[2],
-    'basedir3=s' => \$basedirs[3],
-    #'basedir=s@' => \@basedirs,
-    'vardir=s' => \$vardirs[0],
-    'vardir1=s' => \$vardirs[1],
-    'vardir2=s' => \$vardirs[2],
-    'vardir3=s' => \$vardirs[3],
-    'debug-server' => \$debug_server[0],
-    'debug-server1' => \$debug_server[1],
-    'debug-server2' => \$debug_server[2],
-    'debug-server3' => \$debug_server[3],
-    #'vardir=s@' => \@vardirs,
-    'rpl_mode=s' => \$rpl_mode,
-    'rpl-mode=s' => \$rpl_mode,
-    'engine=s' => \$engine[0],
-    'engine1=s' => \$engine[1],
-    'engine2=s' => \$engine[2],
-    'engine3=s' => \$engine[3],
-    'grammar=s' => \$grammar_file,
+GetOptions(
+    'rpl_mode|rpl-mode=s' => \$rpl_mode,
     'skip-recursive-rules' > \$skip_recursive_rules,
     'redefine=s@' => \@redefine_files,
-    'threads=i' => \$threads,
     'queries=s' => \$queries,
     'duration=i' => \$duration,
     'help' => \$help,
@@ -124,9 +100,8 @@ my $opt_result = GetOptions(
     'reporters=s@' => \@reporters,
     'transformers=s@' => \@transformers,
     'gendata:s' => \$gendata,
-    'gendata_advanced' => \$gendata_advanced,
-    'gendata-advanced' => \$gendata_advanced,
-    'skip-gendata' => \$skip_gendata,
+    'gendata_advanced|gendata-advanced' => \$gendata_advanced,
+    'skip_gendata|skip-gendata' => \$skip_gendata,
     'genconfig:s' => \$genconfig,
     'notnull' => \$notnull,
     'short_column_names' => \$short_column_names,
@@ -137,26 +112,18 @@ my $opt_result = GetOptions(
     'mask-level=i' => \$mask_level,
     'mem' => \$mem,
     'rows=s' => \$rows,
+    'rpl_topology|rpl-topology|rpl=s' => \$rpl_topology,
     'varchar-length=i' => \$varchar_len,
     'xml-output=s'    => \$xml_output,
     'report-xml-tt'    => \$report_xml_tt,
     'report-xml-tt-type=s' => \$report_xml_tt_type,
     'report-xml-tt-dest=s' => \$report_xml_tt_dest,
-    'restart_timeout=i' => \$restart_timeout,
-    'restart-timeout=i' => \$restart_timeout,
+    'restart_timeout|restart-timeout=i' => \$restart_timeout,
     'testname=s'        => \$testname,
     'valgrind!'    => \$valgrind,
     'valgrind_options=s@'    => \@valgrind_options,
-    'vcols:s'        => \$vcols[0],
-    'vcols1:s'        => \$vcols[1],
-    'vcols2:s'        => \$vcols[2],
-    'vcols3:s'        => \$vcols[3],
-    'views:s'        => \$views[0],
-    'views1:s'        => \$views[1],
-    'views2:s'        => \$views[2],
-    'views3:s'        => \$views[3],
-    'wait-for-debugger' => \$wait_debugger,
-    'start-dirty'    => \$start_dirty,
+    'wait_for_debugger|wait-for-debugger' => \$wait_debugger,
+    'start_dirty|start-dirty'    => \$start_dirty,
     'filter=s'    => \$filter,
     'mtr-build-thread=i' => \$build_thread,
     'sqltrace:s' => \$sqltrace,
@@ -165,16 +132,19 @@ my $opt_result = GetOptions(
     'report-tt-logdir=s' => \$report_tt_logdir,
     'querytimeout=i' => \$querytimeout,
     'no-mask' => \$no_mask,
-    'skip_shutdown' => \$skip_shutdown,
-    'skip-shutdown' => \$skip_shutdown,
+    'skip_shutdown|skip-shutdown' => \$skip_shutdown,
     'galera=s' => \$galera,
     'use-gtid=s' => \$use_gtid,
     'use_gtid=s' => \$use_gtid,
-    'annotate_rules' => \$annotate_rules,
-    'annotate-rules' => \$annotate_rules,
-    'upgrade-test:s' => \$upgrade_test,
-    'upgrade_test:s' => \$upgrade_test
+    'annotate_rules|annotate-rules' => \$annotate_rules,
+    'upgrade_test|upgrade-test:s' => \$upgrade_test,
 );
+
+if ($help) {
+    help();
+    exit 0;
+}
+
 
 if (defined $logfile && defined $logger) {
     setLoggingToFile($logfile);
@@ -184,23 +154,64 @@ if (defined $logfile && defined $logger) {
     }
 }
 
-if ($help) {
-    help();
-    exit 0;
+# Now @ARGV should only contain options which relate to multiple servers,
+# as described below
+
+# We can have arbitrary number of servers.
+# For each array, x[0] stands is default, and x[N] where N>0 belongs
+# to the corresponging server
+my @basedirs= ();
+my @debug_servers= (); # TODO: remind me, what is it?
+my @engines= ();
+my @grammars= ();
+my @mysqld_options= (); # array of arrays
+my @threads= ();
+my @vardirs= ();
+my @vcols= ();
+my @views= ();
+
+# Find the highest server index from the options, it will be the number of our servers.
+# And while we are at it, check that we don't have unknown options
+# and populate the arrays above
+
+# TODO: it can also be defined via rpl_topology (the highest server number in the topology)
+
+my $num_servers= 0;
+my $opt_result= 0;
+
+foreach my $opt (@ARGV) {
+    if ($opt =~ /^--(basedir|debug[-_]server|engine|grammar|mysqld|threads|vardir|vcols|views)(\d*)=?(.*)$/) {
+        my ($nm, $num, $val)= ($1, $2, $3);
+        $num ||= 0; # In case it was undefined
+        $num_servers= $num if $num > $num_servers;
+        switch ($nm) {
+            case 'basedir'          { @basedirs[$nm]= $val }
+            case /^debug[-_]server/ { @debug_servers[$nm]= $val }
+            case 'engine'           { @engines[$nm]= $val }
+            case 'grammar'          { @grammars[$nm]= $val }
+            case 'mysqld'           { @{mysqld_options[$nm]} = ($mysqld_options[$nm] ? (@{$mysqld_options[$nm]}, $val) : ($val)) }
+            case 'threads'          { @threads[$nm]= $val }
+            case 'vardir'           { @vardirs[$nm]= $val }
+            case 'vcols'            { @vcols[$nm]= $val }
+            case 'views'            { @views[$nm]= $val }
+        }
+    } else {
+        print STDERR "Unknown option: $opt\n";
+        $opt_result= 1;
+    }
 }
-if ($basedirs[0] eq '' and $basedirs[1] eq '') {
-    print STDERR "\nERROR: Basedir is not defined\n\n";
+
+if ($opt_result) {
     help();
+    print "\nFATAL ERROR: option check failed, see errors above\n\n";
+    exit 1;
+} elsif (not $basedirs[0] and not $basedirs[1]) {
+    print "\nFATAL ERROR: no servers have been defined, provide at least one of --basedir or --basedir1\n\n";
     exit 1;
 }
-if (not defined $grammar_file) {
-    print STDERR "\nERROR: Grammar file is not defined\n\n";
-    help();
-    exit 1;
-}
-if (!$opt_result) {
-    print STDERR "\nERROR: Error occured while reading options\n\n";
-    help();
+
+if (not scalar(@grammars)) {
+    print STDERR "\nFATAL ERROR: No grammar files are defined\n\n";
     exit 1;
 }
 
@@ -227,13 +238,13 @@ if (defined $sqltrace) {
     }
 }
 
+# TODO: replace with something more relevant
 say("Copyright (c) 2010,2011 Oracle and/or its affiliates. All rights reserved. Use is subject to license terms.");
-say("Please see http://forge.mysql.com/wiki/Category:RandomQueryGenerator for more information on this test framework.");
+#say("Please see http://forge.mysql.com/wiki/Category:RandomQueryGenerator for more information on this test framework.");
 say("Starting \n# $0 \\ \n# ".join(" \\ \n# ", @ARGV_saved));
 
 #
-# Calculate master and slave ports based on MTR_BUILD_THREAD (MTR
-# Version 1 behaviour)
+# Calculate master and slave ports based on MTR_BUILD_THREAD
 #
 
 if (not defined $build_thread) {
@@ -249,94 +260,126 @@ if ( $build_thread eq 'auto' ) {
     exit (STATUS_ENVIRONMENT_FAILURE);
 }
 
-my @ports = (10000 + 10 * $build_thread, 10000 + 10 * $build_thread + 2, 10000 + 10 * $build_thread + 4);
+# num_servers contains the number of servers to be run. 
+# Populate missing values for each server
 
-say("master_port : $ports[0] slave_port : $ports[1] ports : @ports MTR_BUILD_THREAD : $build_thread ");
+my @ports= (10000 + 10 * $build_thread);
 
-# Different servers can be defined either by providing separate basedirs (basedir1, basedir2[, basedir3]),
-# or by providing separate vardirs (vardir1, vardir2[, vardir3]).
-# Now it's time to clean it all up and define for sure how many servers we need to run, and with options 
+# TODO:
+# make default values apply to server#1 automatically if only one server is running
 
-if ($basedirs[1] eq '' and $basedirs[0] ne '') {
-    # We need at least one server anyway
-    $basedirs[1] = $basedirs[0];
-}
-if ($vardirs[1] eq '' and $vardirs[0] ne '') {
-    $vardirs[1] = $vardirs[0];
-}
+foreach my $n (1..$num_servers) 
+{
+    # In general, every server should have a unique port.
+    # Port numbers are shifted one value comparing to server numbers, e.g
+    # server 1 runs on port 19300,
+    # server 2 runs on port 19301, 
+    # etc.
+    # Baseport is 10000 + 10 * $build_thread (stored in $ports[0])
+    $ports[$n]= $ports[0] + $n - 1;
 
-foreach (2..3) {
-    # If servers 2 and 3 are defined through vardirs, use the default basedir for them
-    if ($vardirs[$_] ne '' and $basedirs[$_] eq '') {
-        $basedirs[$_] = $basedirs[0];
+    # We checked earlier that either basedir or basedir1 is populated.
+    # We'll use them as a default value for basedir for all requested servers
+    unless ($basedirs[$n]) {
+        $basedirs[$n]= $basedirs[0] || $basedirs[1];
+    }
+
+    # Every server should have unique vardir.
+    # If default vardir is provided in vardirs[0], we'll use it as a base
+    # and create vardirs[0]/1 , vardirs[0]/2 etc.
+    # Otherwise, if the location is not defined for a server, let's use 
+    # basedir/mysql-test/var as it was before, and also create
+    # basedir/mysql-test/var/1, basedir/mysql-test/var/2 etc.
+    unless ($vardirs[$n]) {
+        $vardirs[$n]= (defined $vardirs[0] ? "$vardirs[0]/$n" : "$basedirs[$n]/mysql-test/var/$n");
+    }
+
+    # For mysqld options, we will merge server-specific set with the default set.
+    # Default set should go first, so that server-specific options would override default ones
+    # if both were configured
+    @{$mysqld_options[$n]}= ( ( $mysqld_options[0] ? @{$mysqld_options[0]} : () ), ( $mysqld_options[$n] ? @{$mysqld_options[$n]} : () ));
+
+    # Grammar will only apply to the server if it's configured explicitly
+    # (comparison tests will take care of it in their own way).
+    #unless (defined $grammars[$n]) {
+    #    $grammars[$n]= $grammars[0];
+    #}
+
+    # threads number is optional, it should only be set if a grammar is defined for the server
+    if (defined $grammars[$n]) {
+        $threads[$n] ||= $threads[0];
+    }
+
+    # Other values are simple: if they were defined for the server, use them,
+    # Otherwise if the default is defined, use it, otherwise keep them unset
+    
+    unless (defined $debug_servers[$n]) {
+        $debug_servers[$n]= $debug_servers[0];
+    }
+    unless (defined $engines[$n]) {
+        $engines[$n]= $engines[0];
+    }
+    unless (defined $vcols[$n]) {
+        $vcols[$n]= $vcols[0];
+    }
+    unless (defined $views[$n]) {
+        $views[$n]= $views[0];
     }
 }
 
-# Now we should have all basedirs.
-# Check that there is no overlap in vardirs (when the user defines for two different servers the same basedir,
-# but does not define separate vardirs)
+# Now we can convert the numerous arrays into one mega-array of hashes,
+# array element per server
 
-foreach my $i (1..3) {
-    next unless $basedirs[$i] or $vardirs[$i];
-    foreach my $j ($i+1..3) {
-        next unless $basedirs[$j] or $vardirs[$j];
-        if ($basedirs[$i] eq $basedirs[$j] and $vardirs[$i] eq $vardirs[$j]) {
-            croak("Please specify either different --basedir[$i]/--basedir[$j] or different --vardir[$i]/--vardir[$j] in order to start two MySQL servers");
-        }
-    }
-}
+my @server_settings= ();
 
-# Make sure that "default" values ([0]) are also set, for compatibility,
-# in case they are used somewhere
-$basedirs[0] ||= $basedirs[1];
-$vardirs[0] ||= $vardirs[1];
-
-# Now sort out other options that can be set differently for different servers:
-# - mysqld_options
-# - debug_server
-# - views
-# - engine
-# values[0] are those that are applied to all servers.
-# values[N] expand or override values[0] for the server N
-
-@{$mysqld_options[0]} = () if not defined $mysqld_options[0];
-push @{$mysqld_options[0]}, "--sql-mode=no_engine_substitution" if join(' ', @ARGV_saved) !~ m{sql-mode}io;
-
-foreach my $i (1..3) {
-    @{$mysqld_options[$i]} = ( defined $mysqld_options[$i] 
-            ? ( @{$mysqld_options[0]}, @{$mysqld_options[$i]} )
-            : @{$mysqld_options[0]}
+foreach my $n (1..$#basedirs) {
+    my %s= (
+        'basedir' => $basedirs[$n],
+        'debug' => $debug_servers[$n],
+        'engines' => $engines[$n],
+        'grammar' => $grammars[$n],
+        'mysqld_options' => $mysqld_options[$n],
+        'port' => $ports[$n],
+        'threads' => $threads[$n],
+        'vardir' => $vardirs[$n],
+        'vcols' => $vcols[$n],
+        'views' => $views[$n]
     );
-    $debug_server[$i] = $debug_server[0] if $debug_server[$i] eq '';
-    $vcols[$i] = $vcols[0] if $vcols[$i] eq '';
-    $views[$i] = $views[0] if $views[$i] eq '';
-    $engine[$i] ||= $engine[0];
+    push @server_settings, {%s};
 }
 
-shift @mysqld_options;
-shift @debug_server;
-shift @vcols;
-shift @views;
-shift @engine;
-
-foreach my $dir (cwd(), @basedirs) {
-# calling bzr usually takes a few seconds...
-    if (defined $dir) {
-        my $bzrinfo = GenTest::BzrInfo->new(
-            dir => $dir
-        );
-        my $revno = $bzrinfo->bzrRevno();
-        my $revid = $bzrinfo->bzrRevisionId();
-        
-        if ((defined $revno) && (defined $revid)) {
-            say("$dir Revno: $revno");
-            say("$dir Revision-Id: $revid");
-        } else {
-            say($dir.' does not look like a bzr branch, cannot get revision info.');
-        } 
+# TODO: print better
+foreach my $n (0..$#server_settings) {
+    say "Configuration for server $n:";
+    my $s= $server_settings[$n];
+    foreach my $sk (sort keys %{$s}) {
+        say "    $sk : $s->{$sk}";
     }
 }
 
+
+say("MTR_BUILD_THREAD : $build_thread, server ports: @ports[1..$#ports]");
+
+#push @{$mysqld_options[0]}, "--sql-mode=no_engine_substitution" if join(' ', @ARGV_saved) !~ m{sql-mode}io;
+
+# TODO: Replace with Git Info
+#foreach my $dir (cwd(), @basedirs) {
+## calling bzr usually takes a few seconds...
+#    if (defined $dir) {
+#        my $bzrinfo = GenTest::BzrInfo->new(
+#            dir => $dir
+#        );
+#        my $revno = $bzrinfo->bzrRevno();
+#        my $revid = $bzrinfo->bzrRevisionId();
+#        
+#        if ((defined $revno) && (defined $revid)) {
+#            say("$dir Revno: $revno");
+#            say("$dir Revision-Id: $revid");
+#        } else {
+#            say($dir.' does not look like a bzr branch, cannot get revision info.');
+#        } 
+#    }
+#}
 
 my $client_basedir;
 
@@ -378,18 +421,20 @@ if ($genconfig) {
 my @server;
 my $rplsrv;
 
+# Unlike previous arrays, this one will be generated
+my @dsns;
 
-if ($rpl_mode ne '') {
 
-    $rplsrv = DBServer::MySQL::ReplMySQLd->new(master_basedir => $basedirs[1],
-                                               slave_basedir => $basedirs[2],
-                                               master_vardir => $vardirs[1],
-                                               debug_server => $debug_server[1],
-                                               master_port => $ports[0],
-                                               slave_vardir => $vardirs[2],
-                                               slave_port => $ports[1],
-                                               mode => $rpl_mode,
-                                               server_options => $mysqld_options[1],
+if ($rpl_topology ne '') {
+
+    $rpl_topology= '1->2'; # TODO: make it configurable and check vs the number of servers!
+
+# TODO: 
+# Should start-dirty be here?
+# debug_servers?
+# config?
+    $rplsrv = DBServer::MySQL::ReplMySQLd->new(servers => \@server_settings,
+                                               topology => $rpl_topology,
                                                valgrind => $valgrind,
                                                valgrind_options => \@valgrind_options,
                                                general_log => 1,
@@ -413,11 +458,11 @@ if ($rpl_mode ne '') {
         croak("Could not start replicating server pair");
     }
     
-    $dsns[0] = $rplsrv->master->dsn($database,$user);
-    $dsns[1] = undef; ## passed to gentest. No dsn for slave!
-    $server[0] = $rplsrv->master;
-    $server[1] = $rplsrv->slave;
-
+    foreach my $n (1..$num_servers) {
+        $server[$n]= $rplsrv->server->[$n];
+        $dsns[$n]= $server[$n]->dsn($database,$user);
+    }
+    
 } elsif ($galera ne '') {
 
     if (osWindows()) {
@@ -670,7 +715,7 @@ $gentestProps->threads($threads) if defined $threads;
 $gentestProps->queries($queries) if defined $queries;
 $gentestProps->duration($duration) if defined $duration;
 $gentestProps->dsn(\@dsns) if @dsns;
-$gentestProps->grammar($grammar_file);
+$gentestProps->grammar(\@grammars);
 $gentestProps->property('skip-recursive-rules', $skip_recursive_rules);
 $gentestProps->redefine(\@redefine_files) if @redefine_files;
 $gentestProps->seed($seed) if defined $seed;
@@ -723,6 +768,7 @@ say("GenTest exited with exit status ".status2text($gentest_result)." ($gentest_
 # server dumps for any differences else if there are no failures exit with success.
 
 if (($gentest_result == STATUS_OK) && !$upgrade_test && ($rpl_mode || (defined $basedirs[2]) || (defined $basedirs[3]) || $galera)) {
+#if (0) {
 #
 # Compare master and slave, or all masters
 #
@@ -864,7 +910,7 @@ $0 - Run a complete random query generation test, including server start with re
 EOF
     ;
     print "$0 arguments were: ".join(' ', @ARGV_saved)."\n";
-    exit_test(STATUS_UNKNOWN_ERROR);
+#    exit_test(STATUS_UNKNOWN_ERROR);
 }
 
 sub exit_test {

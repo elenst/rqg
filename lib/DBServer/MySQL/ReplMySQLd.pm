@@ -1,5 +1,6 @@
 # Copyright (c) 2010, 2012, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab.
+# Copyright (c) 2017, MariaDB Corporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -31,39 +32,22 @@ use strict;
 use Carp;
 use Data::Dumper;
 
-use constant REPLMYSQLD_MASTER_BASEDIR => 0;
-use constant REPLMYSQLD_MASTER_VARDIR => 1;
-use constant REPLMYSQLD_SLAVE_VARDIR => 2;
-use constant REPLMYSQLD_MASTER_PORT => 3;
-use constant REPLMYSQLD_SLAVE_PORT => 4;
-use constant REPLMYSQLD_MODE => 5;
-use constant REPLMYSQLD_START_DIRTY => 6;
-use constant REPLMYSQLD_SERVER_OPTIONS => 7;
-use constant REPLMYSQLD_MASTER => 8;
-use constant REPLMYSQLD_SLAVE => 9;
-use constant REPLMYSQLD_VALGRIND => 10;
-use constant REPLMYSQLD_VALGRIND_OPTIONS => 11;
-use constant REPLMYSQLD_GENERAL_LOG => 12;
-use constant REPLMYSQLD_DEBUG_SERVER => 13;
-use constant REPLMYSQLD_USE_GTID => 14;
-use constant REPLMYSQLD_SLAVE_BASEDIR => 15;
-use constant REPLMYSQLD_CONFIG_CONTENTS => 16;
-use constant REPLMYSQLD_USER => 17;
+use constant REPLMYSQLD_TOPOLOGY => 1;
+use constant REPLMYSQLD_SERVER_SETTINGS => 2;
+use constant REPLMYSQLD_SERVERS => 3;
+use constant REPLMYSQLD_START_DIRTY => 4;
+use constant REPLMYSQLD_VALGRIND => 5;
+use constant REPLMYSQLD_VALGRIND_OPTIONS => 6;
+use constant REPLMYSQLD_GENERAL_LOG => 7;
+use constant REPLMYSQLD_USE_GTID => 8;
+use constant REPLMYSQLD_CONFIG_CONTENTS => 9;
+use constant REPLMYSQLD_USER => 10;
 
 sub new {
     my $class = shift;
 
-    my $self = $class->SUPER::new({'master' => REPLMYSQLD_MASTER,
-                                   'slave' => REPLMYSQLD_SLAVE,
-                                   'master_basedir' => REPLMYSQLD_MASTER_BASEDIR,
-                                   'slave_basedir' => REPLMYSQLD_SLAVE_BASEDIR,
-                                   'debug_server' => REPLMYSQLD_DEBUG_SERVER,
-                                   'master_vardir' => REPLMYSQLD_MASTER_VARDIR,
-                                   'master_port' => REPLMYSQLD_MASTER_PORT,
-                                   'slave_vardir' => REPLMYSQLD_SLAVE_VARDIR,
-                                   'slave_port' => REPLMYSQLD_SLAVE_PORT,
-                                   'mode' => REPLMYSQLD_MODE,
-                                   'server_options' => REPLMYSQLD_SERVER_OPTIONS,
+    my $self = $class->SUPER::new({'servers' => REPLMYSQLD_SERVER_SETTINGS,
+                                   'topology' => REPLMYSQLD_TOPOLOGY,
                                    'general_log' => REPLMYSQLD_GENERAL_LOG,
                                    'start_dirty' => REPLMYSQLD_START_DIRTY,
                                    'valgrind' => REPLMYSQLD_VALGRIND,
@@ -77,157 +61,89 @@ sub new {
         and lc($self->[REPLMYSQLD_USE_GTID] ne 'current_pos')
         and lc($self->[REPLMYSQLD_USE_GTID] ne 'slave_pos')
     ) {
-        croak("Invalid value $self->[REPLMYSQLD_USE_GTID] for use_gtid option");
+        croak("FATAL ERROR: Invalid value $self->[REPLMYSQLD_USE_GTID] for use_gtid option");
+    }
+
+    # TODO: make sure we can just say --rpl for the default M->S topology
+    if (not defined $self->[REPLMYSQLD_TOPOLOGY]) {
+        croak("FATAL ERROR: Replication topology is not defined");
+    }
+    # TODO: compare it with the topology, not with the constant
+    if (scalar @{$self->[REPLMYSQLD_SERVER_SETTINGS]}<2) {
+        croak("FATAL ERROR: Not enough servers defined for replication");
     }
     
-    if (defined $self->master || defined $self->slave) {
-        ## Repl pair defined from two predefined servers
-
-        if (not (defined $self->master && defined $self->slave)) {
-            croak("Both master and slave must be defined");
-        }
-        $self->master->addServerOptions(["--server_id=1",
-                                         "--log-bin=mysql-bin",
-                                         "--report-host=127.0.0.1",
-                                         "--report_port=".$self->master->port]);
-        $self->slave->addServerOptions(["--server_id=2",
-                                        "--report-host=127.0.0.1",
-                                        "--report_port=".$self->slave->port]);
-    } else {
-        ## Repl pair defined from parameters. 
-        if (not defined $self->[REPLMYSQLD_MASTER_PORT]) {
-            $self->[REPLMYSQLD_MASTER_PORT] = DBServer::MySQL::MySQLd::MYSQLD_DEFAULT_PORT;
-        }
+    @{$self->[REPLMYSQLD_SERVERS]} = ();
     
-        if (not defined $self->[REPLMYSQLD_SLAVE_PORT]) {
-            $self->[REPLMYSQLD_SLAVE_PORT] = $self->[REPLMYSQLD_MASTER_PORT] + 2;        
+    # TODO: Add log-bin for every master and server-id for every server
+    foreach my $n (0..$#{$self->[REPLMYSQLD_SERVER_SETTINGS]}) {
+        # Hash of server settings (basedir, vardir etc.)
+        my %s= ${$self->[REPLMYSQLD_SERVER_SETTINGS]}[$n];
+        $self->[REPLMYSQLD_SERVERS]->[$n] = 
+            DBServer::MySQL::MySQLd->new(
+                basedir => $s{basedir},
+                vardir => $s{vardir},
+                debug_server => $s{debug},                
+                port => $s{port},
+                server_options => $s{mysqld_options},
+                general_log => $self->[REPLMYSQLD_GENERAL_LOG],
+                start_dirty => $self->[REPLMYSQLD_START_DIRTY],
+                valgrind => $self->[REPLMYSQLD_VALGRIND],
+                valgrind_options => $self->[REPLMYSQLD_VALGRIND_OPTIONS],
+                config => $self->[REPLMYSQLD_CONFIG_CONTENTS],
+                user => $self->[REPLMYSQLD_USER]
+            );
+        if (not defined $self->[REPLMYSQLD_SERVERS]->[$n]) {
+#            foreach (0..$n-1) {
+#                $self->server->[$_]->stopServer;
+#            }
+            croak("FATAL ERROR: Could not create server #".$n);
         }
-
-        if (not defined $self->[REPLMYSQLD_MODE]) {
-            $self->[REPLMYSQLD_MODE] = 'default';
-        }
-    
-        if (not defined $self->[REPLMYSQLD_MASTER_VARDIR]) {
-            $self->[REPLMYSQLD_MASTER_VARDIR] = "mysql-test/var";
-        }
-        if (not defined $self->[REPLMYSQLD_SLAVE_VARDIR]) {
-            my $varbase = $self->[REPLMYSQLD_MASTER_VARDIR];
-            $varbase =~ s/(.*)\/$/\1/;
-            $self->[REPLMYSQLD_SLAVE_VARDIR] = $varbase.'_slave';
-        }
-
-        if (not defined $self->[REPLMYSQLD_SLAVE_BASEDIR]) {
-            $self->[REPLMYSQLD_SLAVE_BASEDIR] = $self->[REPLMYSQLD_MASTER_BASEDIR];
-        }
-
-        my @master_options;
-        push(@master_options, 
-             "--server_id=1",
-             "--log-bin=mysql-bin",
-             "--report-host=127.0.0.1",
-             "--report_port=".$self->[REPLMYSQLD_MASTER_PORT]);
-        if (defined $self->[REPLMYSQLD_SERVER_OPTIONS]) {
-            push(@master_options, 
-                 @{$self->[REPLMYSQLD_SERVER_OPTIONS]});
-        }
-
-        
-        $self->[REPLMYSQLD_MASTER] = 
-        DBServer::MySQL::MySQLd->new(basedir => $self->[REPLMYSQLD_MASTER_BASEDIR],
-                                     vardir => $self->[REPLMYSQLD_MASTER_VARDIR],
-                                     debug_server => $self->[REPLMYSQLD_DEBUG_SERVER],                
-                                     port => $self->[REPLMYSQLD_MASTER_PORT],
-                                     server_options => \@master_options,
-                                     general_log => $self->[REPLMYSQLD_GENERAL_LOG],
-                                     start_dirty => $self->[REPLMYSQLD_START_DIRTY],
-                                     valgrind => $self->[REPLMYSQLD_VALGRIND],
-                                     valgrind_options => $self->[REPLMYSQLD_VALGRIND_OPTIONS],
-                                     config => $self->[REPLMYSQLD_CONFIG_CONTENTS],
-                                     user => $self->[REPLMYSQLD_USER]);
-        
-        if (not defined $self->master) {
-            croak("Could not create master");
-        }
-        
-        my @slave_options;
-        push(@slave_options, 
-             "--server_id=2",
-             "--report-host=127.0.0.1",
-             "--report_port=".$self->[REPLMYSQLD_SLAVE_PORT]);
-        if (defined $self->[REPLMYSQLD_SERVER_OPTIONS]) {
-            push(@slave_options, 
-                 @{$self->[REPLMYSQLD_SERVER_OPTIONS]});
-        }
-        
-        
-        $self->[REPLMYSQLD_SLAVE] = 
-        DBServer::MySQL::MySQLd->new(basedir => $self->[REPLMYSQLD_SLAVE_BASEDIR],
-                                     vardir => $self->[REPLMYSQLD_SLAVE_VARDIR],
-                                     debug_server => $self->[REPLMYSQLD_DEBUG_SERVER],                
-                                     port => $self->[REPLMYSQLD_SLAVE_PORT],
-                                     server_options => \@slave_options,
-                                     general_log => $self->[REPLMYSQLD_GENERAL_LOG],
-                                     start_dirty => $self->[REPLMYSQLD_START_DIRTY],
-                                     valgrind => $self->[REPLMYSQLD_VALGRIND],
-                                     valgrind_options => $self->[REPLMYSQLD_VALGRIND_OPTIONS],
-                                     config => $self->[REPLMYSQLD_CONFIG_CONTENTS],
-                                     user => $self->[REPLMYSQLD_USER]);
-        
-        if (not defined $self->slave) {
-            $self->master->stopServer;
-            croak("Could not create slave");
-        }
+        $self->startAll();
     }
+}
+
+sub server {
+    return $_[0]->[REPLMYSQLD_SERVERS];
+}
+
+sub startAll {
+    my $self= shift;
+
+    foreach my $s (@{$self->[REPLMYSQLD_SERVERS]}) {
+        $s->startServer;
+    }
+
+#	my ($foo, $master_version) = $master_dbh->selectrow_array("SHOW VARIABLES LIKE 'version'");
+
+#	if (($master_version !~ m{^5\.0}sio) && ($self->mode ne 'default')) {
+#		$master_dbh->do("SET GLOBAL BINLOG_FORMAT = '".$self->mode."'");
+#		$slave_dbh->do("SET GLOBAL BINLOG_FORMAT = '".$self->mode."'");
+#	}
     
-    return $self;
-}
-
-sub master {
-    return $_[0]->[REPLMYSQLD_MASTER];
-}
-
-sub slave {
-    return $_[0]->[REPLMYSQLD_SLAVE];
-}
-
-sub mode {
-    return $_[0]->[REPLMYSQLD_MODE];
-}
-
-sub startServer {
-    my ($self) = @_;
-
-    $self->master->startServer;
-    my $master_dbh = $self->master->dbh;
-    $self->slave->startServer;
-    my $slave_dbh = $self->slave->dbh;
-
-	my ($foo, $master_version) = $master_dbh->selectrow_array("SHOW VARIABLES LIKE 'version'");
-
-	if (($master_version !~ m{^5\.0}sio) && ($self->mode ne 'default')) {
-		$master_dbh->do("SET GLOBAL BINLOG_FORMAT = '".$self->mode."'");
-		$slave_dbh->do("SET GLOBAL BINLOG_FORMAT = '".$self->mode."'");
-	}
-    
-	$slave_dbh->do("STOP SLAVE");
+#	$slave_dbh->do("STOP SLAVE");
 
 #	$slave_dbh->do("SET GLOBAL storage_engine = '$engine'") if defined $engine;
 
-	my $master_use_gtid = ( 
-		defined $self->[REPLMYSQLD_USE_GTID] 
-		? ', MASTER_USE_GTID = ' . $self->[REPLMYSQLD_USE_GTID] 
-		: '' 
-	);
-    
-	$slave_dbh->do("CHANGE MASTER TO ".
-                   " MASTER_PORT = ".$self->master->port.",".
-                   " MASTER_HOST = '127.0.0.1',".
-                   " MASTER_USER = 'root',".
-                   " MASTER_CONNECT_RETRY = 1" . $master_use_gtid);
-    
-	$slave_dbh->do("START SLAVE");
+#    $self->configureSlave($slave_dbh);
+#	$slave_dbh->do("START SLAVE");
     
     return DBSTATUS_OK;
+}
+
+sub configureSlave {
+    my ($self,$dbh) = @_;
+    my $master_use_gtid = ( 
+        defined $self->[REPLMYSQLD_USE_GTID] 
+        ? ', MASTER_USE_GTID = ' . $self->[REPLMYSQLD_USE_GTID] 
+        : '' 
+    );
+    $dbh->do("CHANGE MASTER 'm1' TO ".
+               " MASTER_PORT = ".$self->master->port.",".
+               " MASTER_HOST = '127.0.0.1',".
+               " MASTER_USER = 'root',".
+               " MASTER_USE_GTID = slave_pos,".
+               " MASTER_CONNECT_RETRY = 1" . $master_use_gtid);
 }
 
 sub waitForSlaveSync {
@@ -261,7 +177,7 @@ sub stopServer {
     my ($self, $status) = @_;
 
     if ($status == DBSTATUS_OK) {
-        $self->waitForSlaveSync();
+#        $self->waitForSlaveSync();
     }
     if ($self->slave->dbh) {
         $self->slave->dbh->do("STOP SLAVE");
