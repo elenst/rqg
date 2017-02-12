@@ -47,6 +47,7 @@ my @ARGV_saved = @ARGV;
 
 my $options = {};
 my $opt_result = GetOptions($options,
+				'restart-timeout=i',
                             'config=s',
                             'dsn=s@',
                             'dsn1=s',

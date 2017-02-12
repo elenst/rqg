@@ -223,6 +223,7 @@ sub startServer {
                    " MASTER_PORT = ".$self->master->port.",".
                    " MASTER_HOST = '127.0.0.1',".
                    " MASTER_USER = 'root',".
+                   " MASTER_USE_GTID = slave_pos,".
                    " MASTER_CONNECT_RETRY = 1" . $master_use_gtid);
     
 	$slave_dbh->do("START SLAVE");
@@ -261,7 +262,7 @@ sub stopServer {
     my ($self, $status) = @_;
 
     if ($status == DBSTATUS_OK) {
-        $self->waitForSlaveSync();
+#        $self->waitForSlaveSync();
     }
     if ($self->slave->dbh) {
         $self->slave->dbh->do("STOP SLAVE");
