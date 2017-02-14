@@ -298,7 +298,7 @@ sub dump_database {
     my $port= $server->port;
     
 	my @all_databases = @{$dbh->selectcol_arrayref("SHOW DATABASES")};
-	my $databases_string = join(' ', grep { $_ !~ m{^(mysql|information_schema|performance_schema)$}sgio } @all_databases );
+	my $databases_string = join(' ', grep { $_ !~ m{^(mysql|information_schema|performance_schema|sys)$}sgio } @all_databases );
 	
     my $dump_file = "$vardir/server_schema_$suffix.dump";
     my $mysqldump= $server->dumper;
@@ -354,6 +354,7 @@ sub normalize_dumps {
     # - default numeric values lost single quote marks
     # Let's update pre-10.2 dumps to match it
 
+    say("HERE: old ver: $old_ver new ver: $new_ver");
     if ($old_ver le '100201' and $new_ver ge '100201') {
         move("$vardir/server_schema_old.dump","$vardir/server_schema_old.dump.orig");
         open(DUMP1,"$vardir/server_schema_old.dump.orig");
