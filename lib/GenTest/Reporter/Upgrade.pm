@@ -77,45 +77,14 @@ sub report {
     my $server = $reporter->properties->servers->[0];
     my $dbh = DBI->connect($server->dsn);
 
-    # Sometimes schema can look different before and after restart,
-    # e.g. AUTO_INCREMENT value can be recalculated. 
-    # We don't care about it in the upgrade test, so we'll restart
-    # the old server before getting the dump
-
-    say("Restarting the old server...");
-
-    my $pid= $server->pid();
-    kill(15, $pid);
-
-    foreach (1..60) {
-        last if not kill(0, $pid);
-        sleep 1;
-    }
-    if (kill(0, $pid)) {
-        say("ERROR: could not shut down server with pid $pid; sending SIGBART to get a stack trace");
-        kill('ABRT', $pid);
-        return STATUS_SERVER_DEADLOCKED;
-    } 
-    $server->setStartDirty(1);
-    if ($server->startServer() != STATUS_OK) {
-        say("ERROR: Could not restart the old server");
-        return STATUS_CRITICAL_FAILURE;
-    }
-    $dbh = DBI->connect($server->dsn);
-    if (not defined $dbh) {
-        say("ERROR: Could not connect to the old server after restart");
-        return STATUS_CRITICAL_FAILURE;
-    }
-    
-    dump_database($reporter,$server,$dbh,'old');
-
-#    sleep(10);
-
-    # Save the major version of the old server
     my $major_version_old= $server->majorVersion;
     my $version_numeric_old= $server->versionNumeric();
-    
-    $pid= $server->pid();
+    my $pid= $server->pid();
+
+    my %table_autoinc = ();
+
+    dump_database($reporter,$server,$dbh,'old');
+    $table_autoinc{'old'} = collect_autoincrements($dbh);
 
     if ($upgrade_mode eq 'normal')
     {
@@ -282,11 +251,12 @@ sub report {
     # Phase 3 - dump the server again and compare dumps
     #
     dump_database($reporter,$server,$dbh,'new');
+    $table_autoinc{'new'} = collect_autoincrements($dbh);
 
     my $version_numeric_new= $server->versionNumeric();
     normalize_dumps($version_numeric_old,$version_numeric_new);
 
-    my $res= compare_dumps();
+    my $res= compare_all(\%table_autoinc);
     return ($upgrade_status > $res ? $upgrade_status : $res);
 }
     
@@ -296,10 +266,10 @@ sub dump_database {
     my ($reporter, $server, $dbh, $suffix) = @_;
     $vardir = $server->vardir unless defined $vardir;
     my $port= $server->port;
-    
-	my @all_databases = @{$dbh->selectcol_arrayref("SHOW DATABASES")};
-	my $databases_string = join(' ', grep { $_ !~ m{^(mysql|information_schema|performance_schema|sys)$}sgio } @all_databases );
-	
+
+	my @all_databases = @{$dbh->selectcol_arrayref("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE LOWER(SCHEMA_NAME) NOT IN ('mysql','information_schema','performance_schema','sys')")};
+	my $databases_string = join(' ', @all_databases );
+
     my $dump_file = "$vardir/server_schema_$suffix.dump";
     my $mysqldump= $server->dumper;
 
@@ -319,7 +289,26 @@ sub dump_database {
     return ($dump_result ? STATUS_ENVIRONMENT_FAILURE : STATUS_OK);
 }
 
-sub compare_dumps {
+# Table AUTO_INCREMENT can be re-calculated upon restart,
+# in which case the dumps will be different. We will ignore possible
+# AUTO_INCREMENT differences in the dumps, but instead will check
+# separately that the new value is either equal the old one, or
+# has been recalculated as MAX(column)+1.
+
+sub collect_autoincrements {
+    my $dbh = shift;
+	my $autoinc_tables = $dbh->selectall_arrayref("SELECT CONCAT(ist.TABLE_SCHEMA,'.',ist.TABLE_NAME), ist.AUTO_INCREMENT, isc.COLUMN_NAME, '' FROM INFORMATION_SCHEMA.TABLES ist JOIN INFORMATION_SCHEMA.COLUMNS isc ON (ist.TABLE_SCHEMA = isc.TABLE_SCHEMA AND ist.TABLE_NAME = isc.TABLE_NAME) WHERE ist.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') AND ist.AUTO_INCREMENT IS NOT NULL AND isc.EXTRA LIKE '%auto_increment%' ORDER BY ist.TABLE_SCHEMA, ist.TABLE_NAME, isc.COLUMN_NAME");
+
+    foreach my $t (@$autoinc_tables) {
+        $t->[3] = $dbh->selectrow_arrayref("SELECT MAX($t->[2]) + 1 FROM $t->[0]")->[0];
+    }
+
+    return $autoinc_tables;
+}
+
+sub compare_all {
+    my $table_autoinc= shift;
+
 	say("Comparing SQL schema dumps between old and new servers...");
     my $status = STATUS_OK;
 	my $diff_result = system("diff -u $vardir/server_schema_old.dump $vardir/server_schema_new.dump");
@@ -338,6 +327,40 @@ sub compare_dumps {
 		$status= STATUS_CONTENT_MISMATCH;
 	}
 
+    my $old_autoinc= $table_autoinc->{'old'};
+    my $new_autoinc= $table_autoinc->{'new'};
+
+    if (not $old_autoinc and not $new_autoinc) {
+        say("No auto-inc data for old and new servers, skipping the check");
+    }
+    elsif ($old_autoinc and ref $old_autoinc eq 'ARRAY' and (not $new_autoinc or ref $new_autoinc ne 'ARRAY')) {
+        say("ERROR: auto-increment data for the new server is not available");
+        $status = STATUS_CONTENT_MISMATCH;
+    }
+    elsif ($new_autoinc and ref $new_autoinc eq 'ARRAY' and (not $old_autoinc or ref $old_autoinc ne 'ARRAY')) {
+        say("ERROR: auto-increment data for the old server is not available");
+        $status = STATUS_CONTENT_MISMATCH;
+    }
+    elsif (scalar @$old_autoinc != scalar @$new_autoinc) {
+        say("ERROR: different number of tables in auto-incement data");
+        say("Old server: @$old_autoinc");
+        say("New server: @$new_autoinc");
+        $status= STATUS_CONTENT_MISMATCH;
+    }
+    else {
+        foreach my $i (0..$#$old_autoinc) {
+            my $to = $old_autoinc->[$i];
+            my $tn = $new_autoinc->[$i];
+
+            # 0: table name; 1: table auto-inc; 2: column name; 3: column max+1
+            if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]))
+            {
+                say("ERROR: auto-increment data differs. Old server: @$to ; new server: @$tn");
+                $status= STATUS_CONTENT_MISMATCH;
+            }
+        }
+    }
+
 	if ($status == STATUS_OK) {
 		say("No differences were found between old and new server contents.");
     }
@@ -349,15 +372,34 @@ sub compare_dumps {
 sub normalize_dumps {
     my ($old_ver,$new_ver) = @_;
 
+    move("$vardir/server_schema_old.dump","$vardir/server_schema_old.dump.orig");
+    move("$vardir/server_schema_new.dump","$vardir/server_schema_new.dump.orig");
+
+    open(DUMP1,"$vardir/server_schema_old.dump.orig");
+    open(DUMP2,">$vardir/server_schema_old.dump");
+    while (<DUMP1>) {
+        if (s/AUTO_INCREMENT=\d+//) {};
+        print DUMP2 $_;
+    }
+    close(DUMP1);
+    close(DUMP2);
+    open(DUMP1,"$vardir/server_schema_new.dump.orig");
+    open(DUMP2,">$vardir/server_schema_new.dump");
+    while (<DUMP1>) {
+        if (s/AUTO_INCREMENT=\d+//) {};
+        print DUMP2 $_;
+    }
+    close(DUMP1);
+    close(DUMP2);
+
     # In 10.2 SHOW CREATE TABLE output changed:
     # - blob and text columns got the "DEFAULT" clause;
     # - default numeric values lost single quote marks
     # Let's update pre-10.2 dumps to match it
 
-    say("HERE: old ver: $old_ver new ver: $new_ver");
     if ($old_ver le '100201' and $new_ver ge '100201') {
-        move("$vardir/server_schema_old.dump","$vardir/server_schema_old.dump.orig");
-        open(DUMP1,"$vardir/server_schema_old.dump.orig");
+        move("$vardir/server_schema_old.dump","$vardir/server_schema_old.dump.tmp");
+        open(DUMP1,"$vardir/server_schema_old.dump.tmp");
         open(DUMP2,">$vardir/server_schema_old.dump");
         while (<DUMP1>) {
             # `k` int(10) unsigned NOT NULL DEFAULT '0' => `k` int(10) unsigned NOT NULL DEFAULT 0
