@@ -84,7 +84,7 @@ sub report {
     my %table_autoinc = ();
 
     dump_database($reporter,$server,$dbh,'old');
-    $table_autoinc{'old'} = collect_autoincrements($dbh);
+    $table_autoinc{'old'} = collect_autoincrements($dbh,'old');
 
     if ($upgrade_mode eq 'normal')
     {
@@ -251,7 +251,7 @@ sub report {
     # Phase 3 - dump the server again and compare dumps
     #
     dump_database($reporter,$server,$dbh,'new');
-    $table_autoinc{'new'} = collect_autoincrements($dbh);
+    $table_autoinc{'new'} = collect_autoincrements($dbh,'new');
 
     my $version_numeric_new= $server->versionNumeric();
     normalize_dumps($version_numeric_old,$version_numeric_new);
@@ -292,15 +292,16 @@ sub dump_database {
 # Table AUTO_INCREMENT can be re-calculated upon restart,
 # in which case the dumps will be different. We will ignore possible
 # AUTO_INCREMENT differences in the dumps, but instead will check
-# separately that the new value is either equal the old one, or
+# separately that the new value is either equal to the old one, or
 # has been recalculated as MAX(column)+1.
 
 sub collect_autoincrements {
-    my $dbh = shift;
+    my ($dbh, $suffix) = @_;
+    say("Storing auto-increment data for the $suffix server...");
 	my $autoinc_tables = $dbh->selectall_arrayref("SELECT CONCAT(ist.TABLE_SCHEMA,'.',ist.TABLE_NAME), ist.AUTO_INCREMENT, isc.COLUMN_NAME, '' FROM INFORMATION_SCHEMA.TABLES ist JOIN INFORMATION_SCHEMA.COLUMNS isc ON (ist.TABLE_SCHEMA = isc.TABLE_SCHEMA AND ist.TABLE_NAME = isc.TABLE_NAME) WHERE ist.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') AND ist.AUTO_INCREMENT IS NOT NULL AND isc.EXTRA LIKE '%auto_increment%' ORDER BY ist.TABLE_SCHEMA, ist.TABLE_NAME, isc.COLUMN_NAME");
 
     foreach my $t (@$autoinc_tables) {
-        $t->[3] = $dbh->selectrow_arrayref("SELECT MAX($t->[2]) + 1 FROM $t->[0]")->[0];
+        $t->[3] = $dbh->selectrow_arrayref("SELECT IFNULL(MAX($t->[2]),0) FROM $t->[0]")->[0];
     }
 
     return $autoinc_tables;
@@ -327,6 +328,8 @@ sub compare_all {
 		$status= STATUS_CONTENT_MISMATCH;
 	}
 
+	say("Comparing auto-increment data between old and new servers...");
+
     my $old_autoinc= $table_autoinc->{'old'};
     my $new_autoinc= $table_autoinc->{'new'};
 
@@ -342,18 +345,17 @@ sub compare_all {
         $status = STATUS_CONTENT_MISMATCH;
     }
     elsif (scalar @$old_autoinc != scalar @$new_autoinc) {
-        say("ERROR: different number of tables in auto-incement data");
-        say("Old server: @$old_autoinc");
-        say("New server: @$new_autoinc");
+        say("ERROR: different number of tables in auto-incement data. Old server: ".scalar(@$old_autoinc)." ; new server: ".scalar(@$new_autoinc));
         $status= STATUS_CONTENT_MISMATCH;
     }
     else {
         foreach my $i (0..$#$old_autoinc) {
             my $to = $old_autoinc->[$i];
             my $tn = $new_autoinc->[$i];
+            say("Comparing auto-increment data. Old server: @$to ; new server: @$tn");
 
-            # 0: table name; 1: table auto-inc; 2: column name; 3: column max+1
-            if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]))
+            # 0: table name; 1: table auto-inc; 2: column name; 3: max(column)
+            if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]+1))
             {
                 say("ERROR: auto-increment data differs. Old server: @$to ; new server: @$tn");
                 $status= STATUS_CONTENT_MISMATCH;
