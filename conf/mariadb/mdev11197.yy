@@ -1,0 +1,22 @@
+query:
+	UPDATE t2 AS A NATURAL JOIN t2 B SET A.non_existing_column = 2 |
+	START TRANSACTION;
+
+thread1_init:
+	  CREATE TABLE t1 (i INT) ENGINE=MyISAM
+	; CREATE TABLE t2 (i INT)
+	; INSERT INTO t2 VALUES (1)
+	; SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE
+;
+
+thread2:
+	query |
+	create_temporary_table |
+	LOCK TABLE t1 WRITE;
+
+create_temporary_table:
+	  CREATE OR REPLACE TEMPORARY TABLE tmp LIKE t2
+	; INSERT INTO tmp SELECT * FROM t2
+	; DROP TEMPORARY TABLE IF EXISTS t2
+	; ALTER TABLE tmp RENAME TO t2
+;
