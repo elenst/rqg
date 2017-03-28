@@ -108,6 +108,11 @@ use constant FIELD_TYPE_FLOAT		=> 21;
 
 use constant FIELD_TYPE_JSON		=> 22;
 use constant FIELD_TYPE_JSONPATH	=> 23;
+use constant FIELD_TYPE_JSONKEY     => 24;
+use constant FIELD_TYPE_JSONVALUE   => 25;
+use constant FIELD_TYPE_JSONARRAY   => 26;
+use constant FIELD_TYPE_JSONPAIR    => 27;
+use constant FIELD_TYPE_JSONOBJECT  => 28;
 
 use constant ASCII_RANGE_START		=> 97;
 use constant ASCII_RANGE_END		=> 122;
@@ -182,6 +187,11 @@ my %name2type = (
 	'quid'			=> FIELD_TYPE_QUID,
 	'json'			=> FIELD_TYPE_JSON,
 	'jsonpath'		=> FIELD_TYPE_JSONPATH,
+	'jsonkey'       => FIELD_TYPE_JSONKEY,
+	'jsonvalue'     => FIELD_TYPE_JSONVALUE,
+	'jsonarray'     => FIELD_TYPE_JSONARRAY,
+	'jsonpair'      => FIELD_TYPE_JSONPAIR,
+	'jsonobject'    => FIELD_TYPE_JSONOBJECT
 );
 
 my $cwd = cwd();
@@ -631,6 +641,16 @@ sub fieldType {
 		return $rand->json($orig_field_length);
 	} elsif ($field_type == FIELD_TYPE_JSONPATH) {
 		return $rand->jsonpath();
+	} elsif ($field_type == FIELD_TYPE_JSONKEY) {
+		return $rand->json_key();
+	} elsif ($field_type == FIELD_TYPE_JSONVALUE) {
+		return $rand->json_value();
+	} elsif ($field_type == FIELD_TYPE_JSONARRAY) {
+		return $rand->json_array();
+	} elsif ($field_type == FIELD_TYPE_JSONPAIR) {
+		return $rand->json_pair();
+	} elsif ($field_type == FIELD_TYPE_JSONOBJECT) {
+		return $rand->json_object();
 	} else {
 		croak ("unknown field type $field_def");
 	}
