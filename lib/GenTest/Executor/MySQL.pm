@@ -101,7 +101,7 @@ use constant EXECUTOR_MYSQL_AUTOCOMMIT => 20;
 
 #
 # Column positions for SHOW SLAVES
-# 
+#
 
 use constant SLAVE_INFO_HOST => 1;
 use constant SLAVE_INFO_PORT => 2;
@@ -152,6 +152,7 @@ use constant  ER_TOO_LONG_KEY                                   => 1071;
 use constant  ER_KEY_COLUMN_DOES_NOT_EXIST                      => 1072;
 use constant  ER_COLUMN_LENGTH_TOO_BIG                          => 1074;
 use constant  ER_WRONG_AUTO_KEY                                 => 1075;
+use constant  ER_WRONG_SUB_KEY                                  => 1089;
 use constant  ER_CANT_DROP_FIELD_OR_KEY                         => 1091;
 use constant  ER_UPDATE_TABLE_USED                              => 1093;
 use constant  ER_NO_SUCH_THREAD                                 => 1094;
@@ -182,6 +183,7 @@ use constant  ER_CRASHED_ON_USAGE                               => 1194;
 use constant  ER_TRANS_CACHE_FULL                               => 1197;
 use constant  ER_LOCK_WAIT_TIMEOUT                              => 1205;
 use constant  ER_LOCK_DEADLOCK                                  => 1213;
+use constant  ER_TABLE_CANT_HANDLE_FT                           => 1214;
 use constant  ER_WRONG_USAGE                                    => 1221;
 use constant  ER_CANT_UPDATE_WITH_READLOCK                      => 1223;
 use constant  ER_DUP_ARGUMENT                                   => 1225;
@@ -282,6 +284,30 @@ use constant  ER_SERVER_LOST                                    => 2013;
 use constant  CR_COMMANDS_OUT_OF_SYNC                           => 2014;  # Caused by old DBD::mysql
 use constant  ER_SERVER_LOST_EXTENDED                           => 2055;
 
+#--- MySQL 5.7 JSON-related errors ---
+
+use constant  ER_INVALID_JSON_TEXT                              => 3140;
+use constant  ER_INVALID_JSON_TEXT_IN_PARAM                     => 3141;
+use constant  ER_INVALID_JSON_BINARY_DATA                       => 3142;
+use constant  ER_INVALID_JSON_PATH                              => 3143;
+use constant  ER_INVALID_JSON_CHARSET                           => 3144;
+use constant  ER_INVALID_JSON_CHARSET_IN_FUNCTION               => 3145;
+use constant  ER_INVALID_TYPE_FOR_JSON                          => 3146;
+use constant  ER_INVALID_CAST_TO_JSON                           => 3147;
+use constant  ER_INVALID_JSON_PATH_CHARSET                      => 3148;
+use constant  ER_INVALID_JSON_PATH_WILDCARD                     => 3149;
+use constant  ER_JSON_VALUE_TOO_BIG                             => 3150;
+use constant  ER_JSON_KEY_TOO_BIG                               => 3151;
+use constant  ER_JSON_USED_AS_KEY                               => 3152;
+use constant  ER_JSON_VACUOUS_PATH                              => 3153;
+use constant  ER_JSON_BAD_ONE_OR_ALL_ARG                        => 3154;
+use constant  ER_NUMERIC_JSON_VALUE_OUT_OF_RANGE                => 3155;
+use constant  ER_INVALID_JSON_VALUE_FOR_CAST                    => 3156;
+use constant  ER_JSON_DOCUMENT_TOO_DEEP                         => 3157;
+use constant  ER_JSON_DOCUMENT_NULL_KEY                         => 3158;
+
+#--- end of MySQL 5.7 JSON errors ---
+
 use constant  ER_EXPRESSION_REFERS_TO_UNINIT_FIELD              => 4026;
 use constant  ER_REFERENCED_TRG_DOES_NOT_EXIST                  => 4031;
 
@@ -351,9 +377,27 @@ my %err2type = (
     ER_GET_ERRNO()                                      => STATUS_DATABASE_CORRUPTION,
     ER_ILLEGAL_HA()                                     => STATUS_SEMANTIC_ERROR,
     ER_ILLEGAL_REFERENCE()                              => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_CAST_TO_JSON()                           => STATUS_SEMANTIC_ERROR,
     ER_INVALID_CHARACTER_STRING()                       => STATUS_SEMANTIC_ERROR,
     ER_INVALID_DEFAULT()                                => STATUS_SEMANTIC_ERROR,
     ER_INVALID_GROUP_FUNC_USE()                         => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_BINARY_DATA()                       => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_CHARSET()                           => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_CHARSET_IN_FUNCTION()               => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_PATH()                              => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_PATH_CHARSET()                      => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_PATH_WILDCARD()                     => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_TEXT()                              => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_TEXT_IN_PARAM()                     => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_JSON_VALUE_FOR_CAST()                    => STATUS_SEMANTIC_ERROR,
+    ER_INVALID_TYPE_FOR_JSON()                          => STATUS_SEMANTIC_ERROR,
+    ER_JSON_BAD_ONE_OR_ALL_ARG()                        => STATUS_SEMANTIC_ERROR,
+    ER_JSON_DOCUMENT_NULL_KEY()                         => STATUS_SEMANTIC_ERROR,
+    ER_JSON_DOCUMENT_TOO_DEEP()                         => STATUS_SEMANTIC_ERROR,
+    ER_JSON_KEY_TOO_BIG()                               => STATUS_SEMANTIC_ERROR,
+    ER_JSON_VALUE_TOO_BIG()                             => STATUS_SEMANTIC_ERROR,
+    ER_JSON_USED_AS_KEY()                               => STATUS_SEMANTIC_ERROR,
+    ER_JSON_VACUOUS_PATH()                              => STATUS_SEMANTIC_ERROR,
     ER_IT_IS_A_VIEW()                                   => STATUS_SEMANTIC_ERROR,
     ER_KEY_COLUMN_DOES_NOT_EXIST()                      => STATUS_SEMANTIC_ERROR,
     ER_KEY_DOES_NOT_EXITS()                             => STATUS_SEMANTIC_ERROR,
@@ -381,6 +425,7 @@ my %err2type = (
     ER_NO_SUCH_TABLESPACE()                             => STATUS_SEMANTIC_ERROR,
     ER_NO_SUCH_THREAD()                                 => STATUS_SEMANTIC_ERROR,
     ER_NO_TRIGGERS_ON_SYSTEM_SCHEMA()                   => STATUS_SEMANTIC_ERROR,
+    ER_NUMERIC_JSON_VALUE_OUT_OF_RANGE()                => STATUS_SEMANTIC_ERROR,
     ER_ONLY_ON_RANGE_LIST_PARTITION()                   => STATUS_SEMANTIC_ERROR,
     ER_OPEN_AS_READONLY()                               => STATUS_SEMANTIC_ERROR,
     ER_OPERAND_COLUMNS()                                => STATUS_SEMANTIC_ERROR,
@@ -427,6 +472,7 @@ my %err2type = (
     ER_TABLESPACE_EXIST()                               => STATUS_SEMANTIC_ERROR,
     ER_TABLESPACE_NOT_EMPTY()                           => STATUS_SEMANTIC_ERROR,
     ER_TABLE_CANT_HANDLE_BLOB()                         => STATUS_SEMANTIC_ERROR,
+    ER_TABLE_CANT_HANDLE_FT()                           => STATUS_SEMANTIC_ERROR,
     ER_TABLE_EXISTS_ERROR()                             => STATUS_SEMANTIC_ERROR,
     ER_TABLE_NOT_LOCKED()                               => STATUS_SEMANTIC_ERROR,
     ER_TARGET_NOT_EXPLAINABLE()                         => STATUS_SEMANTIC_ERROR,
@@ -456,13 +502,14 @@ my %err2type = (
     ER_WRONG_OBJECT()                                   => STATUS_SEMANTIC_ERROR,
     ER_WRONG_PARTITION_NAME()                           => STATUS_SEMANTIC_ERROR,
     ER_WRONG_STRING_LENGTH()                            => STATUS_SEMANTIC_ERROR,
+    ER_WRONG_SUB_KEY()                                  => STATUS_SEMANTIC_ERROR,
     ER_WRONG_USAGE()                                    => STATUS_SEMANTIC_ERROR,
     ER_WRONG_VALUE()                                    => STATUS_SEMANTIC_ERROR,
     ER_WRONG_VALUE_FOR_VAR()                            => STATUS_SEMANTIC_ERROR,
 );
 
 # Sub-error numbers (<nr>) from storage engine failures (ER_GET_ERRNO);
-# "1030 Got error <nr> from storage engine", which should not lead to 
+# "1030 Got error <nr> from storage engine", which should not lead to
 # STATUS_DATABASE_CORRUPTION, as they are acceptable runtime errors.
 
 my %acceptable_se_errors = (
@@ -495,7 +542,7 @@ sub init {
     my ($port) = $executor->dsn() =~ m/:port=([^:]+):/;
     $executor->setPort($port);
 
-    # 
+    #
     # Hack around bug 35676, optiimzer_switch must be set sesson-wide in order to have effect
     # So we read it from the GLOBAL_VARIABLE table and set it locally to the session
     # Please leave this statement on a single line, which allows easier correct parsing from general log.
@@ -515,10 +562,10 @@ sub init {
         ($executor->fetchMethod() == FETCH_METHOD_USE_RESULT)
     ) {
         say("Setting mysql_use_result to 1, so mysql_use_result() will be used.") if rqg_debug();
-        $dbh->{'mysql_use_result'} = 1;        
+#        $dbh->{'mysql_use_result'} = 1;
     } elsif ($executor->fetchMethod() == FETCH_METHOD_STORE_RESULT) {
         say("Setting mysql_use_result to 0, so mysql_store_result() will be used.") if rqg_debug();
-        $dbh->{'mysql_use_result'} = 0;
+#        $dbh->{'mysql_use_result'} = 0;
     }
 
     $executor->setConnectionId($dbh->selectrow_arrayref("SELECT CONNECTION_ID()")->[0]);
@@ -531,9 +578,9 @@ sub init {
 
 sub reportError {
     my ($self, $query, $err, $errstr, $execution_flags) = @_;
-    
+
     my $msg = [$query,$err,$errstr];
-    
+
     if (defined $self->channel) {
         $self->sendError($msg) if not ($execution_flags & EXECUTOR_FLAG_SILENT);
     } elsif (not defined $reported_errors{$errstr}) {
@@ -544,7 +591,7 @@ sub reportError {
 
 sub execute {
     my ($executor, $query, $execution_flags) = @_;
-    
+
     $query .= ' /* QNO ' . (++$query_no) . ' CON_ID ' . $executor->connectionId() . ' */ ';
 
     $execution_flags = $execution_flags | $executor->flags();
@@ -555,7 +602,7 @@ sub execute {
         $query =~ s{/\*executor$executor_id (.*?) \*/}{$1}sg;
         $query =~ s{/\*executor.*?\*/}{}sgo;
     }
-    
+
     my $dbh = $executor->dbh();
 
     return GenTest::Result->new( query => $query, status => STATUS_UNKNOWN_ERROR ) if not defined $dbh;
@@ -565,7 +612,7 @@ sub execute {
     if (
         (not defined $executor->[EXECUTOR_MYSQL_AUTOCOMMIT]) &&
         ($query =~ m{^\s*(start\s+transaction|begin|commit|rollback)}io)
-    ) {    
+    ) {
         $dbh->do("SET AUTOCOMMIT=OFF");
         $executor->[EXECUTOR_MYSQL_AUTOCOMMIT] = 0;
 
@@ -584,7 +631,7 @@ sub execute {
         if ($query =~ m{(procedure|function)}sgio) {
             $trace_query = "DELIMITER |\n$query|\nDELIMITER ";
         } else {
-            $trace_query = $query; 
+            $trace_query = $query;
         }
         # MarkErrors logging can only be done post-execution
         if ($executor->sqltrace eq 'MarkErrors') {
@@ -600,9 +647,9 @@ sub execute {
         $performance = GenTest::QueryPerformance->new(
             dbh => $executor->dbh(),
             query => $query
-        );    
+        );
     }
-            
+
     my $start_time = Time::HiRes::time();
     my $sth = $dbh->prepare($query);
 
@@ -723,7 +770,7 @@ sub execute {
             if ($execution_flags & EXECUTOR_FLAG_HASH_DATA) {
                 $data_hash{substr(Digest::MD5::md5_hex(@row), 0, 3)}++;
             } else {
-                push @data, \@row;                
+                push @data, \@row;
             }
 
             last if ($row_count > MAX_ROWS_THRESHOLD);
@@ -738,7 +785,7 @@ sub execute {
             $executor->[EXECUTOR_RETURNED_ROW_COUNTS]->{'>MAX_ROWS_THRESHOLD'}++;
 
             my $kill_dbh = DBI->connect($executor->dsn(), undef, undef, { PrintError => 1 });
-            $kill_dbh->do("KILL QUERY ".$executor->connectionId()); 
+            $kill_dbh->do("KILL QUERY ".$executor->connectionId());
             $kill_dbh->disconnect();
             $sth->finish();
             $dbh->do("SELECT 1 FROM DUAL /* Guard query so that the KILL QUERY we just issued does not affect future queries */;");
@@ -854,7 +901,7 @@ sub explain {
     if (defined $explain_extended) {
         push @explain_fragments, $explain_extended->[2] =~ m{<[a-z_0-9\-]*?>}sgo;
     }
-    
+
     foreach my $explain_fragment (@explain_fragments) {
         $executor->[EXECUTOR_EXPLAIN_COUNTS]->{$explain_fragment}++;
         if ($executor->[EXECUTOR_EXPLAIN_COUNTS]->{$explain_fragment} > RARE_QUERY_THRESHOLD) {
@@ -866,7 +913,7 @@ sub explain {
 
 }
 
-# If Oracle ever issues 5.10.x, this logic will stop working. 
+# If Oracle ever issues 5.10.x, this logic will stop working.
 # Until then it should be fine
 sub is_query_explainable {
     my ($executor, $query) = @_;
@@ -917,7 +964,7 @@ sub currentSchema {
     if (defined $schema) {
         $executor->execute("USE $schema");
     }
-    
+
     return $executor->dbh()->selectrow_array("SELECT DATABASE()");
 }
 
@@ -953,7 +1000,7 @@ sub getSchemaMetaData {
     ## 7. real data type
     my ($self) = @_;
 
-    my $query = 
+    my $query =
         "SELECT DISTINCT ".
                 "CASE WHEN table_schema = 'information_schema' ".
                      "THEN 'INFORMATION_SCHEMA' ".  ## Hack due to
@@ -988,7 +1035,7 @@ sub getSchemaMetaData {
               "information_schema.columns USING(table_schema,table_name) LEFT JOIN ".
               "information_schema.statistics USING(table_schema,table_name,column_name) ".
 
-          "WHERE table_name <> 'DUMMY'"; 
+          "WHERE table_name <> 'DUMMY'";
 
     my $res = $self->dbh()->selectall_arrayref($query);
     croak("FATAL ERROR: Failed to retrieve schema metadata") unless $res;
@@ -1010,7 +1057,7 @@ sub getCollationMetaData {
     ## 1. Collation name
     ## 2. Character set
     my ($self) = @_;
-    my $query = 
+    my $query =
         "SELECT collation_name,character_set_name FROM information_schema.collations";
 
     return $self->dbh()->selectall_arrayref($query);
