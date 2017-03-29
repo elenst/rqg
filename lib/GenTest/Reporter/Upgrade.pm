@@ -55,6 +55,16 @@ my $vardir;
 sub report {
     my $reporter = shift;
     
+    my $upgrade_mode= $reporter->properties->property('upgrade-test');
+    say("The test will perform server upgrade in '".$upgrade_mode."' mode");
+    say("-- Old server info: --");
+    say($reporter->properties->servers->[0]->version());
+    $reporter->properties->servers->[0]->printServerOptions();
+    say("-- New server info: --");
+    say($reporter->properties->servers->[1]->version());
+    $reporter->properties->servers->[1]->printServerOptions();
+    say("----------------------");
+
     # If the test run is not properly configured, the module can be 
     # called more than once. Produce an error if it happens
     
@@ -67,56 +77,39 @@ sub report {
     my $server = $reporter->properties->servers->[0];
     my $dbh = DBI->connect($server->dsn);
 
-    # Sometimes schema can look different before and after restart,
-    # e.g. AUTO_INCREMENT value can be recalculated. 
-    # We don't care about it in the upgrade test, so we'll restart
-    # the old server before getting the dump
-
-    say("Restarting the old server...");
-
-    my $pid= $server->pid();
-    kill(15, $pid);
-
-    foreach (1..60) {
-        last if not kill(0, $pid);
-        sleep 1;
-    }
-    if (kill(0, $pid)) {
-        say("ERROR: could not shut down server with pid $pid; sending SIGBART to get a stack trace");
-        kill('ABRT', $pid);
-        return STATUS_SERVER_DEADLOCKED;
-    } 
-    $server->setStartDirty(1);
-    if ($server->startServer() != STATUS_OK) {
-        say("ERROR: Could not restart the old server");
-        return STATUS_CRITICAL_FAILURE;
-    }
-    $dbh = DBI->connect($server->dsn);
-    if (not defined $dbh) {
-        say("ERROR: Could not connect to the old server after restart");
-        return STATUS_CRITICAL_FAILURE;
-    }
-    
-    dump_database($reporter,$server,$dbh,'old');
-
-    # Save the major version of the old server
     my $major_version_old= $server->majorVersion;
-    
-    say("Shutting down the old server...");
+    my $version_numeric_old= $server->versionNumeric();
+    my $pid= $server->pid();
 
-    $pid= $server->pid();
-    kill(15, $pid);
+    my %table_autoinc = ();
 
-    foreach (1..60) {
-        last if not kill(0, $pid);
-        sleep 1;
+    dump_database($reporter,$server,$dbh,'old');
+    $table_autoinc{'old'} = collect_autoincrements($dbh,'old');
+
+    if ($upgrade_mode eq 'normal')
+    {
+        say("Shutting down the old server...");
+        kill(15, $pid);
+        foreach (1..60) {
+            last if not kill(0, $pid);
+            sleep 1;
+        }
+    }
+    else
+    {
+        say("Killing the old server...");
+        kill(9, $pid);
+        foreach (1..60) {
+            last if not kill(0, $pid);
+            sleep 1;
+        }
     }
     if (kill(0, $pid)) {
-        say("ERROR: could not shut down the old server with pid $pid; sending SIGBART to get a stack trace");
+        say("ERROR: could not shut down/kill the old server with pid $pid; sending SIGBART to get a stack trace");
         kill('ABRT', $pid);
         return STATUS_SERVER_DEADLOCKED;
     } else {
-        say("Old server with pid $pid has been shut down");
+        say("Old server with pid $pid has been shut down/killed");
     }
 
     my $datadir = $server->datadir;
@@ -151,11 +144,28 @@ sub report {
     # check for critical errors in the log (e.g. server crashed or
     # an engine cannot initialize)
 
+    my @errors= ();
+
     open(UPGRADE, $errorlog);
 
     while (<UPGRADE>) {
         $_ =~ s{[\r\n]}{}siog;
-        say($_) if ($_ =~ m{\[ERROR\]}sio);
+        if (
+            ($_ =~ m{\[ERROR\]}sio) ||
+            ($_ =~ m{InnoDB:\s+Error:}sio)
+        ) {
+            push @errors, $_;
+            # InnoDB errors are likely to mean something nasty,
+            # so we'll raise the flag;
+            # but ignore erros about innodb_table_stats at this point
+            if ($_ =~ m{InnoDB}so
+                and $_ !~ m{innodb_table_stats}so
+                and $_ !~ m{ib_buffer_pool' for reading: No such file or directory}so
+            ) {
+                $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status == STATUS_OK;
+            }
+        }
+
         if ($_ =~ m{registration as a STORAGE ENGINE failed.}sio) {
             $upgrade_status = STATUS_UPGRADE_FAILURE;
         } elsif ($_ =~ m{ready for connections}sio) {
@@ -175,29 +185,41 @@ sub report {
 
     close(UPGRADE);
 
-    if ($upgrade_status == STATUS_OK) {
-        $dbh = DBI->connect($server->dsn);
-        if (not defined $dbh) {
-            say("ERROR: Could not connect to the new server after upgrade");
-            $upgrade_status= STATUS_UPGRADE_FAILURE;
-        }
+    if (@errors) {
+        say("-- ERRORS IN THE LOG -------------");
+        foreach(@errors) { say($_) };
+        say("----------------------------------");
     }
 
     if ($upgrade_status != STATUS_OK) {
-        say("ERROR: Upgrade has apparently failed.");
-        return $upgrade_status;
-    } elsif ($server->majorVersion eq $major_version_old) {
+        if ($upgrade_status == STATUS_POSSIBLE_FAILURE) {
+            say("WARNING: Upgrade produced suspicious messages (see above), but we will allow it to continue");
+        } else {
+            say("ERROR: Upgrade has apparently failed.");
+            return $upgrade_status;
+        }
+    }
+
+    $dbh = DBI->connect($server->dsn);
+    if (not defined $dbh) {
+        say("ERROR: Could not connect to the new server after upgrade");
+        return STATUS_UPGRADE_FAILURE;
+    }
+
+    if ($server->majorVersion eq $major_version_old) {
         say("New server started successfully after the minor upgrade");
+    } elsif ($server->serverVariable('innodb_read_only') and (uc($server->serverVariable('innodb_read_only')) eq 'ON' or $server->serverVariable('innodb_read_only') eq '1') ) {
+        say("New server is running with innodb_read_only=1, skipping mysql_upgrade");
     } else {
         my $mysql_upgrade= $server->clientBindir.'/'.(osWindows() ? 'mysql_upgrade.exe' : 'mysql_upgrade');
         say("New server started successfully after the major upgrade, running mysql_upgrade now using the command:");
         my $cmd= "\"$mysql_upgrade\" --host=127.0.0.1 --port=".$server->port." --user=root --password=''";
         say($cmd);
-        $upgrade_status = system("$cmd");
-        if ($upgrade_status != STATUS_OK) {
+        my $res= system("$cmd");
+        if ($res != STATUS_OK) {
             say("ERROR: mysql_upgrade has failed");
             sayFile($errorlog);
-            return $upgrade_status;
+            return STATUS_UPGRADE_FAILURE;
         }
         say("mysql_upgrade has finished successfully, now the server should be ready to work");
     }
@@ -229,7 +251,13 @@ sub report {
     # Phase 3 - dump the server again and compare dumps
     #
     dump_database($reporter,$server,$dbh,'new');
-    return compare_dumps();
+    $table_autoinc{'new'} = collect_autoincrements($dbh,'new');
+
+    my $version_numeric_new= $server->versionNumeric();
+    normalize_dumps($version_numeric_old,$version_numeric_new);
+
+    my $res= compare_all(\%table_autoinc);
+    return ($upgrade_status > $res ? $upgrade_status : $res);
 }
     
     
@@ -238,10 +266,10 @@ sub dump_database {
     my ($reporter, $server, $dbh, $suffix) = @_;
     $vardir = $server->vardir unless defined $vardir;
     my $port= $server->port;
-    
-	my @all_databases = @{$dbh->selectcol_arrayref("SHOW DATABASES")};
-	my $databases_string = join(' ', grep { $_ !~ m{^(mysql|information_schema|performance_schema)$}sgio } @all_databases );
-	
+
+	my @all_databases = @{$dbh->selectcol_arrayref("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE LOWER(SCHEMA_NAME) NOT IN ('mysql','information_schema','performance_schema','sys')")};
+	my $databases_string = join(' ', @all_databases );
+
     my $dump_file = "$vardir/server_schema_$suffix.dump";
     my $mysqldump= $server->dumper;
 
@@ -261,7 +289,27 @@ sub dump_database {
     return ($dump_result ? STATUS_ENVIRONMENT_FAILURE : STATUS_OK);
 }
 
-sub compare_dumps {
+# Table AUTO_INCREMENT can be re-calculated upon restart,
+# in which case the dumps will be different. We will ignore possible
+# AUTO_INCREMENT differences in the dumps, but instead will check
+# separately that the new value is either equal to the old one, or
+# has been recalculated as MAX(column)+1.
+
+sub collect_autoincrements {
+    my ($dbh, $suffix) = @_;
+    say("Storing auto-increment data for the $suffix server...");
+	my $autoinc_tables = $dbh->selectall_arrayref("SELECT CONCAT(ist.TABLE_SCHEMA,'.',ist.TABLE_NAME), ist.AUTO_INCREMENT, isc.COLUMN_NAME, '' FROM INFORMATION_SCHEMA.TABLES ist JOIN INFORMATION_SCHEMA.COLUMNS isc ON (ist.TABLE_SCHEMA = isc.TABLE_SCHEMA AND ist.TABLE_NAME = isc.TABLE_NAME) WHERE ist.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') AND ist.AUTO_INCREMENT IS NOT NULL AND isc.EXTRA LIKE '%auto_increment%' ORDER BY ist.TABLE_SCHEMA, ist.TABLE_NAME, isc.COLUMN_NAME");
+
+    foreach my $t (@$autoinc_tables) {
+        $t->[3] = $dbh->selectrow_arrayref("SELECT IFNULL(MAX($t->[2]),0) FROM $t->[0]")->[0];
+    }
+
+    return $autoinc_tables;
+}
+
+sub compare_all {
+    my $table_autoinc= shift;
+
 	say("Comparing SQL schema dumps between old and new servers...");
     my $status = STATUS_OK;
 	my $diff_result = system("diff -u $vardir/server_schema_old.dump $vardir/server_schema_new.dump");
@@ -280,10 +328,97 @@ sub compare_dumps {
 		$status= STATUS_CONTENT_MISMATCH;
 	}
 
+	say("Comparing auto-increment data between old and new servers...");
+
+    my $old_autoinc= $table_autoinc->{'old'};
+    my $new_autoinc= $table_autoinc->{'new'};
+
+    if (not $old_autoinc and not $new_autoinc) {
+        say("No auto-inc data for old and new servers, skipping the check");
+    }
+    elsif ($old_autoinc and ref $old_autoinc eq 'ARRAY' and (not $new_autoinc or ref $new_autoinc ne 'ARRAY')) {
+        say("ERROR: auto-increment data for the new server is not available");
+        $status = STATUS_CONTENT_MISMATCH;
+    }
+    elsif ($new_autoinc and ref $new_autoinc eq 'ARRAY' and (not $old_autoinc or ref $old_autoinc ne 'ARRAY')) {
+        say("ERROR: auto-increment data for the old server is not available");
+        $status = STATUS_CONTENT_MISMATCH;
+    }
+    elsif (scalar @$old_autoinc != scalar @$new_autoinc) {
+        say("ERROR: different number of tables in auto-incement data. Old server: ".scalar(@$old_autoinc)." ; new server: ".scalar(@$new_autoinc));
+        $status= STATUS_CONTENT_MISMATCH;
+    }
+    else {
+        foreach my $i (0..$#$old_autoinc) {
+            my $to = $old_autoinc->[$i];
+            my $tn = $new_autoinc->[$i];
+            say("Comparing auto-increment data. Old server: @$to ; new server: @$tn");
+
+            # 0: table name; 1: table auto-inc; 2: column name; 3: max(column)
+            if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]+1))
+            {
+                say("ERROR: auto-increment data differs. Old server: @$to ; new server: @$tn");
+                $status= STATUS_CONTENT_MISMATCH;
+            }
+        }
+    }
+
 	if ($status == STATUS_OK) {
 		say("No differences were found between old and new server contents.");
     }
     return $status;
+}
+
+# There are some known expected differences in dump structure between versions.
+# We need to normalize the dumps to avoid false positives
+sub normalize_dumps {
+    my ($old_ver,$new_ver) = @_;
+
+    move("$vardir/server_schema_old.dump","$vardir/server_schema_old.dump.orig");
+    move("$vardir/server_schema_new.dump","$vardir/server_schema_new.dump.orig");
+
+    open(DUMP1,"$vardir/server_schema_old.dump.orig");
+    open(DUMP2,">$vardir/server_schema_old.dump");
+    while (<DUMP1>) {
+        if (s/AUTO_INCREMENT=\d+//) {};
+        print DUMP2 $_;
+    }
+    close(DUMP1);
+    close(DUMP2);
+    open(DUMP1,"$vardir/server_schema_new.dump.orig");
+    open(DUMP2,">$vardir/server_schema_new.dump");
+    while (<DUMP1>) {
+        if (s/AUTO_INCREMENT=\d+//) {};
+        print DUMP2 $_;
+    }
+    close(DUMP1);
+    close(DUMP2);
+
+    # In 10.2 SHOW CREATE TABLE output changed:
+    # - blob and text columns got the "DEFAULT" clause;
+    # - default numeric values lost single quote marks
+    # Let's update pre-10.2 dumps to match it
+
+    if ($old_ver le '100201' and $new_ver ge '100201') {
+        move("$vardir/server_schema_old.dump","$vardir/server_schema_old.dump.tmp");
+        open(DUMP1,"$vardir/server_schema_old.dump.tmp");
+        open(DUMP2,">$vardir/server_schema_old.dump");
+        while (<DUMP1>) {
+            # `k` int(10) unsigned NOT NULL DEFAULT '0' => `k` int(10) unsigned NOT NULL DEFAULT 0
+            s/(DEFAULT\s+)\'(\d+)\'(,?)$/${1}${2}${3}/;
+
+            # `col_blob` blob NOT NULL => `col_blob` blob NOT NULL DEFAULT '',
+            # This part is conditional, see MDEV-12006. For upgrade from 10.1, a text column does not get a default value
+            if ($old_ver lt '100101') {
+                s/(\s+(?:blob|text|mediumblob|mediumtext|longblob|longtext|tinyblob|tinytext)(\s+)NOT\sNULL)(,)?$/${1}${2}DEFAULT${2}\'\'${3}/;
+            }
+            # `col_blob` text => `col_blob` text DEFAULT NULL,
+            s/(\s)(blob|text|mediumblob|mediumtext|longblob|longtext|tinyblob|tinytext)(,)?$/${1}${2}${1}DEFAULT${1}NULL${3}/;
+            print DUMP2 $_;
+        }
+        close(DUMP1);
+        close(DUMP2);
+    }
 }
 
 sub type {
