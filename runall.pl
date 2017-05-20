@@ -406,7 +406,7 @@ foreach my $server_id (0..1) {
 	print MTR_COMMAND $mtr_command;
 	close MTR_COMMAND;
 
-    if (osWindows() and $appverif) {
+    if (osWindows() and $server_id == 0 and $appverif) {
         say("Enabling appverif");
         system("appverif /verify mysqld.exe");
     } elsif (osWindows() and defined $appverif) {
@@ -418,7 +418,7 @@ foreach my $server_id (0..1) {
 
 	my $mtr_status = system($mtr_command);
 
-    if (osWindows() and $appverif) {
+    if (osWindows() and $server_id == 0 and $appverif) {
         say("Disabling appverif");
         system("appverif /n mysqld.exe");
     }
