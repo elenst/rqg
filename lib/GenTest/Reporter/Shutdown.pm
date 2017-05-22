@@ -43,7 +43,7 @@ sub report {
 
     my $mysqladmin_path =
          DBServer::MySQL::MySQLd->_find([$reporter->serverVariable('basedir')],
-                                        ['client','bin'],
+                                        ['client','bin','client/debug','client/relwithdebinfo'],
                                         'mysqladmin','mysqladmin.exe');
 
     for (my $port = $primary_port + 9; $port >= $primary_port; $port--) {
