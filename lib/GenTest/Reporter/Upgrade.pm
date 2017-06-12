@@ -215,7 +215,31 @@ sub report {
         say("New server started successfully after the major upgrade, running mysql_upgrade now using the command:");
         my $cmd= "\"$mysql_upgrade\" --host=127.0.0.1 --port=".$server->port." --user=root --password=''";
         say($cmd);
-        my $res= system("$cmd");
+        my $res= system("$cmd > $datadir/mysql_upgrade.log");
+        if ($res == STATUS_OK) {
+            # mysql_upgrade can return exit code 0 even if user tables are corrupt,
+            # so we don't trust the exit code, we should also check the actual output
+            if (open(UPGRADE_LOG, "$datadir/mysql_upgrade.log")) {
+                OUTER_READ:
+                while (<UPGRADE_LOG>) {
+                    # For now we will only check 'Repairing tables' section,
+                    # and if there are any errors, we'll consider it a failure
+                    next unless /Repairing tables/;
+                    while (<UPGRADE_LOG>) {
+                        if (/^\s*Error/) {
+                            $res= STATUS_UPGRADE_FAILURE;
+                            say("ERROR: Found errors in mysql_upgrade output");
+                            sayFile("$datadir/mysql_upgrade.log");
+                            last OUTER_READ;
+                        }
+                    }
+                }
+                close (UPGRADE_LOG);
+            } else {
+                say("ERROR: Could not find mysql_upgrade.log");
+                $res= STATUS_UPGRADE_FAILURE;
+            }
+        }
         if ($res != STATUS_OK) {
             say("ERROR: mysql_upgrade has failed");
             sayFile($errorlog);
