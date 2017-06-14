@@ -346,9 +346,9 @@ sub doCombination {
     }
     exit($result) if (($result == STATUS_ENVIRONMENT_FAILURE) || ($result == 255)) && (not defined $force);
 
+    $max_result = $result if $result > $max_result;
     if ($result > 0 and not $discard_logs) {
         foreach my $s (1..$servers) {
-            $max_result = $result if $result > $max_result;
             my $from = $workdir.'/current'.$s.'_'.$thread_id;
             my $to = $workdir.'/vardir'.$s.'_'.$trial_id;
             say("[$thread_id] Copying $from to $to") if $logToStd;
