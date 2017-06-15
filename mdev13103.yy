@@ -1,0 +1,5 @@
+query_init:
+    CREATE TABLE `t1` (`pk` BIGINT AUTO_INCREMENT PRIMARY KEY, `i` INT) ENGINE=InnoDB ROW_FORMAT=DYNAMIC PAGE_COMPRESSED=1;
+
+query:
+    INSERT IGNORE INTO `t1` ( `i` ) VALUES ( _smallint_unsigned ) ;
