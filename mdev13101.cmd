@@ -3,13 +3,10 @@ if [ -z "$BASEDIR" ] ; then
 else
   vardir=$BASEDIR/mysql-test/var
   keys=$BASEDIR/mysql-test/std_data/keys.txt
-  echo "Basedir: $BASEDIR"
-  echo "Vardir: $vardir"
-  echo "Encryption keys: $keys\n"
 
   perl ./runall-new.pl \
 --threads=1 \
---duration=60 \
+--duration=30 \
 --grammar=conf/mariadb/oltp.yy \
 --gendata-advanced \
 --skip-gendata \
@@ -23,5 +20,11 @@ else
 --mysqld=--file-key-management-filename=$keys \
 --basedir=$BASEDIR \
 --vardir=$vardir
+
+  echo
+  echo "Basedir: $BASEDIR"
+  echo "Vardir: $vardir"
+  echo "Encryption keys: $keys"
+  echo
 fi
 
