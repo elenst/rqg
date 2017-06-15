@@ -272,6 +272,10 @@ foreach (2..3) {
     }
 }
 
+if ($upgrade_test and $basedirs[2] eq '') {
+    $basedirs[2] = $basedirs[0];
+}
+
 # Now we should have all basedirs.
 # Check that there is no overlap in vardirs (when the user defines for two different servers the same basedir,
 # but does not define separate vardirs)
