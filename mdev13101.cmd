@@ -6,9 +6,9 @@ else
 
   perl ./runall-new.pl \
 --threads=1 \
---duration=30 \
---grammar=conf/mariadb/oltp.yy \
---gendata-advanced \
+--queries=2 \
+--duration=3 \
+--grammar=mdev13101.yy \
 --skip-gendata \
 --upgrade-test=crash \
 --mysqld=--innodb-page-size=8K \
