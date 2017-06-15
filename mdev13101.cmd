@@ -11,12 +11,10 @@ else
 --grammar=mdev13101.yy \
 --skip-gendata \
 --upgrade-test=crash \
---mysqld=--innodb-page-size=8K \
 --mysqld=--file-key-management \
 --mysqld=--plugin-load-add=file_key_management.so \
 --mysqld=--innodb-encrypt-tables \
---mysqld=--innodb-encrypt-log \
---mysqld=--innodb-encryption-threads=4 \
+--mysqld=--innodb-encryption-threads=1 \
 --mysqld=--file-key-management-filename=$keys \
 --basedir=$BASEDIR \
 --vardir=$vardir
