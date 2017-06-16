@@ -1,0 +1,20 @@
+$tables = {
+        pk => [ 'bigint auto_increment' ],
+        names => [ 't001', 't002', 't003', 't004' ],
+        engines => [ 'InnoDB' ],
+        rows => [ 1000, 1000 ],
+        row_formats => [ undef, 'DYNAMIC' ],
+        options => [ 'PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=9' ]
+};
+
+$fields = {
+        types => [ 'int', 'timestamp', 'varchar(8)' ],
+        indexes => [ undef, 'key' ],
+        null => [ undef, 'not null' ]
+};
+
+$data = {
+        numbers => [ 'digit', 'null', undef ],
+        strings => [ 'letter', 'english', 'char(8)', 'null' ],
+        temporals => [ undef, 'timestamp', 'null' ]
+}
