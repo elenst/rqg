@@ -51,6 +51,7 @@ use DBServer::MySQL::MySQLd;
 
 my $first_reporter;
 my $vardir;
+my $version_numeric_old;
 
 sub report {
     my $reporter = shift;
@@ -78,7 +79,7 @@ sub report {
     my $dbh = DBI->connect($server->dsn);
 
     my $major_version_old= $server->majorVersion;
-    my $version_numeric_old= $server->versionNumeric();
+    $version_numeric_old= $server->versionNumeric();
     my $pid= $server->pid();
 
     my %table_autoinc = ();
@@ -359,6 +360,9 @@ sub compare_all {
 
     if (not $old_autoinc and not $new_autoinc) {
         say("No auto-inc data for old and new servers, skipping the check");
+    }
+    elsif ($version_numeric_old > 100204) {
+        say("WARNING: auto-increment check is disabled due to MDEV-13094");
     }
     elsif ($old_autoinc and ref $old_autoinc eq 'ARRAY' and (not $new_autoinc or ref $new_autoinc ne 'ARRAY')) {
         say("ERROR: auto-increment data for the new server is not available");
