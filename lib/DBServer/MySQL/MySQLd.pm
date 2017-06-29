@@ -934,7 +934,7 @@ sub majorVersion {
     if (not defined $self->[MYSQLD_MAJOR_VERSION]) {
         my $ver= $self->version;
         if ($ver =~ /(\d+\.\d+)/) {
-            $self->[MYSQLD_MAJOR_VERSION]= $ver;
+            $self->[MYSQLD_MAJOR_VERSION]= $1;
         }
     }
     return $self->[MYSQLD_MAJOR_VERSION];
@@ -995,13 +995,14 @@ sub _logOptions {
 # 10.0 to 5.6
 # 10.1 to 5.6
 # 10.2 to 5.6 (for now, at least) 
+# 10.3 to 5.6 (for now, at least) 
 
 sub _olderThan {
     my ($self,$b1,$b2,$b3) = @_;
     
     my ($v1, $v2, $v3) = $self->versionNumbers;
 
-    if ($v1 == 10 and $b1 == 5 and ($v2 == 0 or $v2 == 1 or $v2 == 2)) { $v1 = 5; $v2 = 6 }
+    if ($v1 == 10 and $b1 == 5 and ($v2 == 0 or $v2 == 1 or $v2 == 2 or $v2 == 3)) { $v1 = 5; $v2 = 6 }
     elsif ($v1 == 5 and $b1 == 10 and ($b2 == 0 or $b2 == 1)) { $b1 = 5; $b2 = 6 }
 
     my $b = $b1*1000 + $b2 * 100 + $b3;
