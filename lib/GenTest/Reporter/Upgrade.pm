@@ -52,6 +52,7 @@ use DBServer::MySQL::MySQLd;
 my $first_reporter;
 my $vardir;
 my $version_numeric_old;
+my %detected_known_bugs;
 
 sub report {
     my $reporter = shift;
@@ -163,7 +164,13 @@ sub report {
                 and $_ !~ m{innodb_table_stats}so
                 and $_ !~ m{ib_buffer_pool' for reading: No such file or directory}so
             ) {
-                $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status == STATUS_OK;
+                if (m{\[ERROR\] InnoDB: Corruption: Page is marked as compressed but uncompress failed with error}so) 
+                {
+                    $detected_known_bugs{'MDEV-13112'}= (defined $detected_known_bugs{'MDEV-13112'} ? $detected_known_bugs{'MDEV-13112'}+1 : 1);
+                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+                } else {
+                    $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
+                }
             }
         }
 
@@ -193,7 +200,7 @@ sub report {
     }
 
     if ($upgrade_status != STATUS_OK) {
-        if ($upgrade_status == STATUS_POSSIBLE_FAILURE) {
+        if ($upgrade_status == STATUS_POSSIBLE_FAILURE or $upgrade_status == STATUS_CUSTOM_OUTCOME) {
             say("WARNING: Upgrade produced suspicious messages (see above), but we will allow it to continue");
         } else {
             say("ERROR: Upgrade has apparently failed.");
@@ -282,7 +289,22 @@ sub report {
     normalize_dumps($version_numeric_old,$version_numeric_new);
 
     my $res= compare_all(\%table_autoinc);
-    return ($upgrade_status > $res ? $upgrade_status : $res);
+    $res= $upgrade_status if $upgrade_status > $res;
+
+    foreach my $f (keys %detected_known_bugs)
+    {
+        if ($f eq 'MDEV-13094' and $version_numeric_old > 100204) {
+            say("WARNING: Detected ".$detected_known_bugs{'MDEV-13094'}." occurrences of MDEV-13094 (Wrong AUTO_INCREMENT value on the table after server restart)");
+        }
+        elsif ($f eq 'MDEV-13112' and $server->majorVersion eq '10.1' and $major_version_old eq '10.1') {
+            say("WARNING: Detected ".$detected_known_bugs{'MDEV-13112'}." occurrences of MDEV-13112 (InnoDB: Corruption: Page is marked as compressed but uncompress failed with error)");
+        }
+        else {
+            $res= STATUS_UPGRADE_FAILURE if $res <= STATUS_CUSTOM_OUTCOME;
+        }
+    }
+    $res= STATUS_OK if $res == STATUS_CUSTOM_OUTCOME;
+    return $res;
 }
     
     
@@ -361,9 +383,6 @@ sub compare_all {
     if (not $old_autoinc and not $new_autoinc) {
         say("No auto-inc data for old and new servers, skipping the check");
     }
-    elsif ($version_numeric_old > 100204) {
-        say("WARNING: auto-increment check is disabled due to MDEV-13094");
-    }
     elsif ($old_autoinc and ref $old_autoinc eq 'ARRAY' and (not $new_autoinc or ref $new_autoinc ne 'ARRAY')) {
         say("ERROR: auto-increment data for the new server is not available");
         $status = STATUS_CONTENT_MISMATCH;
@@ -385,8 +404,9 @@ sub compare_all {
             # 0: table name; 1: table auto-inc; 2: column name; 3: max(column)
             if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]+1))
             {
+                $detected_known_bugs{'MDEV-13094'}= (defined $detected_known_bugs{'MDEV-13094'} ? $detected_known_bugs{'MDEV-13094'}+1 : 1);
                 say("ERROR: auto-increment data differs. Old server: @$to ; new server: @$tn");
-                $status= STATUS_CONTENT_MISMATCH;
+                $status= STATUS_CUSTOM_OUTCOME if $status < STATUS_CUSTOM_OUTCOME;
             }
         }
     }
