@@ -34,7 +34,7 @@ use Time::HiRes;
 use Digest::MD5;
 
 use constant RARE_QUERY_THRESHOLD    => 5;
-use constant MAX_ROWS_THRESHOLD        => 5000000;
+use constant MAX_ROWS_THRESHOLD        => 7000000;
 
 my %reported_errors;
 
@@ -276,6 +276,7 @@ use constant  ER_CANT_DO_ONLINE                                 => 1915;
 use constant  ER_CONNECTION_KILLED                              => 1927;
 use constant  ER_TARGET_NOT_EXPLAINABLE                         => 1933;
 use constant  ER_IT_IS_A_VIEW                                   => 1965;
+use constant  ER_STATEMENT_TIMEOUT                              => 1969;
 
 use constant  ER_CONNECTION_ERROR                               => 2002;
 use constant  ER_CONN_HOST_ERROR                                => 2003;
@@ -429,7 +430,7 @@ my %err2type = (
     ER_ONLY_ON_RANGE_LIST_PARTITION()                   => STATUS_SEMANTIC_ERROR,
     ER_OPEN_AS_READONLY()                               => STATUS_SEMANTIC_ERROR,
     ER_OPERAND_COLUMNS()                                => STATUS_SEMANTIC_ERROR,
-    ER_OPTION_PREVENTS_STATEMENT()                      => STATUS_ENVIRONMENT_FAILURE,
+    ER_OPTION_PREVENTS_STATEMENT()                      => STATUS_SEMANTIC_ERROR,
     ER_OUTOFMEMORY()                                    => STATUS_ENVIRONMENT_FAILURE,
     ER_OUTOFMEMORY2()                                   => STATUS_ENVIRONMENT_FAILURE,
     ER_OUT_OF_RESOURCES()                               => STATUS_ENVIRONMENT_FAILURE,
@@ -465,6 +466,7 @@ my %err2type = (
 #    ER_SP_PROC_TABLE_CORRUPT()                          => STATUS_DATABASE_CORRUPTION,  # this error is bogus due to bug # 47870
     ER_SP_RECURSION_LIMIT()                             => STATUS_SEMANTIC_ERROR,
     ER_STACK_OVERRUN()                                  => STATUS_ENVIRONMENT_FAILURE,
+    ER_STATEMENT_TIMEOUT()                              => STATUS_SEMANTIC_ERROR,
     ER_STMT_NOT_ALLOWED_IN_SF_OR_TRG()                  => STATUS_SEMANTIC_ERROR,
     ER_STORED_FUNCTION_PREVENTS_SWITCH_BINLOG_FORMAT()  => STATUS_SEMANTIC_ERROR,
     ER_SYNTAX_ERROR()                                   => STATUS_SYNTAX_ERROR,
