@@ -240,7 +240,7 @@ sub populate_table
     my @column_list = ();
 
     foreach my $c (@$columns) {
-        push @column_list, $c->[5];
+        push @column_list, '`'.$c->[5].'`';
     }
 
     my $column_list = join ',', @column_list;
