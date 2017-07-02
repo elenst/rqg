@@ -109,7 +109,7 @@ sub report {
     if (kill(0, $pid)) {
         say("ERROR: could not shut down/kill the old server with pid $pid; sending SIGBART to get a stack trace");
         kill('ABRT', $pid);
-        return STATUS_SERVER_DEADLOCKED;
+        return report_and_return(STATUS_SERVER_DEADLOCKED);
     } else {
         say("Old server with pid $pid has been shut down/killed");
     }
@@ -136,15 +136,11 @@ sub report {
 
     if ($upgrade_status != STATUS_OK) {
         say("ERROR: New server failed to start");
-        return STATUS_UPGRADE_FAILURE;
     }
-    
-    # If we are here, the new server must have started. For a minor upgrade,
-    # it should be enough, and the server should be working properly.
-    # For the major upgrade, however, having some errors in the error is
-    # normal, until we run mysql_upgrade. So, at this point we'll only
-    # check for critical errors in the log (e.g. server crashed or
-    # an engine cannot initialize)
+
+    # Check and parse the error log up to this point,
+    # even if the server failed to start, we need to see what went wrong
+    # to tune the error code
 
     my @errors= ();
 
@@ -153,41 +149,52 @@ sub report {
     while (<UPGRADE>) {
         $_ =~ s{[\r\n]}{}siog;
         if (
-            ($_ =~ m{\[ERROR\]}sio) ||
-            ($_ =~ m{InnoDB:\s+Error:}sio)
+            ($_ =~ m{\[ERROR\]\s+InnoDB}sio) ||
+            ($_ =~ m{InnoDB:\s+Error:}sio) ||
+            ($_ =~ m{Assertion\s}sio) ||
+            ($_ =~ m{registration as a STORAGE ENGINE failed.}sio) ||
+            ($_ =~ m{got signal}sio) ||
+            ($_ =~ m{segmentation fault}sio) ||
+            ($_ =~ m{segfault}sio) ||
+            ($_ =~ m{exception}sio)
         ) {
             push @errors, $_;
             # InnoDB errors are likely to mean something nasty,
             # so we'll raise the flag;
             # but ignore erros about innodb_table_stats at this point
-            if ($_ =~ m{InnoDB}so
-                and $_ !~ m{innodb_table_stats}so
-                and $_ !~ m{ib_buffer_pool' for reading: No such file or directory}so
+            if ( $_ !~ m{innodb_table_stats}so
+                   and $_ !~ m{ib_buffer_pool' for reading: No such file or directory}so
             ) {
                 if (m{\[ERROR\] InnoDB: Corruption: Page is marked as compressed but uncompress failed with error}so) 
                 {
                     $detected_known_bugs{'MDEV-13112'}= (defined $detected_known_bugs{'MDEV-13112'} ? $detected_known_bugs{'MDEV-13112'}+1 : 1);
                     $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
-                } else {
+                }
+                elsif (m{Assertion `flags & BUF_PAGE_PRINT_NO_CRASH' failed}so)
+                {
+                    $detected_known_bugs{'MDEV-13103'}= (defined $detected_known_bugs{'MDEV-13103'} ? $detected_known_bugs{'MDEV-13103'}+1 : 1);
+                    # We will only set the status to CUSTOM_OUTCOME if it was previously set to POSSIBLE_FAILURE
+                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status == STATUS_POSSIBLE_FAILURE;
+                    last;
+                }
+                elsif (m{InnoDB: Corruption: Page is marked as compressed space:}so)
+                {
+                    # Most likely it is an indication of MDEV-13103, but to make sure, we still need to find the assertion failure.
+                    # If we find it later, we will set result to STATUS_CUSTOM_OUTCOME.
+                    # If we don't find it later, we will raise it to STATUS_UPGRADE_FAILURE
                     $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
+                }
+                else {
+                    $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status < STATUS_UPGRADE_FAILURE;
                 }
             }
         }
-
-        if ($_ =~ m{registration as a STORAGE ENGINE failed.}sio) {
-            $upgrade_status = STATUS_UPGRADE_FAILURE;
-        } elsif ($_ =~ m{ready for connections}sio) {
+        elsif ($_ =~ m{ready for connections}sio) {
             last;
-        } elsif ($_ =~ m{device full error|no space left on device}sio) {
+        }
+        elsif ($_ =~ m{device full error|no space left on device}sio) {
             $upgrade_status = STATUS_ENVIRONMENT_FAILURE;
             last;
-        } elsif (
-            ($_ =~ m{got signal}sio) ||
-            ($_ =~ m{segfault}sio) ||
-            ($_ =~ m{segmentation fault}sio) ||
-            ($_ =~ m{exception}sio)
-        ) {
-            $upgrade_status = STATUS_UPGRADE_FAILURE;
         }
     }
 
@@ -200,18 +207,20 @@ sub report {
     }
 
     if ($upgrade_status != STATUS_OK) {
-        if ($upgrade_status == STATUS_POSSIBLE_FAILURE or $upgrade_status == STATUS_CUSTOM_OUTCOME) {
-            say("WARNING: Upgrade produced suspicious messages (see above), but we will allow it to continue");
-        } else {
-            say("ERROR: Upgrade has apparently failed.");
-            return $upgrade_status;
-        }
+        $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status == STATUS_POSSIBLE_FAILURE;
+        say("ERROR: Upgrade has apparently failed.");
+        return report_and_return($upgrade_status);
     }
+
+    # If we are here, the new server must have started and no critical errors occurred.
+    # For a minor upgrade, it should be enough, and the server should be working properly.
+    # For the major upgrade, however, having some errors in the error is
+    # normal, until we run mysql_upgrade.
 
     $dbh = DBI->connect($server->dsn);
     if (not defined $dbh) {
         say("ERROR: Could not connect to the new server after upgrade");
-        return STATUS_UPGRADE_FAILURE;
+        return report_and_return(STATUS_UPGRADE_FAILURE);
     }
 
     if ($server->majorVersion eq $major_version_old) {
@@ -251,7 +260,7 @@ sub report {
         if ($res != STATUS_OK) {
             say("ERROR: mysql_upgrade has failed");
             sayFile($errorlog);
-            return STATUS_UPGRADE_FAILURE;
+            return report_and_return(STATUS_UPGRADE_FAILURE);
         }
         say("mysql_upgrade has finished successfully, now the server should be ready to work");
     }
@@ -274,7 +283,7 @@ sub report {
             say("Verifying table: $table; database: $database");
             $dbh->do("CHECK TABLE `$database`.`$table` EXTENDED");
             # 1178 is ER_CHECK_NOT_IMPLEMENTED
-            return STATUS_DATABASE_CORRUPTION if $dbh->err() > 0 && $dbh->err() != 1178;
+            return report_and_return(STATUS_DATABASE_CORRUPTION) if $dbh->err() > 0 && $dbh->err() != 1178;
         }
     }
     say("Schema does not look corrupt");
@@ -291,22 +300,15 @@ sub report {
     my $res= compare_all(\%table_autoinc);
     $res= $upgrade_status if $upgrade_status > $res;
 
-    foreach my $f (keys %detected_known_bugs)
-    {
-        if ($f eq 'MDEV-13094' and $version_numeric_old > 100204) {
-            say("WARNING: Detected ".$detected_known_bugs{'MDEV-13094'}." occurrences of MDEV-13094 (Wrong AUTO_INCREMENT value on the table after server restart)");
-        }
-        elsif ($f eq 'MDEV-13112' and $server->majorVersion eq '10.1' and $major_version_old eq '10.1') {
-            say("WARNING: Detected ".$detected_known_bugs{'MDEV-13112'}." occurrences of MDEV-13112 (InnoDB: Corruption: Page is marked as compressed but uncompress failed with error)");
-        }
-        else {
-            $res= STATUS_UPGRADE_FAILURE if $res <= STATUS_CUSTOM_OUTCOME;
-        }
-    }
-    $res= STATUS_OK if $res == STATUS_CUSTOM_OUTCOME;
+    return report_and_return($res);
+}
+
+sub report_and_return {
+    my $res= shift;
+    my @detected_known_bugs = map { $_ . '('.$detected_known_bugs{$_}.')' } keys %detected_known_bugs;
+    say("Detected possible appearance of known bugs: @detected_known_bugs");
     return $res;
 }
-    
     
 sub dump_database {
     # Suffix is "old" or "new" (restart)
