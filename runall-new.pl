@@ -468,7 +468,7 @@ if ($rpl_mode ne '') {
 
     # There are 'normal' and 'crash' modes.
     # 'normal' will be used by default
-    $upgrade_test= 'normal' if $upgrade_test !~ /crash/i;
+    $upgrade_test= 'normal' if $upgrade_test !~ /(?:crash|undo)/i;
     $upgrade_test= lc($upgrade_test);
 
     # server0 is the "old" server (before upgrade).
