@@ -167,12 +167,12 @@ sub report {
             ) {
                 if (m{\[ERROR\] InnoDB: Corruption: Page is marked as compressed but uncompress failed with error}so) 
                 {
-                    $detected_known_bugs{'MDEV-13112'}= (defined $detected_known_bugs{'MDEV-13112'} ? $detected_known_bugs{'MDEV-13112'}+1 : 1);
+                    detected_bug(13112);
                     $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
                 }
                 elsif (m{Assertion `flags & BUF_PAGE_PRINT_NO_CRASH' failed}so)
                 {
-                    $detected_known_bugs{'MDEV-13103'}= (defined $detected_known_bugs{'MDEV-13103'} ? $detected_known_bugs{'MDEV-13103'}+1 : 1);
+                    detected_bug(13103);
                     # We will only set the status to CUSTOM_OUTCOME if it was previously set to POSSIBLE_FAILURE
                     $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status == STATUS_POSSIBLE_FAILURE;
                     last;
@@ -305,7 +305,7 @@ sub report {
 
 sub report_and_return {
     my $res= shift;
-    my @detected_known_bugs = map { $_ . '('.$detected_known_bugs{$_}.')' } keys %detected_known_bugs;
+    my @detected_known_bugs = map { 'MDEV-'. $_ . '('.$detected_known_bugs{$_}.')' } keys %detected_known_bugs;
     say("Detected possible appearance of known bugs: @detected_known_bugs");
     return $res;
 }
@@ -406,7 +406,7 @@ sub compare_all {
             # 0: table name; 1: table auto-inc; 2: column name; 3: max(column)
             if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]+1))
             {
-                $detected_known_bugs{'MDEV-13094'}= (defined $detected_known_bugs{'MDEV-13094'} ? $detected_known_bugs{'MDEV-13094'}+1 : 1);
+                detected_bug(13094);
                 say("ERROR: auto-increment data differs. Old server: @$to ; new server: @$tn");
                 $status= STATUS_CUSTOM_OUTCOME if $status < STATUS_CUSTOM_OUTCOME;
             }
@@ -417,6 +417,11 @@ sub compare_all {
 		say("No differences were found between old and new server contents.");
     }
     return $status;
+}
+
+sub detected_bug {
+    my $bugnum= shift;
+    $detected_known_bugs{$bugnum}= (defined $detected_known_bugs{$bugnum} ? $detected_known_bugs{$bugnum}+1 : 1);
 }
 
 # There are some known expected differences in dump structure between versions.
