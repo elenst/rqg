@@ -184,6 +184,11 @@ sub report {
                     # If we don't find it later, we will raise it to STATUS_UPGRADE_FAILURE
                     $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
                 }
+                elsif (m{recv_parse_or_apply_log_rec_body.*Assertion.*offs == .*failed}so)
+                {
+                    detected_bug(13101);
+                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+                }
                 else {
                     $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status < STATUS_UPGRADE_FAILURE;
                 }
