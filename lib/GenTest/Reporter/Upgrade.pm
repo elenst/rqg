@@ -151,7 +151,7 @@ sub report {
         if (
             ($_ =~ m{\[ERROR\]\s+InnoDB}sio) ||
             ($_ =~ m{InnoDB:\s+Error:}sio) ||
-            ($_ =~ m{Assertion\s}sio) ||
+            ($_ =~ m{Assertion\W}sio) ||
             ($_ =~ m{registration as a STORAGE ENGINE failed.}sio) ||
             ($_ =~ m{got signal}sio) ||
             ($_ =~ m{segmentation fault}sio) ||
@@ -188,6 +188,20 @@ sub report {
                 {
                     detected_bug(13101);
                     $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+                }
+                elsif (m{InnoDB: Assertion failure in thread \d+ in file page0zip\.cc line \d+})
+                {
+                    # Possibly it's MDEV-13247, it can show up if the old version is between 10.1.2 and 10.1.25.
+                    # We need to check for "Failing assertion: !page_zip_dir_find(page_zip, page_offset(rec))" later
+                    $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
+                }
+                elsif (m{Failing assertion: \!page_zip_dir_find\(page_zip, page_offset\(rec\)\)}so)
+                {
+                    # Possibly it's MDEV-13247, it can show up if the old version is between 10.1.2 and 10.1.25.
+                    # If we've also seen Assertion failure .. in file page0zip.cc, we'll consider it related
+                    detected_bug(13247);
+                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status == STATUS_POSSIBLE_FAILURE;
+                    last;
                 }
                 else {
                     $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status < STATUS_UPGRADE_FAILURE;
