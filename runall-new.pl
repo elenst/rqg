@@ -471,6 +471,10 @@ if ($rpl_mode ne '') {
     $upgrade_test= 'normal' if $upgrade_test !~ /(?:crash|undo)/i;
     $upgrade_test= lc($upgrade_test);
 
+    if ($upgrade_test eq 'undo' and not $restart_timeout) {
+        $restart_timeout= int($duration/2);
+    }
+
     # server0 is the "old" server (before upgrade).
     # We will initialize and start it now
     $server[0] = DBServer::MySQL::MySQLd->new(basedir => $basedirs[1],

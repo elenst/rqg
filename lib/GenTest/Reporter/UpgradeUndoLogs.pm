@@ -17,17 +17,35 @@
 
 ########################################################################
 #
-# The module checks that after the test flow has finished, 
-# upgrade is performed successfully without losing any data.
-
-# It is supposed to be used with the native server startup,
-# i.e. with runall-new.pl rather than runall.pl which is MTR-based, 
-# and with --upgrade-test option, which makes runall-new.pl
-# treat server1 and server2 differently -- instead of running
-# the flow on both servers, it only starts server1 and runs the test
-# flow there, while preserving server2 (the version to upgrade to).
+# The module implements the test described in MDEV-13269.
+# The test flow is such:
 #
-# If the module is used without --upgrade-test, it won't work well.
+# 1. Start the old version with --innodb-change-buffering=none and run quite a bit of DML
+# 2. Kill & restart with --innodb-force-recovery=3 (important, to preserve the undo logs!)
+# 3. Restart the new version with --innodb-read-only
+#    (this would refuse to start up if the change buffer is not empty),
+#    run some DML (say, CHECK TABLE on every InnoDB table)
+# 4. Restart the new version normally, and run some more DML workload and CHECK TABLE.
+#
+#
+# For step 1, we rely on the test configuration to start with proper options
+# (and maybe it will be later decided that other values innodb-change-buffering
+# need to be tried as well). So, step #1 is just a normal test startup,
+# it is not present in the module
+#
+# When half of the test duration has passed, the module will execute
+# step 2 -- crash and restart the old server with innodb-force-recovery=3.
+#
+# If it works, the module will continue operation and execute step 3 --
+# shut down the old server normally, and start the new one with innodb-read-only,
+# and run the same checks that the normal Upgrade.pm does.
+#
+# Then the module will restart the server with initial options and will exit
+# to let the test flow continue till the end of the test duration.
+# All other periodic invocations will be ignored.
+#
+# At the end, the module will be triggered again and will run CHECK TABLE
+# for all tables.
 #
 ########################################################################
 
@@ -61,27 +79,30 @@ my $first_reporter;
 sub monitor {
 	my $reporter = shift;
 
-	# In case of two servers, we will be called twice.
-	# Only kill the first server and ignore the second call.
-	
     $first_reporter = $reporter if not defined $first_reporter;
+
+	# This module shouldn't be used if there is more than one server
+	# running in parallel (e.g. in comparison tests). If it happens,
+    # we will consider it a configuration error
+
     if ($reporter ne $first_reporter) {
         say("ERROR: Update reporter has been called twice, the test run is misconfigured");
         return STATUS_ENVIRONMENT_FAILURE;
     }
 
 	if (not $crash_recovery_done and (time() > ($reporter->testEnd() - $reporter->testDuration()/2))) {
-		say("====================================");
-		say("= Starting the crash-recovery part =");
-		say("====================================");
-		report($reporter);
+		crash_recovery_and_upgrade($reporter);
 	} else {
 		return STATUS_OK;
 	}
 }
 
-sub report {
+sub crash_recovery_and_upgrade {
     my $reporter = shift;
+
+    say("===============================================================");
+    say("= Crash-recovery of the old server with innodb-force-recovery =");
+    say("===============================================================");
 
     # We will attempt it only once
     $crash_recovery_done= 1;
@@ -94,9 +115,6 @@ sub report {
     $reporter->properties->servers->[1]->printServerOptions();
     say("----------------------");
 
-    # If the test run is not properly configured, the module can be 
-    # called more than once. Produce an error if it happens
-    
     my $server = $reporter->properties->servers->[0];
     my $dbh = DBI->connect($server->dsn);
 
@@ -149,6 +167,10 @@ sub report {
         say("Old server with pid $pid has been shut down/killed");
     }
 
+    say("=============================");
+    say("= Upgrade to the new server =");
+    say("=============================");
+
     my $orig_datadir = $datadir.'_orig';
 
     say("Copying datadir... (interrupting the copy operation may cause investigation problems later)");
@@ -165,6 +187,16 @@ sub report {
 
     $server = $reporter->properties->servers->[1];
     $server->setStartDirty(1);
+    my $port= $server->port();
+
+    # Change the port temporarily to avoid the inflow
+    $server->setPort($port+6);
+
+#    my $tmp_port= $port + 6;
+#    my $tmp_dsn= $server->dsn;
+#    $tmp_dsn =~ s/port=$port/port=$tmp_port/;
+#   ,'--tc-heuristic-recover=ROLLBACK'
+
     $server->addServerOptions(['--innodb-read-only']);
     my $upgrade_status = $server->startServer();
     if ($upgrade_status != STATUS_OK) {
@@ -187,9 +219,10 @@ sub report {
         return report_and_return(STATUS_UPGRADE_FAILURE);
     }
 
-    check_database_consistency($dbh);
+    my $res= check_database_consistency($dbh);
+    $upgrade_status= $res unless $res == STATUS_OK;
     
-    say("Shutting down the new server after innodb-read-only...");
+    say("Shutting down the new server after first start...");
 
     kill(15, $pid);
     foreach (1..60) {
@@ -204,6 +237,13 @@ sub report {
     } else {
         say("Old server with pid $pid has been shut down/killed");
     }
+
+    # Restore the normal port
+    $server->setPort($port);
+
+    say("========================================");
+    say("= Normal operation with the new server =");
+    say("========================================");
 
     $server->setStartDirty(1);
     $server->addServerOptions(['--innodb-read-only=0']);
@@ -220,12 +260,8 @@ sub report {
         return report_and_return($upgrade_status);
     }
 
-    check_database_consistency($dbh);
-
     if ($server->majorVersion eq $major_version_old) {
         say("New server started successfully after the minor upgrade");
-    } elsif ($server->serverVariable('innodb_read_only') and (uc($server->serverVariable('innodb_read_only')) eq 'ON' or $server->serverVariable('innodb_read_only') eq '1') ) {
-        say("New server is running with innodb_read_only=1, skipping mysql_upgrade");
     } else {
         my $mysql_upgrade= $server->clientBindir.'/'.(osWindows() ? 'mysql_upgrade.exe' : 'mysql_upgrade');
         say("New server started successfully after the major upgrade, running mysql_upgrade now using the command:");
@@ -288,6 +324,7 @@ sub check_database_consistency {
         }
     }
     say("Schema does not look corrupt");
+    return STATUS_OK;
 }
 
 sub report_and_return {
@@ -526,8 +563,18 @@ sub normalize_dumps {
     }
 }
 
+sub report {
+    my $reporter= shift;
+    my $dbh= DBI->connect($reporter->properties->servers->[1]->dsn);
+    if (not defined $dbh) {
+        say("ERROR: Could not connect to the server at the end of the test");
+        return report_and_return(STATUS_UPGRADE_FAILURE);
+    }
+    check_database_consistency($dbh);
+}
+
 sub type {
-    return REPORTER_TYPE_PERIODIC;
+    return REPORTER_TYPE_PERIODIC | REPORTER_TYPE_SUCCESS;
 }
 
 1;
