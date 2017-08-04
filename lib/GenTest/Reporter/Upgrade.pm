@@ -188,6 +188,7 @@ sub report {
                 {
                     detected_bug(13101);
                     $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+                    last;
                 }
                 elsif (m{InnoDB: Assertion failure in thread \d+ in file page0zip\.cc line \d+})
                 {
