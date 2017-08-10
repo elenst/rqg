@@ -11,7 +11,7 @@ my_field:
     my_field_int | my_field_char ;
 
 my_table:
-    { 'Tablei' . $prng->int(1,45) }
+    { 'Tablei' . $prng->int(1,450000) }
 ;
 
 insert:
