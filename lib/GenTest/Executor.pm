@@ -325,7 +325,10 @@ sub getCollationMetaData {
 
 sub cacheMetaData {
     my ($self, $redo) = @_;
-    
+
+    # This is a HACK for this tree only!
+    return;
+
     my $meta = {};
 
     if ($redo or not exists $global_schema_cache{$self->dsn()}) {
