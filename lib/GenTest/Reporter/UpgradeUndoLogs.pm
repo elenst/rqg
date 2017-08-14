@@ -37,8 +37,14 @@
 # step 2 -- crash and restart the old server with innodb-force-recovery=3.
 #
 # If it works, the module will continue operation and execute step 3 --
-# shut down the old server normally, and start the new one with innodb-read-only,
-# and run the same checks that the normal Upgrade.pm does.
+# shut down the old server normally, and start the new one, blocking users' requests,
+# run the same checks that the normal Upgrade.pm does, and execute mysql_upgrade
+# if necessary
+#
+# Note: since read-only was only a part of the scenario to enforce a more
+# predictable and controlled environment, instead of using innodb-read-only
+# (which disallows the upgrade in some cases), we will block users' requests
+# by temporarily changing the server port. 
 #
 # Then the module will restart the server with initial options and will exit
 # to let the test flow continue till the end of the test duration.
@@ -190,14 +196,13 @@ sub crash_recovery_and_upgrade {
     my $port= $server->port();
 
     # Change the port temporarily to avoid the inflow
-    $server->setPort($port+6);
-
-#    my $tmp_port= $port + 6;
-#    my $tmp_dsn= $server->dsn;
-#    $tmp_dsn =~ s/port=$port/port=$tmp_port/;
+    my $tmp_port= $port + 6;
+    $server->setPort($tmp_port);
+    my $tmp_dsn= $server->dsn;
+    $tmp_dsn =~ s/port=$port/port=$tmp_port/;
 #   ,'--tc-heuristic-recover=ROLLBACK'
 
-    $server->addServerOptions(['--innodb-read-only']);
+#    $server->addServerOptions(['--innodb-read-only']);
     my $upgrade_status = $server->startServer();
     if ($upgrade_status != STATUS_OK) {
         say("ERROR: New server failed to start");
@@ -221,44 +226,6 @@ sub crash_recovery_and_upgrade {
 
     my $res= check_database_consistency($dbh);
     $upgrade_status= $res unless $res == STATUS_OK;
-    
-    say("Shutting down the new server after first start...");
-
-    kill(15, $pid);
-    foreach (1..60) {
-        last if not kill(0, $pid);
-        sleep 1;
-    }
-
-    if (kill(0, $pid)) {
-        say("ERROR: could not shut down the new server with pid $pid; sending SIGBART to get a stack trace");
-        kill('ABRT', $pid);
-        return report_and_return(STATUS_SERVER_DEADLOCKED);
-    } else {
-        say("Old server with pid $pid has been shut down/killed");
-    }
-
-    # Restore the normal port
-    $server->setPort($port);
-
-    say("========================================");
-    say("= Normal operation with the new server =");
-    say("========================================");
-
-    $server->setStartDirty(1);
-    $server->addServerOptions(['--innodb-read-only=0']);
-    my $upgrade_status = $server->startServer();
-    if ($upgrade_status != STATUS_OK) {
-        say("ERROR: New server failed to start");
-    }
-    check_start_log(\$upgrade_status, $errorlog);
-    $pid= $server->pid();
-
-    if ($upgrade_status != STATUS_OK) {
-        $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status == STATUS_POSSIBLE_FAILURE;
-        say("ERROR: Upgrade has apparently failed.");
-        return report_and_return($upgrade_status);
-    }
 
     if ($server->majorVersion eq $major_version_old) {
         say("New server started successfully after the minor upgrade");
@@ -300,7 +267,45 @@ sub crash_recovery_and_upgrade {
         say("mysql_upgrade has finished successfully, now the server should be ready to work");
     }
 
-    return report_and_return($upgrade_status);
+    say("Shutting down the new server after first start...");
+
+    kill(15, $pid);
+    foreach (1..60) {
+        last if not kill(0, $pid);
+        sleep 1;
+    }
+
+    if (kill(0, $pid)) {
+        say("ERROR: could not shut down the new server with pid $pid; sending SIGBART to get a stack trace");
+        kill('ABRT', $pid);
+        return report_and_return(STATUS_SERVER_DEADLOCKED);
+    } else {
+        say("Old server with pid $pid has been shut down/killed");
+    }
+
+    # Restore the normal port
+    $server->setPort($port);
+
+    say("========================================");
+    say("= Normal operation with the new server =");
+    say("========================================");
+
+    $server->setStartDirty(1);
+#    $server->addServerOptions(['--innodb-read-only=0']);
+    my $upgrade_status = $server->startServer();
+    if ($upgrade_status != STATUS_OK) {
+        say("ERROR: New server failed to start");
+    }
+    check_start_log(\$upgrade_status, $errorlog);
+    $pid= $server->pid();
+
+    if ($upgrade_status != STATUS_OK) {
+        $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status == STATUS_POSSIBLE_FAILURE;
+        say("ERROR: Upgrade has apparently failed.");
+        return report_and_return($upgrade_status);
+    }
+
+   return STATUS_OK;
 }
 
 sub check_database_consistency {
@@ -330,7 +335,7 @@ sub check_database_consistency {
 sub report_and_return {
     my $res= shift;
     my @detected_known_bugs = map { $_ . '('.$detected_known_bugs{$_}.')' } keys %detected_known_bugs;
-    say("Detected possible appearance of known bugs: @detected_known_bugs");
+    say("Detected possible appearance of known bugs: @detected_known_bugs") if scalar(@detected_known_bugs);
     return $res;
 }
 
