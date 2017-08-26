@@ -85,9 +85,9 @@ $tables = {
         rows => [ 0, 1, 1000 ],
         row_formats => [ undef, 'DYNAMIC', 'REDUNDANT', 'COMPACT', 'COMPRESSED' ],
         options => [ undef, 
-            'PAGE_COMPRESSED=1', 
-            'PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=1',
-            'PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=9'
+            '/*!100100 PAGE_COMPRESSED=1 */', 
+            '/*!100100 PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=1 */',
+            '/*!100100 PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=9 */'
         ]
 };
 
