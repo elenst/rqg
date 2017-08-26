@@ -87,8 +87,7 @@ $tables = {
         options => [ undef, 
             'PAGE_COMPRESSED=1', 
             'PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=1',
-            'PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=9',
-            'ATOMIC_WRITES=`ON`',
+            'PAGE_COMPRESSED=1 PAGE_COMPRESSION_LEVEL=9'
         ]
 };
 
