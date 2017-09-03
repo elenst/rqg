@@ -30,10 +30,13 @@ create:
 truncate:
 	TRUNCATE TABLE table_name ;
 
+uie:
+  UNION | INTERSECT | EXCEPT ;
+
 select:
 	select_single | select_single | select_single |
 	SELECT field1 , field2 , field3 , field4 FROM ( select_single ) AS select1 where |
-	( select_single ) UNION ( select_single ) ;
+	( select_single ) uie ( select_single ) ;
 
 select_single:
 	SELECT field1 , field2 , field3 , field4 FROM table_view_name where |

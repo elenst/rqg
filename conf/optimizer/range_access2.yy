@@ -42,6 +42,9 @@ query:
 	select | select | select | select | select |
 	select | select | select | select | select ;
 
+uie:
+  UNION | INTERSECT | EXCEPT ;
+
 select:
 	SELECT distinct * FROM _table index_hint WHERE where order_by /* limit */ |
 	SELECT distinct * FROM _table index_hint WHERE where order_by /* limit */ |

@@ -80,6 +80,9 @@ loose_select_item:
 	_field AS { my $f = "field".++$fields ; push @nonaggregates , $f ; $f } |
 	_field_int AS { my $f = "ifield".++$ifields ; push @nonaggregates , $f ; $f } |
 	_field_char AS { my $f = "cfield".++$cfields ; push @nonaggregates , $f ; $f } ;
+  
+uie:
+  UNION | INTERSECT | EXCEPT ;
 	
 ################################################################################
 
@@ -292,10 +295,10 @@ int_single_member_subquery:
 	( SELECT _digit FROM DUAL ) ;
 
 int_single_union_subquery:
-	(  SELECT _digit  UNION all_distinct  SELECT _digit  )  ;
+	(  SELECT _digit  uie all_distinct  SELECT _digit  )  ;
 
 int_single_union_subquery_disabled:
-	int_single_member_subquery   UNION all_distinct  int_single_member_subquery ;
+	int_single_member_subquery   uie all_distinct  int_single_member_subquery ;
 
 int_double_member_subquery:
 	( SELECT distinct select_option subquery_table_one_two . _field_int AS { "SQ".$subquery_idx."_ifield1" } , 
@@ -318,7 +321,7 @@ int_double_member_subquery:
 	  subquery_body 
 	  single_subquery_group_by
 	  subquery_having ) |
-	(  SELECT _digit , _digit  UNION all_distinct  SELECT _digit, _digit  ) ;
+	(  SELECT _digit , _digit  uie all_distinct  SELECT _digit, _digit  ) ;
 
 char_single_member_subquery:
 	( SELECT distinct select_option subquery_table_one_two . _field_char AS { $sq_cfields = 1; "SQ".$subquery_idx."_cfield1" }
@@ -327,10 +330,10 @@ char_single_member_subquery:
 	 subquery_having) ;
 
 char_single_union_subquery:
-	(  SELECT _char  UNION all_distinct  SELECT _char  )  ;
+	(  SELECT _char  uie all_distinct  SELECT _char  )  ;
 
 char_single_union_subquery_disabled:
-	char_single_member_subquery   UNION all_distinct char_single_member_subquery  ;
+	char_single_member_subquery   uie all_distinct char_single_member_subquery  ;
 
 char_double_member_subquery:
    ( SELECT distinct select_option subquery_table_one_two . _field_char AS { "SQ".$subquery_idx."_cfield1" } ,
@@ -358,7 +361,7 @@ char_double_member_subquery:
 	 subquery_body
 	 single_subquery_group_by
 	 subquery_having ) |
-   (  SELECT _char , _char  UNION all_distinct  SELECT _char , _char  ) ;
+   (  SELECT _char , _char  uie all_distinct  SELECT _char , _char  ) ;
 
 int_correlated_subquery:
 	( SELECT distinct select_option subquery_table_one_two . _field_int AS { $sq_ifields = 1; "SQ".$subquery_idx."_ifield1" }
@@ -508,7 +511,7 @@ int_single_member_child_subquery:
 	  child_subquery_having ) ;
 
 int_single_union_child_subquery:
-	(  SELECT _digit  UNION all_distinct  SELECT _digit  )  ;
+	(  SELECT _digit  uie all_distinct  SELECT _digit  )  ;
 
 int_double_member_child_subquery:
 	( SELECT distinct select_option child_subquery_table_one_two . _field_int AS { "C_SQ".$child_subquery_idx."_ifield1" } , 
@@ -529,7 +532,7 @@ char_single_member_child_subquery:
 	 child_subquery_having) ;
 
 char_single_union_child_subquery:
-	(  SELECT _digit  UNION all_distinct  SELECT _digit  )  ;
+	(  SELECT _digit  uie all_distinct  SELECT _digit  )  ;
 
 char_double_member_child_subquery:
    ( SELECT distinct select_option child_subquery_table_one_two . _field_char AS { "C_SQ".$child_subquery_idx."_cfield1" } ,
@@ -801,8 +804,8 @@ select_subquery_body:
 	 int_scalar_correlated_subquery AS  { my $f = "field".++$fields ; push @nonaggregates , $f ; $f } ;
 
 select_subquery_body_disabled:
-	 (  SELECT _digit  UNION all_distinct  ( SELECT _digit ) LIMIT 1 )  AS  { my $f = "field".++$fields ; push @nonaggregates , $f ; $f } |
-	 (  SELECT _char  UNION all_distinct ( SELECT _char ) LIMIT 1 )  AS  { my $f = "field".++$fields ; push @nonaggregates , $f ; $f } ;
+	 (  SELECT _digit  uie all_distinct  ( SELECT _digit ) LIMIT 1 )  AS  { my $f = "field".++$fields ; push @nonaggregates , $f ; $f } |
+	 (  SELECT _char  uie all_distinct ( SELECT _char ) LIMIT 1 )  AS  { my $f = "field".++$fields ; push @nonaggregates , $f ; $f } ;
 
 ################################################################################
 # The combo_select_items are for 'spice' 

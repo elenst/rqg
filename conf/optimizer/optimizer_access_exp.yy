@@ -36,6 +36,9 @@
 query:
   { @nonaggregates = () ; $tables = 0 ; $fields = 0 ; "" } main_select ;
 
+uie:
+  UNION | INTERSECT | EXCEPT ;
+
 main_select:
   simple_select | mixed_select | mixed_select ;
 
