@@ -36,6 +36,7 @@ use DBServer::MySQL::MySQLd;
 use DBServer::MySQL::ReplMySQLd;
 use DBServer::MySQL::GaleraMySQLd;
 
+$| = 1;
 my $logger;
 eval
 {
@@ -449,7 +450,7 @@ if ($rpl_mode ne '') {
     if ($status > DBSTATUS_OK) {
         stopServers($status);
 
-        say("ERROR: Could not start Galera cluster");
+        sayError("Could not start Galera cluster");
         exit_test(STATUS_ENVIRONMENT_FAILURE);
     }
 
@@ -503,7 +504,7 @@ if ($rpl_mode ne '') {
         } else {
             say(system("ls -l ".$server[0]->datadir));
         }
-        say("ERROR: Could not start the old server in the upgrade test");
+        sayError("Could not start the old server in the upgrade test");
         exit_test(STATUS_CRITICAL_FAILURE);
     }
 
@@ -556,7 +557,7 @@ if ($rpl_mode ne '') {
             } else {
                 say(system("ls -l ".$server[$server_id]->datadir));
             }
-            say("ERROR: Could not start all servers");
+            sayError("Could not start all servers");
             exit_test(STATUS_CRITICAL_FAILURE);
         }
         
@@ -763,7 +764,7 @@ if (($gentest_result == STATUS_OK) && !$upgrade_test && ($rpl_mode || (defined $
         if ($diff == STATUS_OK) {
             say("No differences were found between servers ".($i-1)." and $i.");
         } else {
-            say("ERROR: found differences between servers ".($i-1)." and $i.");
+            sayError("Found differences between servers ".($i-1)." and $i.");
             $diff_result = STATUS_CONTENT_MISMATCH;
         }
     }

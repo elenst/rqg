@@ -72,7 +72,7 @@ sub report {
     
     $first_reporter = $reporter if not defined $first_reporter;
     if ($reporter ne $first_reporter) {
-        say("ERROR: Update reporter has been called twice, the test run is misconfigured");
+        sayError("Upgrade reporter has been called twice, the test run is misconfigured");
         return STATUS_ENVIRONMENT_FAILURE;
     }
 
@@ -107,7 +107,7 @@ sub report {
         }
     }
     if (kill(0, $pid)) {
-        say("ERROR: could not shut down/kill the old server with pid $pid; sending SIGBART to get a stack trace");
+        sayError("Could not shut down/kill the old server with pid $pid; sending SIGBART to get a stack trace");
         kill('ABRT', $pid);
         return report_and_return(STATUS_SERVER_DEADLOCKED);
     } else {
@@ -135,7 +135,7 @@ sub report {
     my $upgrade_status = $server->startServer();
 
     if ($upgrade_status != STATUS_OK) {
-        say("ERROR: New server failed to start");
+        sayError("New server failed to start");
     }
 
     # Check and parse the error log up to this point,
@@ -228,7 +228,7 @@ sub report {
 
     if ($upgrade_status != STATUS_OK) {
         $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status == STATUS_POSSIBLE_FAILURE;
-        say("ERROR: Upgrade has apparently failed.");
+        sayError("Upgrade has apparently failed");
         return report_and_return($upgrade_status);
     }
 
@@ -239,7 +239,7 @@ sub report {
 
     $dbh = DBI->connect($server->dsn);
     if (not defined $dbh) {
-        say("ERROR: Could not connect to the new server after upgrade");
+        sayError("Could not connect to the new server after upgrade");
         return report_and_return(STATUS_UPGRADE_FAILURE);
     }
 
@@ -265,7 +265,7 @@ sub report {
                     while (<UPGRADE_LOG>) {
                         if (/^\s*Error/) {
                             $res= STATUS_UPGRADE_FAILURE;
-                            say("ERROR: Found errors in mysql_upgrade output");
+                            sayError("Found errors in mysql_upgrade output");
                             sayFile("$datadir/mysql_upgrade.log");
                             last OUTER_READ;
                         }
@@ -273,12 +273,12 @@ sub report {
                 }
                 close (UPGRADE_LOG);
             } else {
-                say("ERROR: Could not find mysql_upgrade.log");
+                sayError("Could not find mysql_upgrade.log");
                 $res= STATUS_UPGRADE_FAILURE;
             }
         }
         if ($res != STATUS_OK) {
-            say("ERROR: mysql_upgrade has failed");
+            sayError("mysql_upgrade has failed");
             sayFile($errorlog);
             return report_and_return(STATUS_UPGRADE_FAILURE);
         }
@@ -385,7 +385,7 @@ sub compare_all {
 	$diff_result = $diff_result >> 8;
 
 	if ($diff_result != 0) {
-		say("ERROR: Server schema has changed");
+		sayError("Server schema has changed");
 		$status= STATUS_SCHEMA_MISMATCH;
 	}
 
@@ -393,7 +393,7 @@ sub compare_all {
 	$diff_result = $diff_result >> 8;
 
 	if ($diff_result != 0) {
-		say("ERROR: Server data has changed");
+		sayError("Server data has changed");
 		$status= STATUS_CONTENT_MISMATCH;
 	}
 
@@ -406,15 +406,15 @@ sub compare_all {
         say("No auto-inc data for old and new servers, skipping the check");
     }
     elsif ($old_autoinc and ref $old_autoinc eq 'ARRAY' and (not $new_autoinc or ref $new_autoinc ne 'ARRAY')) {
-        say("ERROR: auto-increment data for the new server is not available");
+        sayError("Auto-increment data for the new server is not available");
         $status = STATUS_CONTENT_MISMATCH;
     }
     elsif ($new_autoinc and ref $new_autoinc eq 'ARRAY' and (not $old_autoinc or ref $old_autoinc ne 'ARRAY')) {
-        say("ERROR: auto-increment data for the old server is not available");
+        sayError("Auto-increment data for the old server is not available");
         $status = STATUS_CONTENT_MISMATCH;
     }
     elsif (scalar @$old_autoinc != scalar @$new_autoinc) {
-        say("ERROR: different number of tables in auto-incement data. Old server: ".scalar(@$old_autoinc)." ; new server: ".scalar(@$new_autoinc));
+        sayError("Different number of tables in auto-incement data. Old server: ".scalar(@$old_autoinc)." ; new server: ".scalar(@$new_autoinc));
         $status= STATUS_CONTENT_MISMATCH;
     }
     else {
@@ -427,7 +427,7 @@ sub compare_all {
             if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]+1))
             {
                 detected_bug(13094);
-                say("ERROR: auto-increment data differs. Old server: @$to ; new server: @$tn");
+                sayError("Auto-increment data differs. Old server: @$to ; new server: @$tn");
                 $status= STATUS_CUSTOM_OUTCOME if $status < STATUS_CUSTOM_OUTCOME;
             }
         }
