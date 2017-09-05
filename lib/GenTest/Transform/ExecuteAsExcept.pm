@@ -44,9 +44,8 @@ sub transform {
 	$orig_query_no_limit =~ s{LIMIT\s+\d+\s*(\/\*\s*[\w ]+\s*\*\/)*\s*$}{}sio;
 
 	return [
-		"( $orig_query ) EXCEPT ( $orig_query_no_limit LIMIT 0 ) /* TRANSFORM_OUTCOME_UNORDERED_MATCH */",
-		"( $orig_query ) EXCEPT ( $orig_query ) /* TRANSFORM_OUTCOME_EMPTY_RESULT */",
-		"( $orig_query ) EXCEPT DISTINCT ( $orig_query_no_limit 0 ) /* TRANSFORM_OUTCOME_UNORDERED_MATCH */"
+		"( $orig_query ) EXCEPT ( $orig_query_no_limit LIMIT 0 ) /* TRANSFORM_OUTCOME_DISTINCT */",
+		"( $orig_query ) EXCEPT ( $orig_query ) /* TRANSFORM_OUTCOME_EMPTY_RESULT */"
 	];
 }
 
