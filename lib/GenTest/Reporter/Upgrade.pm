@@ -170,7 +170,7 @@ sub report {
                     detected_bug(13112);
                     $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
                 }
-                elsif (m{Assertion `flags & BUF_PAGE_PRINT_NO_CRASH' failed}so)
+                elsif (m{void fil_decompress_page.*: Assertion `0' failed}so)
                 {
                     detected_bug(13103);
                     # We will only set the status to CUSTOM_OUTCOME if it was previously set to POSSIBLE_FAILURE
