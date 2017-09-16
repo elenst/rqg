@@ -78,7 +78,7 @@ my $vardir;
 my $version_numeric_old;
 my %detected_known_bugs;
 my $crash_recovery_done= 0;
-
+my $upgrade_mode;
 
 my $first_reporter;
 
@@ -86,6 +86,7 @@ sub monitor {
 	my $reporter = shift;
 
     $first_reporter = $reporter if not defined $first_reporter;
+    $upgrade_mode= $reporter->properties->property('upgrade-test');
 
 	# This module shouldn't be used if there is more than one server
 	# running in parallel (e.g. in comparison tests). If it happens,
@@ -141,7 +142,11 @@ sub crash_recovery_and_upgrade {
     if (kill(0, $pid)) {
         sayError("Could not kill the old server with pid $pid; sending SIGBART to get a stack trace");
         kill('ABRT', $pid);
-        return report_and_return(STATUS_SERVER_DEADLOCKED);
+        if ($upgrade_mode eq 'undo-recovery') {
+          return report_and_return(STATUS_SERVER_DEADLOCKED);
+        } else { # $upgrade_mode eq 'undo', we will ignore old server's hang
+          return report_and_return(STATUS_SKIP);
+        }
     } else {
         say("Old server with pid $pid has been killed");
     }
@@ -153,6 +158,11 @@ sub crash_recovery_and_upgrade {
     my $upgrade_status = $server->startServer();
     if ($upgrade_status != STATUS_OK) {
         sayError("Old server failed to start with innodb-force-recovery");
+        if ($upgrade_mode eq 'undo-recovery') {
+          return report_and_return($upgrade_status);
+        } else { # $upgrade_mode eq 'undo', we will ignore old server's failure
+          return report_and_return(STATUS_SKIP);
+        }
     }
     check_start_log(\$upgrade_status, $errorlog);
     $pid= $server->pid();
@@ -168,7 +178,11 @@ sub crash_recovery_and_upgrade {
     if (kill(0, $pid)) {
         sayError("Could not shut down the old server with pid $pid; sending SIGBART to get a stack trace");
         kill('ABRT', $pid);
-        return report_and_return(STATUS_SERVER_DEADLOCKED);
+        if ($upgrade_mode eq 'undo-recovery') {
+          return report_and_return(STATUS_SERVER_DEADLOCKED);
+        } else { # $upgrade_mode eq 'undo', we will ignore old server's hang
+          return report_and_return(STATUS_SKIP);
+        }
     } else {
         say("Old server with pid $pid has been shut down/killed");
     }
@@ -374,6 +388,12 @@ sub check_start_log {
                     $detected_known_bugs{'MDEV-13103'}= (defined $detected_known_bugs{'MDEV-13103'} ? $detected_known_bugs{'MDEV-13103'}+1 : 1);
                     # We will only set the status to CUSTOM_OUTCOME if it was previously set to POSSIBLE_FAILURE
                     $$upgrade_status_ref = STATUS_CUSTOM_OUTCOME if $$upgrade_status_ref == STATUS_POSSIBLE_FAILURE;
+                    last;
+                }
+                elsif (m{Failing assertion: \!memcmp\(FIL_PAGE_TYPE \+ page, FIL_PAGE_TYPE \+ page_zip\-\>data, PAGE_HEADER - FIL_PAGE_TYPE\)}so)
+                {
+                    $detected_known_bugs{'MDEV-13512'}= (defined $detected_known_bugs{'MDEV-13512'} ? $detected_known_bugs{'MDEV-13512'}+1 : 1);
+                    $$upgrade_status_ref = STATUS_CUSTOM_OUTCOME if $$upgrade_status_ref < STATUS_CUSTOM_OUTCOME;
                     last;
                 }
                 elsif (m{InnoDB: Corruption: Page is marked as compressed space:}so)
