@@ -58,7 +58,13 @@ sub report {
     my $reporter = shift;
     
     my $upgrade_mode= $reporter->properties->property('upgrade-test');
-    say("The test will perform server upgrade in '".$upgrade_mode."' mode");
+    if ($upgrade_mode eq 'normal') {
+      say("The test will perform normal server upgrade");
+    } elsif ($upgrade_mode eq 'crash') {
+      say("The test will perform server crash-upgrade");
+    } elsif ($upgrade_mode eq 'recovery') {
+      say("The test will perform server crash-recovery");
+    }
     say("-- Old server info: --");
     say($reporter->properties->servers->[0]->version());
     $reporter->properties->servers->[0]->printServerOptions();
@@ -109,7 +115,11 @@ sub report {
     if (kill(0, $pid)) {
         sayError("Could not shut down/kill the old server with pid $pid; sending SIGBART to get a stack trace");
         kill('ABRT', $pid);
-        return report_and_return(STATUS_SERVER_DEADLOCKED);
+        if ($upgrade_mode eq 'recovery') {
+          return report_and_return(STATUS_SERVER_DEADLOCKED);
+        } else { # $upgrade_mode eq 'crash', we'll ignore hang on old server shutdown
+          return report_and_return(STATUS_SKIP);
+        }
     } else {
         say("Old server with pid $pid has been shut down/killed");
     }
@@ -187,6 +197,12 @@ sub report {
                 elsif (m{recv_parse_or_apply_log_rec_body.*Assertion.*offs == .*failed}so)
                 {
                     detected_bug(13101);
+                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+                    last;
+                }
+                elsif (m{Failing assertion: \!memcmp\(FIL_PAGE_TYPE \+ page, FIL_PAGE_TYPE \+ page_zip\-\>data, PAGE_HEADER - FIL_PAGE_TYPE\)}so)
+                {
+                    detected_bug(13512);
                     $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
                     last;
                 }
