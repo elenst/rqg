@@ -466,18 +466,18 @@ if ($rpl_mode ne '') {
 
 } elsif (defined $upgrade_test) {
 
-    # There are 'normal' and 'crash' modes.
+    # There are 'normal', 'crash', 'recovery' and 'undo' modes.
     # 'normal' will be used by default
     $upgrade_test= 'normal' if $upgrade_test !~ /(?:crash|undo|recovery)/i;
 
     $upgrade_test= lc($upgrade_test);
     
-    # Recovery is an alias for 'crash' test when the basedir before and after is the same
-    if ($upgrade_test eq 'recovery') {
-      $upgrade_test= 'crash';
+    # recovery is an alias for 'crash' test when the basedir before and after is the same
+    # undo-recovery is an alias for 'undo' test when the basedir before and after is the same
+    if ($upgrade_test eq 'recovery' or $upgrade_test eq 'undo-recovery') {
       $basedirs[2] = $basedirs[1] = $basedirs[0];
     }
-    elsif ($upgrade_test eq 'undo' and not $restart_timeout) {
+    elsif (($upgrade_test eq 'undo' or $upgrade_test eq 'undo-upgrade') and not $restart_timeout) {
         $restart_timeout= int($duration/2);
     }
 
