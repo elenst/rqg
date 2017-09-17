@@ -79,7 +79,6 @@ my $version_numeric_old;
 my %detected_known_bugs;
 my $crash_recovery_done= 0;
 
-
 my $first_reporter;
 
 sub monitor {
@@ -189,7 +188,7 @@ sub crash_recovery_and_upgrade {
     move($errorlog, $server->errorlog.'_orig');
     unlink("$datadir/core*");    # Remove cores from any previous crash
 
-    say("Starting the new server with innodb-read-only...");
+    say("Starting the new server without external connections...");
 
     $server = $reporter->properties->servers->[1];
     $server->setStartDirty(1);
@@ -267,6 +266,9 @@ sub crash_recovery_and_upgrade {
         say("mysql_upgrade has finished successfully, now the server should be ready to work");
     }
 
+    $res= alter_tables($reporter,$dbh);
+    $upgrade_status= $res if $res > $upgrade_status;
+
     say("Shutting down the new server after first start...");
 
     kill(15, $pid);
@@ -329,6 +331,33 @@ sub check_database_consistency {
         }
     }
     say("Schema does not look corrupt");
+    return STATUS_OK;
+}
+
+sub alter_tables {
+    my ($reporter, $dbh)= @_;
+
+    say("Running ALTER TABLE ... FORCE on some tables");
+
+    my $prng= $reporter->prng();
+    my $databases = $dbh->selectcol_arrayref("SHOW DATABASES");
+    foreach my $database (@$databases) {
+        next if $database =~ m{^(mysql|information_schema|pbxt|performance_schema)$}sio;
+        $dbh->do("USE $database");
+        my $tabl_ref = $dbh->selectcol_arrayref("SHOW FULL TABLES", { Columns=>[1,2] });
+        my %tables = @$tabl_ref;
+        my $all_tables= $prng->shuffleArray([keys %tables]);
+        my @few_tables= @$all_tables[0..$prng->uint16(1,9)];
+        foreach my $table (@few_tables) {
+            # Should not do CHECK etc., and especially ALTER, on a view
+            next if $tables{$table} eq 'VIEW';
+            say("Altering table: $table; database: $database");
+            $dbh->do("ALTER TABLE `$database`.`$table` FORCE, LOCK=NONE");
+            # 1178 is ER_CHECK_NOT_IMPLEMENTED
+            return report_and_return(STATUS_DATABASE_CORRUPTION) if $dbh->err() > 0;
+        }
+    }
+    say("ALTER TABLE went well");
     return STATUS_OK;
 }
 
