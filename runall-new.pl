@@ -477,7 +477,7 @@ if ($rpl_mode ne '') {
     if ($upgrade_test eq 'recovery' or $upgrade_test eq 'undo-recovery') {
       $basedirs[2] = $basedirs[1] = $basedirs[0];
     }
-    elsif (($upgrade_test eq 'undo' or $upgrade_test eq 'undo-upgrade') and not $restart_timeout) {
+    elsif ($upgrade_test =~ /undo/ and not $restart_timeout) {
         $restart_timeout= int($duration/2);
     }
 
