@@ -632,7 +632,7 @@ sub initReporters {
                 or $self->config->reporters->[$i] eq '';
         }
     }
-    if ($self->config->property('upgrade-test') and $self->config->property('upgrade-test') eq 'undo') {
+    if ($self->config->property('upgrade-test') and $self->config->property('upgrade-test') =~ /undo/) {
         push @{$self->config->reporters}, 'UpgradeUndoLogs';
     }
     elsif ($self->config->property('upgrade-test')) {
