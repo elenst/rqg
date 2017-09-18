@@ -474,10 +474,10 @@ if ($rpl_mode ne '') {
     
     # recovery is an alias for 'crash' test when the basedir before and after is the same
     # undo-recovery is an alias for 'undo' test when the basedir before and after is the same
-    if ($upgrade_test eq 'recovery' or $upgrade_test eq 'undo-recovery') {
+    if ($upgrade_test =~ /recovery/) {
       $basedirs[2] = $basedirs[1] = $basedirs[0];
     }
-    elsif ($upgrade_test =~ /undo/ and not $restart_timeout) {
+    if ($upgrade_test =~ /undo/ and not $restart_timeout) {
         $restart_timeout= int($duration/2);
     }
 
