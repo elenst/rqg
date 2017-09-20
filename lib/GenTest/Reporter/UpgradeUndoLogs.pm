@@ -151,6 +151,7 @@ sub crash_recovery_and_upgrade {
         say("Old server with pid $pid has been killed");
     }
 
+    move($errorlog, $server->errorlog.'_1');
     say("Starting the old server with innodb-force-recovery...");
 
     $server->setStartDirty(1);
@@ -160,12 +161,18 @@ sub crash_recovery_and_upgrade {
         sayError("Old server failed to start with innodb-force-recovery");
         if ($upgrade_mode eq 'undo-recovery') {
           return report_and_return($upgrade_status);
-        } else { # $upgrade_mode eq 'undo', we will ignore old server's failure
+        } else { # $upgrade_mode is 'undo-upgrade' ('undo'), we will ignore old server's failure
           return report_and_return(STATUS_SKIP);
         }
     }
     check_start_log(\$upgrade_status, $errorlog);
     $pid= $server->pid();
+
+    if ($upgrade_status != STATUS_OK) {
+        $upgrade_status = ($upgrade_mode eq 'undo-recovery' ? STATUS_UPGRADE_FAILURE : STATUS_CUSTOM_OUTCOME);
+        sayError("Old server recovery has apparently failed");
+        return report_and_return($upgrade_status);
+    }
 
     say("Shutting down the old server after innodb-force-recovery...");
 
@@ -200,9 +207,9 @@ sub crash_recovery_and_upgrade {
         system("cp -r $datadir $orig_datadir");
     }
 
-    move($errorlog, $server->errorlog.'_orig');
     unlink("$datadir/core*");    # Remove cores from any previous crash
 
+    move($errorlog, $server->errorlog.'_2');
     say("Starting the new server without external connections...");
 
     $server = $reporter->properties->servers->[1];
@@ -300,12 +307,15 @@ sub crash_recovery_and_upgrade {
         say("Old server with pid $pid has been shut down/killed");
     }
 
-    # Restore the normal port
-    $server->setPort($port);
-
     say("========================================");
     say("= Normal operation with the new server =");
     say("========================================");
+
+    # Restore the normal port
+    $server->setPort($port);
+
+    move($errorlog, $server->errorlog.'_3');
+    say("Starting the new server for normal operation...");
 
     $server->setStartDirty(1);
 #    $server->addServerOptions(['--innodb-read-only=0']);
@@ -431,6 +441,7 @@ sub check_start_log {
                     # Most likely it is an indication of MDEV-13103, but to make sure, we still need to find the assertion failure.
                     # If we find it later, we will set result to STATUS_CUSTOM_OUTCOME.
                     # If we don't find it later, we will raise it to STATUS_UPGRADE_FAILURE
+                    $detected_known_bugs{'MDEV-13103'}= (defined $detected_known_bugs{'MDEV-13103'} ? $detected_known_bugs{'MDEV-13103'}+1 : 1);
                     $$upgrade_status_ref = STATUS_POSSIBLE_FAILURE if $$upgrade_status_ref < STATUS_POSSIBLE_FAILURE;
                 }
                 else {
