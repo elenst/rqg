@@ -14,17 +14,19 @@
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 thread3_init:
-  create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; 
+  create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace
 ;
  
 thread3:
     create_or_replace 
   | create_like
   | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert
+  | update | update
   | delete | truncate
   | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert
   | delete | truncate
-  | add_column | add_column | add_column
+  | add_column | add_column | add_column | add_column | add_column
+  | modify_column | modify_column
   | add_index | add_index | add_index
   | drop_column | drop_column
   | drop_index | drop_index
@@ -61,6 +63,13 @@ other_alter:
     ALTER TABLE table_name FORCE lock algorithm
   | ALTER TABLE table_name ENGINE=InnoDB
   | ALTER TABLE table_name row_format
+  | alter_partitioning
+;
+
+alter_partitioning:
+    ALTER TABLE table_name PARTITION BY HASH(col_name)
+  | ALTER TABLE table_name PARTITION BY KEY(col_name)
+  | ALTER TABLE table_name REMOVE PARTITIONING
 ;
 
 delete:
@@ -72,25 +81,87 @@ truncate:
 ;
 
 table_name:
-    { $last_table = 't'.$prng->int(1,20) }
-  | { $last_table = 't'.$prng->int(1,20) }
-  | { $last_table = 't'.$prng->int(1,20) }
+    { $my_last_table = 't'.$prng->int(1,20) }
+  | { $my_last_table = 't'.$prng->int(1,20) }
+  | { $my_last_table = 't'.$prng->int(1,20) }
   | _table
 ;
 
 col_name:
-    { $last_column = 'col'.$prng->int(1,20) }
-  | { $last_column = 'col'.$prng->int(1,20) }
-  | { $last_column = 'col'.$prng->int(1,20) }
-  | _field
+  int_col_name | num_col_name | temporal_col_name | text_col_name | enum_col_name | _field
+;
+
+int_col_name:
+    { $last_column = 'icol'.$prng->int(1,10) }
+  | { $last_column = 'icol'.$prng->int(1,10) }
+  | { $last_column = 'icol'.$prng->int(1,10) }
+  | _field_int
+;
+
+num_col_name:
+    { $last_column = 'ncol'.$prng->int(1,10) }
+;
+
+temporal_col_name:
+    { $last_column = 'tcol'.$prng->int(1,10) }
+;
+
+geo_col_name:
+    { $last_column = 'geocol'.$prng->int(1,10) }
+;
+
+text_col_name:
+    { $last_column = 'scol'.$prng->int(1,10) }
+  | { $last_column = 'scol'.$prng->int(1,10) }
+  | { $last_column = 'scol'.$prng->int(1,10) }
+  | _field_char
+;
+
+enum_col_name:
+    { $last_column = 'ecol'.$prng->int(1,20) }
 ;
 
 ind_name:
   { $last_index = 'ind'.$prng->int(1,10) }
 ;
 
+col_name_and_definition:
+    int_col_name int_type unsigned zerofill null default_or_auto_increment
+  | int_col_name int_type unsigned zerofill null default_or_auto_increment
+  | int_col_name int_type unsigned zerofill null default_or_auto_increment
+  | num_col_name num_type unsigned zerofill null default
+  | temporal_col_name temporal_type null default_or_current_timestamp
+  | temporal_col_name temporal_type null default_or_current_timestamp
+  | text_col_name text_type null default
+  | text_col_name text_type null default
+  | text_col_name text_type null default
+  | enum_col_name enum_type null default
+  | geo_col_name geo_type null default
+;
+
+
+default_or_current_timestamp:
+    DEFAULT '1970-01-01'
+  | DEFAULT CURRENT_TIMESTAMP
+  | DEFAULT CURRENT_TIESTAMP ON UPDATE CURRENT_TIMESTAMP
+  | DEFAULT 0
+;
+
+
+unsigned:
+  | | UNSIGNED
+;
+
+zerofill:
+  | | | | ZEROFILL
+;
+
+default_or_auto_increment:
+  default | default | default | auto_increment
+;
+
 column_definition:
-  data_type null default auto_increment key comment compressed
+  data_type null default auto_increment inline_key comment compressed
 ;
 
 create_or_replace:
@@ -112,12 +183,15 @@ row_format:
 ;
 
 create_like:
-  CREATE temporary TABLE table_name LIKE table_name
+  CREATE temporary TABLE table_name LIKE _table
 ;
 
 insert:
   insert_select | insert_values
 ;
+
+update:
+  UPDATE table_name SET col_name = DEFAULT LIMIT 1;
 
 insert_select:
   INSERT INTO table_name ( col_name ) SELECT col_name FROM table_name
@@ -137,15 +211,27 @@ empty_value_list:
 ;
 
 add_column:
-  ALTER TABLE table_name ADD COLUMN IF NOT EXISTS col_name column_definition algorithm lock
+  ALTER TABLE table_name ADD COLUMN if_not_exists col_name_and_definition algorithm lock
+;
+
+modify_column:
+  ALTER TABLE table_name MODIFY COLUMN if_exists col_name_and_definition algorithm lock
+;
+
+if_exists:
+  | IF EXISTS | IF EXISTS
+;
+
+if_not_exists:
+  | IF NOT EXISTS | IF NOT EXISTS
 ;
 
 drop_column:
-  ALTER TABLE table_name DROP COLUMN IF EXISTS col_name algorithm lock
+  ALTER TABLE table_name DROP COLUMN if_exists col_name algorithm lock
 ;
 
 add_index:
-  ALTER TABLE table_name ADD index ind_name(column_list) algorithm lock
+  ALTER TABLE table_name ADD any_key ind_name(column_list) algorithm lock
 ;
 
 
@@ -178,7 +264,42 @@ lock:
 ;
   
 data_type:
-  INT | TINYINT | SMALLINT | MEDIUMINT | BIGINT | DECIMAL | FLOAT | DOUBLE | BIT | DATE | TIME | DATETIME | TIMESTAMP | YEAR | CHAR | VARCHAR | BINARY | VARBINARY | BLOB | TEXT | ENUM('foo','bar') | SET('foo','bar') ;
+    int_type
+  | int_type
+  | int_type
+  | num_type
+  | temporal_type
+  | temporal_type
+  | text_type
+  | text_type
+  | text_type
+  | enum_type
+  | geo_type
+;
+
+int_type:
+  INT | TINYINT | SMALLINT | MEDIUMINT | BIGINT | BIT
+;
+
+num_type:
+  DECIMAL | FLOAT | DOUBLE
+;
+
+temporal_type:
+  DATE | TIME | DATETIME | TIMESTAMP | YEAR
+;
+
+enum_type:
+  ENUM('foo','bar') | SET('foo','bar')
+;
+
+text_type:
+  BLOB | TEXT | CHAR | VARCHAR(_smallint_unsigned) | BINARY | VARBINARY(_smallint_unsigned)
+;
+
+geo_type:
+  POINT | LINESTRING | POLYGON | MULTIPOINT | MULTILINESTRING | MULTIPOLYGON | GEOMETRYCOLLECTION | GEOMETRY
+;
 
 null:
   | NULL | NOT NULL ;
@@ -189,12 +310,31 @@ default:
 auto_increment:
   | | | | | | AUTO_INCREMENT ;
   
-key:
+inline_key:
   | | | index ;
   
 index:
   KEY | PRIMARY KEY | UNIQUE ;
   
+key_column:
+  int_col_name | int_col_name | num_col_name | enum_col_name | temporal_col_name | text_col_name(_tinyint_unsigned) | text_col_name(_smallint_unsigned)
+;
+
+key_column_list:
+  key_column | key_column, key_column_list
+;
+
+any_key:
+    index(key_column)
+  | index(key_column)
+  | index(key_column)
+  | index(key_column)
+  | index(key_column_list)
+  | index(key_column_list)
+  | FULLTEXT KEY(text_col_name)
+  | SPATIAL INDEX(geo_col_name)
+;
+
 comment:
   | | COMMENT 'comment';
   
