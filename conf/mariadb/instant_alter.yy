@@ -88,7 +88,7 @@ table_name:
 ;
 
 col_name:
-  int_col_name | num_col_name | temporal_col_name | text_col_name | enum_col_name | _field
+  int_col_name | num_col_name | temporal_col_name | text_col_name | enum_col_name | virt_col_name | _field
 ;
 
 int_col_name:
@@ -100,6 +100,10 @@ int_col_name:
 
 num_col_name:
     { $last_column = 'ncol'.$prng->int(1,10) }
+;
+
+virt_col_name:
+    { $last_column = 'vcol'.$prng->int(1,10) }
 ;
 
 temporal_col_name:
@@ -136,9 +140,22 @@ col_name_and_definition:
   | text_col_name text_type null default
   | text_col_name text_type null default
   | enum_col_name enum_type null default
-  | geo_col_name geo_type null default
+  | virt_col_name virt_col_definition virt_type
+  | geo_col_name geo_type null geo_default
 ;
 
+virt_col_definition:
+    int_type AS ( int_col_name + _digit )
+  | num_type AS ( num_col_name + _digit )
+  | temporal_type AS ( temporal_col_name )
+  | text_type AS ( SUBSTR(text_col_name, _digit, _digit )
+  | enum_type AS ( enum_col_name )
+  | geo_type AS ( geo_col_name )
+;
+
+virt_type:
+  STORED | VIRTUAL
+;
 
 default_or_current_timestamp:
     DEFAULT '1970-01-01'
@@ -305,7 +322,10 @@ null:
   | NULL | NOT NULL ;
   
 default:
-  | DEFAULT NULL | DEFAULT '' | DEFAULT 0;
+  | DEFAULT NULL | DEFAULT '' | DEFAULT 0 ;
+
+geo_default:
+  | DEFAULT ST_GEOMFROMTEXT('Point(1 1)') ;
 
 auto_increment:
   | | | | | | AUTO_INCREMENT ;
