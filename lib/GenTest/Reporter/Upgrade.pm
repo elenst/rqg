@@ -152,94 +152,62 @@ sub report {
     # even if the server failed to start, we need to see what went wrong
     # to tune the error code
 
-    my @errors= ();
-
-    open(UPGRADE, $errorlog);
-
-    while (<UPGRADE>) {
-        $_ =~ s{[\r\n]}{}siog;
-        if (
-            ($_ =~ m{\[ERROR\]\s+InnoDB}sio) ||
-            ($_ =~ m{InnoDB:\s+Error:}sio) ||
-            ($_ =~ m{Assertion\W}sio) ||
-            ($_ =~ m{registration as a STORAGE ENGINE failed.}sio) ||
-            ($_ =~ m{got signal}sio) ||
-            ($_ =~ m{segmentation fault}sio) ||
-            ($_ =~ m{segfault}sio) ||
-            ($_ =~ m{exception}sio)
-        ) {
-            push @errors, $_;
-            # InnoDB errors are likely to mean something nasty,
-            # so we'll raise the flag;
-            # but ignore erros about innodb_table_stats at this point
-            if ( $_ !~ m{innodb_table_stats}so
-                   and $_ !~ m{ib_buffer_pool' for reading: No such file or directory}so
-            ) {
-                if (m{\[ERROR\] InnoDB: Corruption: Page is marked as compressed but uncompress failed with error}so) 
-                {
-                    detected_bug(13112);
-                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
-                }
-                elsif (m{void fil_decompress_page.*: Assertion `0' failed}so)
-                {
-                    detected_bug(13103);
-                    # We will only set the status to CUSTOM_OUTCOME if it was previously set to POSSIBLE_FAILURE
-                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status == STATUS_POSSIBLE_FAILURE;
-                    last;
-                }
-                elsif (m{InnoDB: Corruption: Page is marked as compressed space:}so)
-                {
-                    # Most likely it is an indication of MDEV-13103, but to make sure, we still need to find the assertion failure.
-                    # If we find it later, we will set result to STATUS_CUSTOM_OUTCOME.
-                    # If we don't find it later, we will raise it to STATUS_UPGRADE_FAILURE
-                    $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
-                }
-                elsif (m{recv_parse_or_apply_log_rec_body.*Assertion.*offs == .*failed}so)
-                {
-                    detected_bug(13101);
-                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
-                    last;
-                }
-                elsif (m{Failing assertion: \!memcmp\(FIL_PAGE_TYPE \+ page, FIL_PAGE_TYPE \+ page_zip\-\>data, PAGE_HEADER - FIL_PAGE_TYPE\)}so)
-                {
-                    detected_bug(13512);
-                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
-                    last;
-                }
-                elsif (m{InnoDB: Assertion failure in thread \d+ in file page0zip\.cc line \d+})
-                {
-                    # Possibly it's MDEV-13247, it can show up if the old version is between 10.1.2 and 10.1.25.
-                    # We need to check for "Failing assertion: !page_zip_dir_find(page_zip, page_offset(rec))" later
-                    $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
-                }
-                elsif (m{Failing assertion: \!page_zip_dir_find\(page_zip, page_offset\(rec\)\)}so)
-                {
-                    # Possibly it's MDEV-13247, it can show up if the old version is between 10.1.2 and 10.1.25.
-                    # If we've also seen Assertion failure .. in file page0zip.cc, we'll consider it related
-                    detected_bug(13247);
-                    $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status == STATUS_POSSIBLE_FAILURE;
-                    last;
-                }
-                else {
-                    $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status < STATUS_UPGRADE_FAILURE;
-                }
-            }
-        }
-        elsif ($_ =~ m{ready for connections}sio) {
-            last;
-        }
-        elsif ($_ =~ m{device full error|no space left on device}sio) {
-            $upgrade_status = STATUS_ENVIRONMENT_FAILURE;
-            last;
-        }
-    }
-
-    close(UPGRADE);
-
-    if (@errors) {
-        say("-- ERRORS IN THE LOG -------------");
-        foreach(@errors) { say($_) };
-        say("----------------------------------");
+    my ($crashes, $errors)= $server->checkErrorLogForErrors();
+    foreach (@$crashes, @$errors) {
+      if (m{\[ERROR\] InnoDB: Corruption: Page is marked as compressed but uncompress failed with error}so) 
+      {
+          detected_bug(13112);
+          $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+      }
+      elsif (m{void fil_decompress_page.*: Assertion `0' failed}so)
+      {
+          detected_bug(13103);
+          # We will only set the status to CUSTOM_OUTCOME if it was previously set to POSSIBLE_FAILURE
+          $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status == STATUS_POSSIBLE_FAILURE;
+          last;
+      }
+      elsif (m{InnoDB: Corruption: Page is marked as compressed space:}so)
+      {
+          # Most likely it is an indication of MDEV-13103, but to make sure, we still need to find the assertion failure.
+          # If we find it later, we will set result to STATUS_CUSTOM_OUTCOME.
+          # If we don't find it later, we will raise it to STATUS_UPGRADE_FAILURE
+          $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
+      }
+      elsif (m{recv_parse_or_apply_log_rec_body.*Assertion.*offs == .*failed}so)
+      {
+          detected_bug(13101);
+          $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+          last;
+      }
+      elsif (m{Failing assertion: \!memcmp\(FIL_PAGE_TYPE \+ page, FIL_PAGE_TYPE \+ page_zip\-\>data, PAGE_HEADER - FIL_PAGE_TYPE\)}so)
+      {
+          detected_bug(13512);
+          $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+          last;
+      }
+      elsif (m{InnoDB: Assertion failure in thread \d+ in file page0zip\.cc line \d+})
+      {
+          # Possibly it's MDEV-13247, it can show up if the old version is between 10.1.2 and 10.1.25.
+          # We need to check for "Failing assertion: !page_zip_dir_find(page_zip, page_offset(rec))" later
+          $upgrade_status = STATUS_POSSIBLE_FAILURE if $upgrade_status < STATUS_POSSIBLE_FAILURE;
+      }
+      elsif (m{Failing assertion: \!page_zip_dir_find\(page_zip, page_offset\(rec\)\)}so)
+      {
+          # Possibly it's MDEV-13247, it can show up if the old version is between 10.1.2 and 10.1.25.
+          # If we've also seen Assertion failure .. in file page0zip.cc, we'll consider it related
+          detected_bug(13247);
+          $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status == STATUS_POSSIBLE_FAILURE;
+          last;
+      }
+      elsif (m{Assertion \`\!is_user_rec \|\| \!leaf \|\| index-\>is_dummy \|\| dict_index_is_ibuf\(index\) \|\| n == n_fields \|\| \(n \>= index->n_core_fields \&\& n \<= index-\>n_fields\)\' failed}so)
+      {
+          detected_bug(14022);
+          $upgrade_status = STATUS_CUSTOM_OUTCOME if $upgrade_status < STATUS_CUSTOM_OUTCOME;
+          last;
+      }
+      else {
+          $upgrade_status = STATUS_UPGRADE_FAILURE if $upgrade_status < STATUS_UPGRADE_FAILURE;
+      }
     }
 
     if ($upgrade_status != STATUS_OK) {
