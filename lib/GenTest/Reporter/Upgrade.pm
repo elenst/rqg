@@ -153,7 +153,7 @@ sub report {
     # to tune the error code
 
     my ($crashes, $errors)= $server->checkErrorLogForErrors();
-    foreach (@$crashes, @$errors) {
+    foreach (@$errors, @$crashes) {
       if (m{\[ERROR\] InnoDB: Corruption: Page is marked as compressed but uncompress failed with error}so) 
       {
           detected_bug(13112);
