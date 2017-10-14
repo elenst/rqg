@@ -155,10 +155,16 @@ if (not defined $sc_opts{basedir} and not defined $sc_opts{basedir1}) {
   print STDERR "\nERROR: Basedir is not defined\n\n";
   exit 1;
 }
+elsif (not defined $sc_opts{basedir}) {
+  $sc_opts{basedir}= $sc_opts{basedir1};
+}
 
 if (not defined $sc_opts{vardir} and not defined $sc_opts{vardir1}) {
   print STDERR "\nERROR: Vardir is not defined\n\n";
   exit 1;
+}
+elsif (not defined $sc_opts{vardir}) {
+  $sc_opts{vardir}= $sc_opts{vardir1};
 }
 
 say("Starting \n# $0 \\ \n# ".join(" \\ \n# ", @ARGV_saved));
