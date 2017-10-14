@@ -58,11 +58,18 @@ sub new {
   if (not defined $scenario->getTestType) {
     $scenario->setTestType('normal');
   }
+
+  if (not defined $scenario->getProperty('grammar')) {
+    $scenario->setProperty('grammar', 'conf/mariadb/oltp.yy');
+  }
   if (not defined $scenario->getProperty('gendata')) {
     $scenario->setProperty('gendata', 'conf/mariadb/innodb_upgrade.zz');
   }
-  if (not defined $scenario->getProperty('grammar')) {
-    $scenario->setProperty('grammar', 'conf/mariadb/oltp.yy');
+  if (not defined $scenario->getProperty('gendata1')) {
+    $scenario->setProperty('gendata1', $scenario->getProperty('gendata'));
+  }
+  if (not defined $scenario->getProperty('gendata-advanced1')) {
+    $scenario->setProperty('gendata-advanced1', $scenario->getProperty('gendata-advanced'));
   }
   if (not defined $scenario->getProperty('threads')) {
     $scenario->setProperty('threads', 4);
@@ -110,7 +117,7 @@ sub run {
 
   if ($status != STATUS_OK) {
     sayError("Old server failed to start");
-    return $status;
+    return $scenario->finalize($status,[]);
   }
   
   #####
@@ -128,7 +135,7 @@ sub run {
   
   if ($status != STATUS_OK) {
     sayError("Test flow on the old server failed");
-    return $status;
+    return $scenario->finalize($status,[$old_server]);
   }
 
   #####
@@ -146,7 +153,7 @@ sub run {
 
   if ($status != STATUS_OK) {
     sayError("Shutdown of the old server failed");
-    return $status;
+    return $scenario->finalize($status,[$old_server]);
   }
 
   #####
@@ -155,13 +162,14 @@ sub run {
   $old_server->backupDatadir($old_server->datadir."_orig");
   move($old_server->errorlog, $old_server->errorlog.'_orig');
 
+  #####
   $scenario->printStep("Starting the new server");
 
   $status= $new_server->startServer;
 
   if ($status != STATUS_OK) {
     sayError("New server failed to start");
-    return $status;
+    return $scenario->finalize($status,[$new_server]);
   }
 
   #####
@@ -171,7 +179,7 @@ sub run {
 
   if ($status != STATUS_OK) {
     sayError("Found errors in the log, upgrade has apparently failed");
-    return $status;
+    return $scenario->finalize($status,[$new_server]);
   }
   
   #####
@@ -181,7 +189,7 @@ sub run {
 
   if ($status != STATUS_OK) {
     sayError("Database appears to be corrupt after upgrade");
-    return $status;
+    return $scenario->finalize($status,[$new_server]);
   }
   
   #####
@@ -198,7 +206,7 @@ sub run {
   $status= compare($new_server->vardir.'/server_schema_old.dump', $new_server->vardir.'/server_schema_new.dump');
   if ($status != STATUS_OK) {
     sayError("Database structures differ after upgrade");
-    return STATUS_UPGRADE_FAILURE;
+    return $scenario->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
   }
   else {
     say("Structure dumps appear to be identical");
@@ -207,16 +215,16 @@ sub run {
   $status= compare($new_server->vardir.'/server_data_old.dump', $new_server->vardir.'/server_data_new.dump');
   if ($status != STATUS_OK) {
     sayError("Data differs after upgrade");
-    return STATUS_UPGRADE_FAILURE;
+    return $scenario->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
   }
   else {
     say("Data dumps appear to be identical");
   }
   
-  $status= $scenario->compare_autoincrements($table_autoinc{old}, $table_autoinc{new});
+  $status= $scenario->_compare_autoincrements($table_autoinc{old}, $table_autoinc{new});
   if ($status != STATUS_OK) {
     sayError("Auto-increment data differs after upgrade");
-    return $status;
+    return $scenario->finalize($status,[$new_server]);
   }
   else {
     say("Auto-increment data appears to be identical");
@@ -236,6 +244,7 @@ sub run {
   
   if ($status != STATUS_OK) {
     sayError("Test flow on the new server failed");
+    return $scenario->finalize($status,[$new_server])
   }
 
   #####
@@ -244,13 +253,14 @@ sub run {
   $status= $new_server->stopServer;
 
   if ($status != STATUS_OK) {
-    sayError("SHutdown of the new server failed");
+    sayError("Shutdown of the new server failed");
+    return $scenario->finalize($status,[$new_server]);
   }
 
-  return $status;
+  return $scenario->finalize($status,[]);
 }
 
-sub compare_autoincrements {
+sub _compare_autoincrements {
   my ($self, $old_autoinc, $new_autoinc)= @_;
 #	say("Comparing auto-increment data between old and new servers...");
 
@@ -280,7 +290,7 @@ sub compare_autoincrements {
       if ($to->[0] ne $tn->[0] or $to->[2] ne $tn->[2] or $to->[3] != $tn->[3] or ($tn->[1] != $to->[1] and $tn->[1] != $tn->[3]+1))
       {
         $self->addDetectedBug(13094);
-        sayError("Auto-increment data differs. Old server: @$to ; new server: @$tn");
+        sayError("Difference found:\n  old server: table $to->[0]; autoinc $to->[1]; MAX($to->[2])=$to->[3]\n  new server: table $tn->[0]; autoinc $tn->[1]; MAX($tn->[2])=$tn->[3]");
         return STATUS_CUSTOM_OUTCOME;
       }
     }

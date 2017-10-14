@@ -65,11 +65,11 @@ sub setTestType {
 }
 
 sub getTestDuration {
-  return $_[0]->getProperty('test_duration');
+  return $_[0]->getProperty('duration');
 }
 
 sub setTestDuration {
-  return $_[0]->setProperty('test_duration',$_[1]);
+  return $_[0]->setProperty('duration',$_[1]);
 }
 
 sub getProperties {
@@ -152,6 +152,14 @@ sub prepareGentest {
   }
   if (!defined $config->property('duration')) {
     $config->property('duration', $self->getProperty('duration') || 300);
+  }
+  # gendata and gendata-advanced will only be used if they specified
+  # explicitly for this run
+  if (!defined $config->property('gendata')) {
+    $config->property('gendata', $self->getProperty('gendata'.$gentest_num));
+  }
+  if (!defined $config->property('gendata-advanced')) {
+    $config->property('gendata-advanced', $self->getProperty('gendata-advanced'.$gentest_num));
   }
   if (!defined $config->property('generator')) {
     $config->property('generator', $self->getProperty('generator') || 'FromGrammar');
@@ -251,6 +259,19 @@ sub checkErrorLog {
     }
   }
   $status= STATUS_UPGRADE_FAILURE if $status == STATUS_POSSIBLE_FAILURE;
+  return $status;
+}
+
+sub finalize {
+  my ($self, $status, $servers)= @_;
+  if ($servers) {
+    foreach my $s (@$servers) {
+      $s->kill;
+    }
+  }
+  my $bugs= $self->detectedBugs;
+  my @bugs= map { 'MDEV-'. $_ . '('.$bugs->{$_}.')' } keys %$bugs;
+  say("Detected possible appearance of known bugs: @bugs");
   return $status;
 }
 

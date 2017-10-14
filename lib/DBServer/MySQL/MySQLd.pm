@@ -433,7 +433,6 @@ sub createMysqlBase  {
     }
     close BOOT;
 
-    say("Running bootstrap: $command (and feeding $boot to it)");
     system("$command > \"".$self->vardir."/boot.log\" 2>&1");
     return $?;
 }
@@ -756,7 +755,6 @@ sub dumpdb {
     if ($self->_notOlderThan(5,1,14)) {
         $dump_command = $dump_command . " --no-tablespaces";
     }
-    say("Running $dump_command");
     my $dump_result = system("$dump_command | sort > $file");
     return $dump_result;
 }
@@ -774,7 +772,6 @@ sub dumpSchema {
     if ($self->_notOlderThan(5,1,14)) {
         $dump_command = $dump_command . " --no-tablespaces";
     }
-    say("Running $dump_command");
     my $dump_result = system("$dump_command > $file");
     return $dump_result;
 }
@@ -902,10 +899,10 @@ sub checkDatabaseIntegrity {
       my $tabl_ref = $dbh->selectcol_arrayref("SHOW FULL TABLES", { Columns=>[1,2] });
       # 1178 is ER_CHECK_NOT_IMPLEMENTED
       my %tables = @$tabl_ref;
-      foreach my $table (keys %tables) {
+      foreach my $table (sort keys %tables) {
         # Should not do CHECK etc., and especially ALTER, on a view
         next if $tables{$table} eq 'VIEW';
-        say("Verifying table: $database.$table:");
+#        say("Verifying table: $database.$table:");
         my $check = $dbh->selectcol_arrayref("CHECK TABLE `$database`.`$table` EXTENDED", { Columns=>[3,4] });
         if ($dbh->err() > 0 && $dbh->err() != 1178) {
           sayError("Table $database.$table appears to be corrupted, error: ".$dbh->err());
