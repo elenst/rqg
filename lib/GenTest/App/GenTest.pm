@@ -485,8 +485,8 @@ sub doGenData {
             $gendata_result = GenTest::App::GendataAdvanced->new(
                dsn => $dsn,
                vcols => (defined $self->config->property('vcols') ? ${$self->config->property('vcols')}[$i] : undef),
-               views => ${$self->config->views}[$i],
-               engine => ${$self->config->engine}[$i],
+               views => (defined $self->config->views ? ${$self->config->views}[$i] : undef),
+               engine => (defined $self->config->engine ? ${$self->config->engine}[$i] : undef),
                sqltrace=> $self->config->sqltrace,
                notnull => $self->config->notnull,
                rows => $self->config->rows,
@@ -500,8 +500,8 @@ sub doGenData {
             $gendata_result = GenTest::App::GendataSimple->new(
                dsn => $dsn,
                vcols => (defined $self->config->property('vcols') ? ${$self->config->property('vcols')}[$i] : undef),
-               views => ${$self->config->views}[$i],
-               engine => ${$self->config->engine}[$i],
+               views => (defined $self->config->views ? ${$self->config->views}[$i] : undef),
+               engine => (defined $self->config->engine ? ${$self->config->engine}[$i] : undef),
                sqltrace=> $self->config->sqltrace,
                notnull => $self->config->notnull,
                rows => $self->config->rows,
@@ -511,11 +511,11 @@ sub doGenData {
             $gendata_result = GenTest::App::Gendata->new(
                spec_file => $self->config->gendata,
                dsn => $dsn,
-               engine => ${$self->config->engine}[$i],
+               engine => (defined $self->config->engine ? ${$self->config->engine}[$i] : undef),
                seed => $self->config->seed(),
                debug => $self->config->debug,
                rows => $self->config->rows,
-               views => ${$self->config->views}[$i],
+               views => (defined $self->config->views ? ${$self->config->views}[$i] : undef),
                varchar_length => $self->config->property('varchar-length'),
                sqltrace => $self->config->sqltrace,
                short_column_names => $self->config->short_column_names,
@@ -663,7 +663,7 @@ sub initReporters {
                 test_start => $self->[GT_TEST_START],
                 test_end => $self->[GT_TEST_END],
                 test_duration => $self->config->duration,
-                debug_server => $self->config->debug_server->[$i],
+                debug_server => (defined $self->config->debug_server ? ${$self->config->debug_server}[$i] : undef),
                 properties => $self->config
             });
 
