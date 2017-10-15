@@ -195,14 +195,17 @@ sub detectedBugs {
 
 # Check and parse the error log up to this point,
 # and parse for known errors.
-# The check is performed either from the given marker or from the start
+# Additional options can be provided. Currently the function recognizes
+# - Marker - the check is performed either from the given marker or from the start
+# - CrashOnly - if true, non-fatal errors are ignored
 sub checkErrorLog {
-  my ($self, $server, $marker)= @_;
- 
+  my ($self, $server, $opts)= @_;
+
+  my $marker= ($opts ? $opts->{Marker} : undef);
   my $status= STATUS_OK;
-  
   my ($crashes, $errors)= $server->checkErrorLogForErrors($marker);
-  foreach (@$errors, @$crashes) {
+  my @errors= (($opts && $opts->{CrashOnly}) ? @$crashes : (@$errors, @$crashes));
+  foreach (@errors) {
     if (m{\[ERROR\] InnoDB: Corruption: Page is marked as compressed but uncompress failed with error}so) 
     {
         $self->addDetectedBug(13112);

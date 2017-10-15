@@ -157,6 +157,16 @@ sub run {
   }
 
   #####
+  $scenario->printStep("Checking the old server log for fatal errors after shutdown");
+
+  $status= $scenario->checkErrorLog($old_server, {CrashOnly => 1});
+
+  if ($status != STATUS_OK) {
+    sayError("Found fatal errors in the log, old server shutdown has apparently failed");
+    return $scenario->finalize($status,[$old_server]);
+  }
+
+  #####
   $scenario->printStep("Backing up data from the old server");
 
   $old_server->backupDatadir($old_server->datadir."_orig");
