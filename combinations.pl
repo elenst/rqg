@@ -282,7 +282,7 @@ sub doCombination {
     say("[$thread_id] Running $comment ".$trial_id."/".$trials);
 	my $mask = $prng->uint16(0, 65535);
 
-    my $runall = $new?"runall-new.pl":"run-scenario.pl";
+    my $runall = $new?"runall-new.pl":"runall.pl";
 
 	my $command = "
 		perl ".($Carp::Verbose?"-MCarp=verbose ":"").

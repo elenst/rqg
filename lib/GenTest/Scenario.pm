@@ -30,6 +30,7 @@ use constant SCENARIO_PROPERTIES      => 1;
 use constant SCENARIO_CURRENT_BASEDIR => 2;
 use constant SCENARIO_TYPE            => 3;
 use constant SCENARIO_DETECTED_BUGS   => 4;
+use constant SCENARIO_GLOBAL_RESULT   => 5;
 
 1;
 
@@ -42,6 +43,7 @@ sub new {
   }, @_);
 
   $scenario->[SCENARIO_DETECTED_BUGS] = {};
+  $scenario->[SCENARIO_GLOBAL_RESULT] = STATUS_OK;
 
   if (!defined $scenario->getProperty('database')) {
     $scenario->setProperty('database','test');
@@ -49,6 +51,7 @@ sub new {
   if (!defined $scenario->getProperty('user')) {
     $scenario->setProperty('user','root');
   }
+
   return $scenario;
 }
 
@@ -155,12 +158,12 @@ sub prepareGentest {
   }
   # gendata and gendata-advanced will only be used if they specified
   # explicitly for this run
-  if (!defined $config->property('gendata')) {
-    $config->property('gendata', $self->getProperty('gendata'.$gentest_num));
-  }
-  if (!defined $config->property('gendata-advanced')) {
-    $config->property('gendata-advanced', $self->getProperty('gendata-advanced'.$gentest_num));
-  }
+#  if (!defined $config->property('gendata')) {
+    #$config->property('gendata', $self->getProperty('gendata'.$gentest_num));
+#  }
+#  if (!defined $config->property('gendata-advanced')) {
+#    $config->property('gendata-advanced', $self->getProperty('gendata-advanced'.$gentest_num));
+#  }
   if (!defined $config->property('generator')) {
     $config->property('generator', $self->getProperty('generator') || 'FromGrammar');
   }
@@ -265,6 +268,19 @@ sub checkErrorLog {
   return $status;
 }
 
+sub setStatus {
+  my ($self, $res)= @_;
+  if ($res > $self->[SCENARIO_GLOBAL_RESULT]) {
+    $self->[SCENARIO_GLOBAL_RESULT]= $res;
+  }
+  return $self->[SCENARIO_GLOBAL_RESULT];
+}
+
+sub getStatus {
+  my $self= shift;
+  return $self->[SCENARIO_GLOBAL_RESULT];
+}
+
 sub finalize {
   my ($self, $status, $servers)= @_;
   if ($servers) {
@@ -272,10 +288,12 @@ sub finalize {
       $s->kill;
     }
   }
-  my $bugs= $self->detectedBugs;
-  my @bugs= map { 'MDEV-'. $_ . '('.$bugs->{$_}.')' } keys %$bugs;
-  say("Detected possible appearance of known bugs: @bugs");
-  return $status;
+  if (scalar (keys %{$self->detectedBugs})) {
+    my $bugs= $self->detectedBugs;
+    my @bugs= map { 'MDEV-'. $_ . '('.$bugs->{$_}.')' } keys %$bugs;
+    say("Detected possible appearance of known bugs: @bugs");
+  }
+  return $self->setStatus($status);
 }
 
 sub printTitle {
@@ -293,14 +311,14 @@ sub printTitle {
 
 sub printStep {
   my ($self, $step)= @_;
-  $step= "--- $step ---";
+  $step= "-- $step --";
   my $filler='';
   foreach (1..length($step)) {
     $filler.='-';
   }
-  say("\n$filler");
-  say($step);
-  say("");
+  say("#$filler#");
+  say("#$step#");
+  say("#$filler#");
 }
 
 sub configure {

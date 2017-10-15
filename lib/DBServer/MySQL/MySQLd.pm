@@ -682,6 +682,7 @@ sub kill {
     # clean up when the server is not alive.
     unlink $self->socketfile if -e $self->socketfile;
     unlink $self->pidfile if -e $self->pidfile;
+    return ($self->running ? DBSTATUS_FAILURE : DBSTATUS_OK);
 }
 
 sub term {
@@ -736,6 +737,44 @@ sub corefile {
 
     ## Unix variant
     return $self->datadir."/core.".$self->serverpid;
+}
+
+sub upgradeDb {
+  my $self= shift;
+
+  my $mysql_upgrade= $self->_find([$self->basedir],
+                                        osWindows()?["client/Debug","client/RelWithDebInfo","client/Release","bin"]:["client","bin"],
+                                        osWindows()?"mysql_upgrade.exe":"mysql_upgrade");
+  my $upgrade_command=
+    '"'.$mysql_upgrade.'" --host=127.0.0.1 --port='.$self->port.' -uroot';
+  my $upgrade_log= $self->datadir.'/mysql_upgrade.log';
+  say("Running mysql_upgrade:\n  $upgrade_command");
+  my $res= system("$upgrade_command > $upgrade_log");
+  if ($res == DBSTATUS_OK) {
+    # mysql_upgrade can return exit code 0 even if user tables are corrupt,
+    # so we don't trust the exit code, we should also check the actual output
+    if (open(UPGRADE_LOG, "$upgrade_log")) {
+     OUTER_READ:
+      while (<UPGRADE_LOG>) {
+        # For now we will only check 'Repairing tables' section,
+        # and if there are any errors, we'll consider it a failure
+        next unless /Repairing tables/;
+        while (<UPGRADE_LOG>) {
+          if (/^\s*Error/) {
+            $res= DBSTATUS_FAILURE;
+            sayError("Found errors in mysql_upgrade output");
+            sayFile("$upgrade_log");
+            last OUTER_READ;
+          }
+        }
+      }
+      close (UPGRADE_LOG);
+    } else {
+      sayError("Could not find $upgrade_log");
+      $res= DBSTATUS_FAILURE;
+    }
+  }
+  return $res;
 }
 
 sub dumper {
@@ -985,8 +1024,9 @@ sub checkErrorLogForErrors {
   open(ERRLOG, $self->errorlog);
   my $found_marker= 0;
 
-  say("------ Checking server log for important errors starting from " . ($marker ? "marker $marker" : 'the beginning'));
+  say("Checking server log for important errors starting from " . ($marker ? "marker $marker" : 'the beginning'));
 
+  my $count= 0;
   while (<ERRLOG>)
   {
     next unless !$marker or $found_marker or /^$marker$/;
@@ -1007,6 +1047,7 @@ sub checkErrorLogForErrors {
         or $_ =~ /segfault/sio
         or $_ =~ /exception/sio
     ) {
+      say("------") unless $count++;
       say($_);
       push @crashes, $_;
     }
@@ -1016,11 +1057,12 @@ sub checkErrorLogForErrors {
         or $_ =~ /InnoDB:\s+Error:/sio
         or $_ =~ /registration as a STORAGE ENGINE failed./sio
     ) {
+      say("------") unless $count++;
       say($_);
       push @errors, $_;
     }
   }
-  say("------");
+  say("------") if $count;
   close(ERRLOG);
   return (\@crashes, \@errors);
 }

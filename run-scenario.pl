@@ -73,13 +73,13 @@ if (!$scenario) {
 # thus we will parse them manually
 
 foreach my $o (@ARGV) {
-  if ($o =~ /^--mysqld=(\S+)$/) {
+  if ($o =~ /^--(?:loose[-_])?mysqld=(\S+)$/) {
     if (not defined $sc_opts{mysqld}) {
       @{$sc_opts{mysqld}}= ();
     }
     push @{$sc_opts{mysqld}}, $1;
   }
-  elsif ($o =~ /^--(mysqld\d+)=(\S+)$/) {
+  elsif ($o =~ /^--(?:loose[-_])?(mysqld\d+)=(\S+)$/) {
     if (not defined $sc_opts{$1}) {
       @{$sc_opts{$1}}= ();
     }
