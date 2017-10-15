@@ -286,7 +286,10 @@ sub run {
 
   if ($status != STATUS_OK) {
     sayError("New server failed to start");
-    return $self->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
+    # Error log might indicate known bugs which will affect the exit code
+    $status= $self->checkErrorLog($new_server);
+    # ... but even if it's a known error, we cannot proceed without the server
+    return $self->finalize($status,[$new_server]);
   }
 
   #####
