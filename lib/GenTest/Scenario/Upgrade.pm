@@ -226,7 +226,7 @@ sub run {
     }
   }
   else {
-    printStep("mysql_upgrade is skipped, as servers have the same major version");
+    $self->printStep("mysql_upgrade is skipped, as servers have the same major version");
   }
 
   #####
