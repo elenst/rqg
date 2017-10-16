@@ -248,17 +248,40 @@ sub run {
   $table_autoinc{'new'} = $new_server->collectAutoincrements();
 
   #####
-  $self->printStep("Comparing databases");
+  $self->printStep("Running test flow on the new server");
+
+  $gentest= $self->prepareGentest(2,
+    {
+      duration => int($self->getTestDuration / 3),
+      dsn => [$new_server->dsn($self->getProperty('database'))],
+      servers => [$new_server],
+      'start-dirty' => 1,
+    }
+  );
+  $status= $gentest->run();
+
+  if ($status != STATUS_OK) {
+    sayError("Test flow on the new server failed");
+    return $self->finalize($status,[$new_server])
+  }
+
+  #####
+  $self->printStep("Stopping the new server");
+
+  $status= $new_server->stopServer;
+
+  if ($status != STATUS_OK) {
+    sayError("Shutdown of the new server failed");
+    return $self->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
+  }
+
+  #####
+  $self->printStep("Comparing databases before and after upgrade");
   
   $status= compare($new_server->vardir.'/server_schema_old.dump', $new_server->vardir.'/server_schema_new.dump');
   if ($status != STATUS_OK) {
-    # Comaring databases can show known errors. We want to update 
-    # the global status, but don't want to exit prematurely
-    $self->setStatus($status);
     sayError("Database structures differ after upgrade");
-    if ($status > STATUS_CUSTOM_OUTCOME) {
-      return $self->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
-    }
+    return $self->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
   }
   else {
     say("Structure dumps appear to be identical");
@@ -285,34 +308,6 @@ sub run {
   }
   else {
     say("Auto-increment data appears to be identical");
-  }
-
-  #####
-  $self->printStep("Running test flow on the new server");
-
-  $gentest= $self->prepareGentest(2,
-    {
-      duration => int($self->getTestDuration / 3),
-      dsn => [$new_server->dsn($self->getProperty('database'))],
-      servers => [$new_server],
-      'start-dirty' => 1,
-    }
-  );
-  $status= $gentest->run();
-  
-  if ($status != STATUS_OK) {
-    sayError("Test flow on the new server failed");
-    return $self->finalize($status,[$new_server])
-  }
-
-  #####
-  $self->printStep("Stopping the new server");
-
-  $status= $new_server->stopServer;
-
-  if ($status != STATUS_OK) {
-    sayError("Shutdown of the new server failed");
-    return $self->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
   }
 
   return $self->finalize($status,[]);
