@@ -74,7 +74,7 @@ sub new {
     $scenario->printTitle('Undo log recovery');
   }
   else {
-    $scenario->printTitle('Unido log upgrade');
+    $scenario->printTitle('Undo log upgrade');
   }
 
   if (not defined $scenario->getProperty('grammar')) {
