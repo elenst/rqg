@@ -873,6 +873,13 @@ sub masterStatus {
 # Run EXPLAIN on the query in question, recording all notes in the EXPLAIN's Extra field into the statistics
 #
 
+sub import_tablespace {
+    my ($executor, $table, $backup, $tablespace) = @_;
+    $executor->execute("ALTER TABLE $table DISCARD TABLESPACE");
+    system("cp $backup $tablespace");
+    $executor->execute("ALTER TABLE $table IMPORT TABLESPACE /* $backup */");
+}
+
 sub explain {
     my ($executor, $query) = @_;
 

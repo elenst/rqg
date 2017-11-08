@@ -62,9 +62,9 @@ use File::Basename;
 
 
 # Configurable constants:
-use constant MIN_DURATION   => 0.02;  # (seconds) Queries with shorter execution times are not processed.
+use constant MIN_DURATION   => 0.1;  # (seconds) Queries with shorter execution times are not processed.
 use constant MAX_DURATION   => 300;   # (seconds) Queries with longer execution times are not processed.
-use constant MIN_RATIO      => 1.5;   # Minimum speed-up or slow-down required in order to report a query
+use constant MIN_RATIO      => 2;   # Minimum speed-up or slow-down required in order to report a query
 use constant MAX_ROWS       => 200;   # Skip query if initial execution resulted in more than so many rows.
 use constant MIN_SAMPLES    => 0;     # Minimum number of execution time samples to do for each query per server.
 use constant MAX_SAMPLES    => 0;     # Max number of execution time samples per query per server. Must be no less than MIN_SAMPLES.
@@ -208,10 +208,10 @@ sub validate {
     my $query = $results->[0]->query();
     $candidate_queries++;
 
-    if ($query !~ m{^\s*SELECT}sio) {
-        $non_selects++;
-        return STATUS_WONT_HANDLE;
-    }
+#    if ($query !~ m{^\s*SELECT}sio) {
+#        $non_selects++;
+#        return STATUS_WONT_HANDLE;
+#    }
     if ($results->[0]->status() != STATUS_OK || $results->[1]->status() != STATUS_OK) {
         $non_status_ok++;
         return STATUS_WONT_HANDLE

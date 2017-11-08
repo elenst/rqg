@@ -71,7 +71,8 @@ use DBI;
 use Cwd;
 
 my $database = 'test';
-my $user = 'rqg';
+my $user = 'root';
+
 my @dsns;
 
 my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
