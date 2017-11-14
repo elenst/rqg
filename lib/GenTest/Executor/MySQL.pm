@@ -312,6 +312,7 @@ use constant  ER_JSON_DOCUMENT_NULL_KEY                         => 3158;
 
 use constant  ER_EXPRESSION_REFERS_TO_UNINIT_FIELD              => 4026;
 use constant  ER_REFERENCED_TRG_DOES_NOT_EXIST                  => 4031;
+use constant  ER_UNKNOWN_VIEW                                   => 4090;
 
 my %err2type = (
 
@@ -493,6 +494,7 @@ my %err2type = (
     ER_UNKNOWN_STORAGE_ENGINE()                         => STATUS_ENVIRONMENT_FAILURE,
     ER_UNKNOWN_SYSTEM_VARIABLE()                        => STATUS_SEMANTIC_ERROR,
     ER_UNKNOWN_TABLE()                                  => STATUS_SEMANTIC_ERROR,
+    ER_UNKNOWN_VIEW()                                   => STATUS_SEMANTIC_ERROR,
     ER_UPDATE_TABLE_USED()                              => STATUS_SEMANTIC_ERROR,
     ER_VAR_CANT_BE_READ()                               => STATUS_SEMANTIC_ERROR,
     ER_VIEW_INVALID()                                   => STATUS_SEMANTIC_ERROR,
