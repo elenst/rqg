@@ -14,27 +14,44 @@
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 thread3_init:
-  create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace ; create_or_replace
+  ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace
 ;
  
 thread3:
-    create_or_replace 
-  | create_like
-  | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert
-  | update | update
-  | delete | truncate
-  | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert | insert
-  | delete | truncate
-  | add_column | add_column | add_column | add_column | add_column
-  | modify_column | modify_column
-  | add_index | add_index | add_index
-  | drop_column | drop_column
-  | drop_index | drop_index
-  | other_alter | other_alter | other_alter
-  | flush
-  | optimize
-  | lock_unlock_table
-  | transaction
+    ia_create_or_replace
+  | ia_create_like
+  | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert
+  | ia_update | ia_update
+  | ia_delete | ia_truncate
+  | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert
+  | ia_delete | ia_truncate
+  | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter
+  | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter | ia_alter
+  | ia_alter_partitioning
+  | ia_flush
+  | ia_optimize
+  | ia_lock_unlock_table
+  | ia_transaction
+;
+
+ia_alter:
+  ALTER TABLE ia_table_name ia_alter_list
+;
+
+ia_alter_list:
+  ia_alter_item | ia_alter_item, ia_alter_list
+;
+
+ia_alter_item:
+    ia_add_column | ia_add_column | ia_add_column | ia_add_column | ia_add_column
+  | ia_modify_column | ia_modify_column
+  | ia_add_index | ia_add_index | ia_add_index
+  | ia_drop_column | ia_drop_column
+  | ia_drop_index | ia_drop_index
+# Disabled due to MDEV-14396
+#  | ia_change_row_format
+  | FORCE ia_lock ia_algorithm
+  | ENGINE=InnoDB
 ;
 
 thread4:
@@ -43,7 +60,7 @@ thread4:
 thread5:
   thread3;
   
-transaction:
+ia_transaction:
     BEGIN
   | SAVEPOINT sp
   | ROLLBACK TO SAVEPOINT sp
@@ -51,113 +68,124 @@ transaction:
   | ROLLBACK
 ;
 
-lock_unlock_table:
-    FLUSH TABLE table_name FOR EXPORT
-  | LOCK TABLE table_name READ
-  | LOCK TABLE table_name WRITE
-  | SELECT * FROM table_name FOR UPDATE
+ia_lock_unlock_table:
+    FLUSH TABLE ia_table_name FOR EXPORT
+  | LOCK TABLE ia_table_name READ
+  | LOCK TABLE ia_table_name WRITE
+  | SELECT * FROM ia_table_name FOR UPDATE
   | UNLOCK TABLES
 ;
 
-other_alter:
-    ALTER TABLE table_name FORCE lock algorithm
-  | ALTER TABLE table_name ENGINE=InnoDB
-  | ALTER TABLE table_name row_format
-  | alter_partitioning
+ia_alter_partitioning:
+    ALTER TABLE ia_table_name PARTITION BY HASH(ia_col_name)
+  | ALTER TABLE ia_table_name PARTITION BY KEY(ia_col_name)
+  | ALTER TABLE ia_table_name REMOVE PARTITIONING
 ;
 
-alter_partitioning:
-    ALTER TABLE table_name PARTITION BY HASH(col_name)
-  | ALTER TABLE table_name PARTITION BY KEY(col_name)
-  | ALTER TABLE table_name REMOVE PARTITIONING
+ia_delete:
+  DELETE FROM ia_table_name LIMIT _digit
 ;
 
-delete:
-  DELETE FROM table_name LIMIT _digit
+ia_truncate:
+  TRUNCATE TABLE ia_table_name
 ;
 
-truncate:
-  TRUNCATE TABLE table_name
-;
-
-table_name:
+ia_table_name:
     { $my_last_table = 't'.$prng->int(1,20) }
   | { $my_last_table = 't'.$prng->int(1,20) }
   | { $my_last_table = 't'.$prng->int(1,20) }
   | _table
 ;
 
-col_name:
-  int_col_name | num_col_name | temporal_col_name | text_col_name | enum_col_name | virt_col_name | _field
+ia_col_name:
+    ia_int_col_name
+  | ia_num_col_name
+  | ia_temporal_col_name
+  | ia_timestamp_col_name
+  | ia_text_col_name
+  | ia_enum_col_name
+  | ia_virt_col_name
+  | _field
 ;
 
-int_col_name:
+ia_bit_col_name:
+  { $last_column = 'bcol'.$prng->int(1,10) }
+;
+
+
+ia_int_col_name:
     { $last_column = 'icol'.$prng->int(1,10) }
   | { $last_column = 'icol'.$prng->int(1,10) }
   | { $last_column = 'icol'.$prng->int(1,10) }
   | _field_int
 ;
 
-num_col_name:
+ia_num_col_name:
     { $last_column = 'ncol'.$prng->int(1,10) }
 ;
 
-virt_col_name:
+ia_virt_col_name:
     { $last_column = 'vcol'.$prng->int(1,10) }
 ;
 
-temporal_col_name:
+ia_temporal_col_name:
     { $last_column = 'tcol'.$prng->int(1,10) }
 ;
 
-geo_col_name:
+ia_timestamp_col_name:
+    { $last_column = 'tscol'.$prng->int(1,10) }
+;
+
+ia_geo_col_name:
     { $last_column = 'geocol'.$prng->int(1,10) }
 ;
 
-text_col_name:
+ia_text_col_name:
     { $last_column = 'scol'.$prng->int(1,10) }
   | { $last_column = 'scol'.$prng->int(1,10) }
   | { $last_column = 'scol'.$prng->int(1,10) }
   | _field_char
 ;
 
-enum_col_name:
-    { $last_column = 'ecol'.$prng->int(1,20) }
+ia_enum_col_name:
+    { $last_column = 'ecol'.$prng->int(1,10) }
 ;
 
-ind_name:
+ia_ind_name:
   { $last_index = 'ind'.$prng->int(1,10) }
 ;
 
-col_name_and_definition:
-    int_col_name int_type unsigned zerofill null default_or_auto_increment
-  | int_col_name int_type unsigned zerofill null default_or_auto_increment
-  | int_col_name int_type unsigned zerofill null default_or_auto_increment
-  | num_col_name num_type unsigned zerofill null default
-  | temporal_col_name temporal_type null default_or_current_timestamp
-  | temporal_col_name temporal_type null default_or_current_timestamp
-  | text_col_name text_type null default
-  | text_col_name text_type null default
-  | text_col_name text_type null default
-  | enum_col_name enum_type null default
-  | virt_col_name virt_col_definition virt_type
-  | geo_col_name geo_type null geo_default
+ia_col_name_and_definition:
+    ia_bit_col_name ia_bit_type ia_null ia_default_int_or_auto_increment
+  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_int_or_auto_increment
+  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_int_or_auto_increment
+  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_int_or_auto_increment
+  | ia_num_col_name ia_num_type ia_unsigned ia_zerofill ia_null ia_default
+  | ia_temporal_col_name ia_temporal_type ia_null ia_default
+  | ia_timestamp_col_name ia_timestamp_type ia_null ia_default_or_current_timestamp
+  | ia_text_col_name ia_text_type ia_null ia_default_car
+  | ia_text_col_name ia_text_type ia_null ia_default_car
+  | ia_text_col_name ia_text_type ia_null ia_default_car
+  | ia_enum_col_name ia_enum_type ia_null ia_default
+  | ia_virt_col_name ia_virt_col_definition ia_virt_type
+  | ia_geo_col_name ia_geo_type ia_null ia_geo_default
 ;
 
-virt_col_definition:
-    int_type AS ( int_col_name + _digit )
-  | num_type AS ( num_col_name + _digit )
-  | temporal_type AS ( temporal_col_name )
-  | text_type AS ( SUBSTR(text_col_name, _digit, _digit )
-  | enum_type AS ( enum_col_name )
-  | geo_type AS ( geo_col_name )
+ia_virt_col_definition:
+    ia_int_type AS ( ia_int_col_name + _digit )
+  | ia_num_type AS ( ia_num_col_name + _digit )
+  | ia_temporal_type AS ( ia_temporal_col_name )
+  | ia_timestamp_type AS ( ia_timestamp_col_name )
+  | ia_text_type AS ( SUBSTR(ia_text_col_name, _digit, _digit ) )
+  | ia_enum_type AS ( ia_enum_col_name )
+  | ia_geo_type AS ( ia_geo_col_name )
 ;
 
-virt_type:
+ia_virt_type:
   STORED | VIRTUAL
 ;
 
-default_or_current_timestamp:
+ia_default_or_current_timestamp:
     DEFAULT '1970-01-01'
   | DEFAULT CURRENT_TIMESTAMP
   | DEFAULT CURRENT_TIESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -165,202 +193,235 @@ default_or_current_timestamp:
 ;
 
 
-unsigned:
+ia_unsigned:
   | | UNSIGNED
 ;
 
-zerofill:
+ia_zerofill:
   | | | | ZEROFILL
 ;
 
-default_or_auto_increment:
-  default | default | default | auto_increment
+ia_default_int_or_auto_increment:
+  ia_default_int | ia_default_int | ia_default_int | ia_auto_increment
 ;
 
-column_definition:
-  data_type null default auto_increment inline_key comment compressed
+#ia_column_definition:
+#  ia_data_type ia_null ia_default ia_auto_increment ia_inline_key ia_comment ia_compressed
+#;
+
+ia_create_or_replace:
+  CREATE OR REPLACE ia_temporary TABLE ia_table_name (ia_col_name_and_definition) ia_table_flags
 ;
 
-create_or_replace:
-  CREATE OR REPLACE temporary TABLE table_name (col_name column_definition) table_flags
+ia_table_flags:
+  ia_row_format ia_encryption ia_compression
 ;
 
-table_flags:
-  row_format encryption compression
+ia_encryption:
 ;
 
-encryption:
+ia_compression:
 ;
 
-compression:
+ia_change_row_format:
+  ROW_FORMAT=COMPACT | ROW_FORMAT=COMPRESSED | ROW_FORMAT=DYNAMIC | ROW_FORMAT=REDUNDANT
 ;
 
-row_format:
-  | ROW_FORMAT=COMPACT | ROW_FORMAT=COMPRESSED | ROW_FORMAT=DYNAMIC | ROW_FORMAT=REDUNDANT
+ia_row_format:
+  | ia_change_row_format | ia_change_row_format
 ;
 
-create_like:
-  CREATE temporary TABLE table_name LIKE _table
+ia_create_like:
+  CREATE ia_temporary TABLE ia_table_name LIKE _table
 ;
 
-insert:
-  insert_select | insert_values
+ia_insert:
+  ia_insert_select | ia_insert_values
 ;
 
-update:
-  UPDATE table_name SET col_name = DEFAULT LIMIT 1;
+ia_update:
+  UPDATE ia_table_name SET ia_col_name = DEFAULT LIMIT 1;
 
-insert_select:
-  INSERT INTO table_name ( col_name ) SELECT col_name FROM table_name
+ia_insert_select:
+  INSERT INTO ia_table_name ( ia_col_name ) SELECT ia_col_name FROM ia_table_name
 ;
 
-insert_values:
-    INSERT INTO table_name () VALUES empty_value_list
-  | INSERT INTO table_name (col_name) VALUES non_empty_value_list
+ia_insert_values:
+    INSERT INTO ia_table_name () VALUES ia_empty_value_list
+  | INSERT INTO ia_table_name (ia_col_name) VALUES ia_non_empty_value_list
 ;
 
-non_empty_value_list:
-  (_value) | (_value),non_empty_value_list
+ia_non_empty_value_list:
+  (_ia_value) | (_ia_value),ia_non_empty_value_list
 ;
  
-empty_value_list:
-  () | (),empty_value_list
+ia_empty_value_list:
+  () | (),ia_empty_value_list
 ;
 
-add_column:
-  ALTER TABLE table_name ADD COLUMN if_not_exists col_name_and_definition algorithm lock
+ia_add_column:
+  ADD COLUMN ia_if_not_exists ia_col_name_and_definition ia_algorithm ia_lock
 ;
 
-modify_column:
-  ALTER TABLE table_name MODIFY COLUMN if_exists col_name_and_definition algorithm lock
+ia_modify_column:
+  MODIFY COLUMN ia_if_exists ia_col_name_and_definition ia_algorithm ia_lock
 ;
 
-if_exists:
+ia_if_exists:
   | IF EXISTS | IF EXISTS
 ;
 
-if_not_exists:
+ia_if_not_exists:
   | IF NOT EXISTS | IF NOT EXISTS
 ;
 
-drop_column:
-  ALTER TABLE table_name DROP COLUMN if_exists col_name algorithm lock
+ia_drop_column:
+  DROP COLUMN ia_if_exists ia_col_name ia_algorithm ia_lock
 ;
 
-add_index:
-  ALTER TABLE table_name ADD any_key ind_name(column_list) algorithm lock
+ia_add_index:
+  ADD ia_any_key ia_algorithm ia_lock
 ;
 
 
-drop_index:
-  ALTER TABLE table_name DROP INDEX ind_name | ALTER TABLE table_name DROP PRIMARY KEY
+ia_drop_index:
+  DROP INDEX ia_ind_name | DROP PRIMARY KEY
 ;
 
-column_list:
-  col_name | col_name, column_list
+ia_column_list:
+  ia_col_name | ia_col_name, ia_column_list
 ;
 
-temporary:
+ia_temporary:
   | | | | TEMPORARY
 ;
 
-flush:
+ia_flush:
   FLUSH TABLES
 ;
 
-optimize:
-  OPTIMIZE TABLE table_name
+ia_optimize:
+  OPTIMIZE TABLE ia_table_name
 ;
 
-algorithm:
+ia_algorithm:
   | | , ALGORITHM=INPLACE | , ALGORITHM=COPY
 ;
 
-lock:
+ia_lock:
   | | , LOCK=NONE | , LOCK=SHARED
 ;
   
-data_type:
-    int_type
-  | int_type
-  | int_type
-  | num_type
-  | temporal_type
-  | temporal_type
-  | text_type
-  | text_type
-  | text_type
-  | enum_type
-  | geo_type
+ia_data_type:
+    ia_bit_type
+  | ia_enum_type
+  | ia_geo_type
+  | ia_int_type
+  | ia_int_type
+  | ia_int_type
+  | ia_int_type
+  | ia_num_type
+  | ia_temporal_type
+  | ia_timestamp_type
+  | ia_text_type
+  | ia_text_type
+  | ia_text_type
+  | ia_text_type
 ;
 
-int_type:
-  INT | TINYINT | SMALLINT | MEDIUMINT | BIGINT | BIT
+ia_bit_type:
+  BIT
 ;
 
-num_type:
+ia_int_type:
+  INT | TINYINT | SMALLINT | MEDIUMINT | BIGINT
+;
+
+ia_num_type:
   DECIMAL | FLOAT | DOUBLE
 ;
 
-temporal_type:
-  DATE | TIME | DATETIME | TIMESTAMP | YEAR
+ia_temporal_type:
+  DATE | TIME | YEAR
 ;
 
-enum_type:
+ia_timestamp_type:
+  DATETIME | TIMESTAMP
+;
+
+ia_enum_type:
   ENUM('foo','bar') | SET('foo','bar')
 ;
 
-text_type:
+ia_text_type:
   BLOB | TEXT | CHAR | VARCHAR(_smallint_unsigned) | BINARY | VARBINARY(_smallint_unsigned)
 ;
 
-geo_type:
+ia_geo_type:
   POINT | LINESTRING | POLYGON | MULTIPOINT | MULTILINESTRING | MULTIPOLYGON | GEOMETRYCOLLECTION | GEOMETRY
 ;
 
-null:
+ia_null:
   | NULL | NOT NULL ;
   
-default:
-  | DEFAULT NULL | DEFAULT '' | DEFAULT 0 ;
+ia_default:
+  | DEFAULT NULL | ia_default_char | ia_default_int
+;
 
-geo_default:
+ia_default_char:
+  | DEFAULT NULL | DEFAULT ''
+;
+
+ia_default_int:
+  | DEFAULT NULL | 0
+;
+
+ia_geo_default:
   | DEFAULT ST_GEOMFROMTEXT('Point(1 1)') ;
 
-auto_increment:
+ia_auto_increment:
   | | | | | | AUTO_INCREMENT ;
   
-inline_key:
-  | | | index ;
+ia_inline_key:
+  | | | ia_index ;
   
-index:
+ia_index:
   KEY | PRIMARY KEY | UNIQUE ;
   
-key_column:
-  int_col_name | int_col_name | num_col_name | enum_col_name | temporal_col_name | text_col_name(_tinyint_unsigned) | text_col_name(_smallint_unsigned)
+ia_key_column:
+    ia_bit_col_name
+  | ia_int_col_name
+  | ia_int_col_name
+  | ia_int_col_name
+  | ia_num_col_name
+  | ia_enum_col_name
+  | ia_temporal_col_name
+  | ia_timestamp_col_name
+  | ia_text_col_name(_tinyint_unsigned)
+  | ia_text_col_name(_smallint_unsigned)
 ;
 
-key_column_list:
-  key_column | key_column, key_column_list
+ia_key_column_list:
+  ia_key_column | ia_key_column, ia_key_column_list
 ;
 
-any_key:
-    index(key_column)
-  | index(key_column)
-  | index(key_column)
-  | index(key_column)
-  | index(key_column_list)
-  | index(key_column_list)
-  | FULLTEXT KEY(text_col_name)
-  | SPATIAL INDEX(geo_col_name)
+ia_any_key:
+    ia_index(ia_key_column)
+  | ia_index(ia_key_column)
+  | ia_index(ia_key_column)
+  | ia_index(ia_key_column)
+  | ia_index(ia_key_column_list)
+  | ia_index(ia_key_column_list)
+  | FULLTEXT KEY(ia_text_col_name)
+  | SPATIAL INDEX(ia_geo_col_name)
 ;
 
-comment:
+ia_comment:
   | | COMMENT 'comment';
   
-compressed:
+ia_compressed:
   | | | | | | COMPRESSED ;
 
-_value:
+_ia_value:
   NULL | _digit | '' | _char(1)
 ;
