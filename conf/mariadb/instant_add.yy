@@ -292,8 +292,9 @@ ia_column_list:
   ia_col_name | ia_col_name, ia_column_list
 ;
 
+# Disabled due to MDEV-11071
 ia_temporary:
-  | | | | TEMPORARY
+#  | | | | TEMPORARY
 ;
 
 ia_flush:
