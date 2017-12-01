@@ -48,8 +48,7 @@ ia_alter_item:
   | ia_add_index | ia_add_index | ia_add_index
   | ia_drop_column | ia_drop_column
   | ia_drop_index | ia_drop_index
-# Disabled due to MDEV-14396
-#  | ia_change_row_format
+  | ia_change_row_format
   | FORCE ia_lock ia_algorithm
   | ENGINE=InnoDB
 ;
