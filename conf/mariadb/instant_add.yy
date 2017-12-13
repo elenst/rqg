@@ -44,7 +44,7 @@ ia_alter_list:
 
 ia_alter_item:
     ia_add_column | ia_add_column | ia_add_column | ia_add_column | ia_add_column
-  | ia_modify_column | ia_modify_column
+  | ia_modify_column | ia_alter_column
   | ia_add_index | ia_add_index | ia_add_index
   | ia_drop_column | ia_drop_column
   | ia_drop_index | ia_drop_index
@@ -259,11 +259,25 @@ ia_empty_value_list:
 ;
 
 ia_add_column:
-  ADD COLUMN ia_if_not_exists ia_col_name_and_definition ia_algorithm ia_lock
+    ADD COLUMN ia_if_not_exists ia_col_name_and_definition ia_col_location ia_algorithm ia_lock
+  | ADD COLUMN ia_if_not_exists ( ia_add_column_list ) ia_algorithm ia_lock
+;
+
+ia_col_location:
+  | | | | | FIRST | AFTER ia_col_name
+;
+
+ia_add_column_list:
+  ia_col_name_and_definition | ia_col_name_and_definition, ia_add_column_list
 ;
 
 ia_modify_column:
   MODIFY COLUMN ia_if_exists ia_col_name_and_definition ia_algorithm ia_lock
+;
+
+ia_alter_column:
+    ALTER COLUMN ia_if_exists ia_col_name SET DEFAULT ia_default
+  | ALTER COLUMN ia_if_exists ia_col_name DROP DEFAULT
 ;
 
 ia_if_exists:
