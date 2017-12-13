@@ -114,6 +114,7 @@ use constant  ER_OUTOFMEMORY2                                      => 5;  # retu
 use constant  ER_CRASHED1                                        => 126;
 use constant  ER_CRASHED2                                        => 145;
 use constant  ER_AUTOINCREMENT                                   => 167;
+use constant  ER_INCOMPATIBLE_FRM                                => 190;
 
 use constant  ER_DB_CREATE_EXISTS                               => 1007;
 use constant  ER_CANT_LOCK                                      => 1015;
@@ -145,6 +146,7 @@ use constant  ER_WRONG_GROUP_FIELD                              => 1056;
 use constant  ER_DUP_FIELDNAME                                  => 1060;
 use constant  ER_DUP_KEYNAME                                    => 1061;
 use constant  ER_DUP_ENTRY                                      => 1062;
+use constant  ER_WRONG_FIELD_SPEC                               => 1063;
 use constant  ER_PARSE_ERROR                                    => 1064;
 use constant  ER_NONUNIQ_TABLE                                  => 1066;
 use constant  ER_INVALID_DEFAULT                                => 1067;
@@ -236,12 +238,14 @@ use constant  ER_CANT_UPDATE_USED_TABLE_IN_SF_OR_TRG            => 1442;
 use constant  ER_SP_RECURSION_LIMIT                             => 1456;
 use constant  ER_SP_PROC_TABLE_CORRUPT                          => 1457;
 use constant  ER_NON_GROUPING_FIELD_USED                        => 1463;
+use constant  ER_TABLE_CANT_HANDLE_SPKEYS                       => 1464;
 use constant  ER_NO_TRIGGERS_ON_SYSTEM_SCHEMA                   => 1465;
 use constant  ER_WRONG_STRING_LENGTH                            => 1470;
 use constant  ER_NON_INSERTABLE_TABLE                           => 1471;
 use constant  ER_PARTITION_WRONG_VALUES_ERROR                   => 1480;
 use constant  ER_PARTITION_MAXVALUE_ERROR                       => 1481;
 use constant  ER_FIELD_NOT_FOUND_PART_ERROR                     => 1488;
+use constant  ER_MIX_HANDLER_ERROR                              => 1497;
 use constant  ER_NO_PARTS_ERROR                                 => 1504;
 use constant  ER_PARTITION_MGMT_ON_NONPARTITIONED               => 1505;
 use constant  ER_DROP_PARTITION_NON_EXISTENT                    => 1507;
@@ -278,6 +282,8 @@ use constant  ER_BACKUP_PROGRESS_TABLES                         => 1691;
 use constant  ER_MULTI_UPDATE_KEY_CONFLICT                      => 1706;
 use constant  ER_TABLESPACE_NOT_EMPTY                           => 1721;
 use constant  ER_TABLESPACE_DATAFILE_EXIST                      => 1726;
+use constant  ER_PARTITION_EXCHANGE_PART_TABLE                  => 1732;
+use constant  ER_PARTITION_INSTEAD_OF_SUBPARTITION              => 1734;
 use constant  ER_UNKNOWN_PARTITION                              => 1735;
 use constant  ER_PARTITION_CLAUSE_ON_NONPARTITIONED             => 1747;
 use constant  ER_ROW_DOES_NOT_MATCH_GIVEN_PARTITION_SET         => 1748;
@@ -326,7 +332,15 @@ use constant  ER_JSON_DOCUMENT_NULL_KEY                         => 3158;
 
 use constant  ER_EXPRESSION_REFERS_TO_UNINIT_FIELD              => 4026;
 use constant  ER_REFERENCED_TRG_DOES_NOT_EXIST                  => 4031;
-use constant  ER_UNKNOWN_VIEW                                   => 4090;
+use constant  ER_MYROCKS_CANT_NOPAD_COLLATION                   => 4077;
+
+#--- end of 10.2 errors ---
+
+#--- the codes below can still change---
+
+use constant  ER_UNKNOWN_VIEW                                   => 4092;
+
+#--- end of 10.3 errors ---
 
 my %err2type = (
 
@@ -395,9 +409,10 @@ my %err2type = (
     ER_FILE_NOT_FOUND()                                 => STATUS_SEMANTIC_ERROR,
     ER_FILSORT_ABORT()                                  => STATUS_SKIP,
     ER_FT_MATCHING_KEY_NOT_FOUND()                      => STATUS_SEMANTIC_ERROR,
-    ER_GET_ERRNO()                                      => STATUS_DATABASE_CORRUPTION,
+    ER_GET_ERRNO()                                      => STATUS_SEMANTIC_ERROR, # TODO: switch back to corruption after MDEV-14641 is fixed
     ER_ILLEGAL_HA()                                     => STATUS_SEMANTIC_ERROR,
     ER_ILLEGAL_REFERENCE()                              => STATUS_SEMANTIC_ERROR,
+    ER_INCOMPATIBLE_FRM()                               => STATUS_SEMANTIC_ERROR, # TODO: switch to corruption after MDEV-14641 is fixed
     ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_BINLOG_FORMAT() => STATUS_SEMANTIC_ERROR,
     ER_INVALID_CAST_TO_JSON()                           => STATUS_SEMANTIC_ERROR,
     ER_INVALID_CHARACTER_STRING()                       => STATUS_SEMANTIC_ERROR,
@@ -427,9 +442,11 @@ my %err2type = (
     ER_LOCK_DEADLOCK()                                  => STATUS_TRANSACTION_ERROR,
     ER_LOCK_OR_ACTIVE_TRANSACTION()                     => STATUS_SEMANTIC_ERROR,
     ER_LOCK_WAIT_TIMEOUT()                              => STATUS_TRANSACTION_ERROR,
+    ER_MIX_HANDLER_ERROR()                              => STATUS_SEMANTIC_ERROR,
     ER_MIX_OF_GROUP_FUNC_AND_FIELDS()                   => STATUS_SEMANTIC_ERROR,
     ER_MULTIPLE_PRI_KEY()                               => STATUS_SEMANTIC_ERROR,
     ER_MULTI_UPDATE_KEY_CONFLICT()                      => STATUS_SEMANTIC_ERROR,
+    ER_MYROCKS_CANT_NOPAD_COLLATION()                   => STATUS_SEMANTIC_ERROR,
     ER_NEED_REPREPARE()                                 => STATUS_SEMANTIC_ERROR,
     ER_NONEXISTING_GRANT()                              => STATUS_SEMANTIC_ERROR,
     ER_NONEXISTING_TABLE_GRANT()                        => STATUS_SEMANTIC_ERROR,
@@ -460,6 +477,8 @@ my %err2type = (
     ER_OUT_OF_RESOURCES()                               => STATUS_ENVIRONMENT_FAILURE,
     ER_PARSE_ERROR()                                    => STATUS_SYNTAX_ERROR,
     ER_PARTITION_CLAUSE_ON_NONPARTITIONED()             => STATUS_SEMANTIC_ERROR,
+    ER_PARTITION_EXCHANGE_PART_TABLE()                  => STATUS_SEMANTIC_ERROR,
+    ER_PARTITION_INSTEAD_OF_SUBPARTITION()              => STATUS_SEMANTIC_ERROR,
     ER_PARTITION_MAXVALUE_ERROR()                       => STATUS_SEMANTIC_ERROR,
     ER_PARTITION_MGMT_ON_NONPARTITIONED()               => STATUS_SEMANTIC_ERROR,
     ER_PARTITION_NO_TEMPORARY()                         => STATUS_SEMANTIC_ERROR,
@@ -501,6 +520,7 @@ my %err2type = (
     ER_TABLESPACE_NOT_EMPTY()                           => STATUS_SEMANTIC_ERROR,
     ER_TABLE_CANT_HANDLE_BLOB()                         => STATUS_SEMANTIC_ERROR,
     ER_TABLE_CANT_HANDLE_FT()                           => STATUS_SEMANTIC_ERROR,
+    ER_TABLE_CANT_HANDLE_SPKEYS()                       => STATUS_SEMANTIC_ERROR,
     ER_TABLE_EXISTS_ERROR()                             => STATUS_SEMANTIC_ERROR,
     ER_TABLE_NOT_LOCKED()                               => STATUS_SEMANTIC_ERROR,
     ER_TABLE_NOT_LOCKED_FOR_WRITE()                     => STATUS_SEMANTIC_ERROR,
@@ -529,6 +549,7 @@ my %err2type = (
     ER_VIEW_SELECT_TMPTABLE()                           => STATUS_SEMANTIC_ERROR,
     ER_VIRTUAL_COLUMN_FUNCTION_IS_NOT_ALLOWED()         => STATUS_SEMANTIC_ERROR,
     ER_WRONG_AUTO_KEY()                                 => STATUS_SEMANTIC_ERROR,
+    ER_WRONG_FIELD_SPEC()                               => STATUS_SEMANTIC_ERROR,
     ER_WRONG_FIELD_WITH_GROUP()                         => STATUS_SEMANTIC_ERROR,
     ER_WRONG_GROUP_FIELD()                              => STATUS_SEMANTIC_ERROR,
     ER_WRONG_MRG_TABLE()                                => STATUS_SEMANTIC_ERROR,
