@@ -28,10 +28,12 @@ vers_query:
     query | query | query
   | vers_ia_query | vers_ia_query | vers_ia_query
   | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter
+  | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter | vers_alter
   | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select 
   | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select 
-  | vers_alter_history
-  | vers_truncate | vers_truncate
+  | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select 
+  | vers_change_variable
+  | vers_truncate | vers_truncate | vers_truncate
   | vers_tx_history
   | vers_show_table
 ;
@@ -63,14 +65,31 @@ vers_with_without_system_versioning:
   | | | | | | WITH SYSTEM VERSIONING | WITHOUT SYSTEM VERSIONING
 ;
 
-vers_alter_history:
-    SET vers_global `versioning_alter_history`= KEEP
-  | SET vers_global `versioning_alter_history`= ERROR
-  | SET vers_global `versioning_alter_history`= DEFAULT
+vers_change_variable:
+    vers_tx_isolation
+  | vers_alter_history
 ;
 
-vers_global:
-  | | | GLOBAL
+vers_innodb_algorithm_simple:
+    SET vers_session_global versioning_innodb_algorithm_simple = ON
+  | SET vers_session_global versioning_innodb_algorithm_simple = OFF
+;
+
+vers_tx_isolation:
+    SET vers_session_global TRANSACTION ISOLATION LEVEL READ UNCOMMITTED
+  | SET vers_session_global TRANSACTION ISOLATION LEVEL READ COMMITTED
+  | SET vers_session_global TRANSACTION ISOLATION LEVEL REPEATABLE READ
+  | SET vers_session_global TRANSACTION ISOLATION LEVEL SERIALIZABLE
+;
+
+vers_alter_history:
+    SET vers_session_global `versioning_alter_history`= KEEP
+  | SET vers_session_global `versioning_alter_history`= ERROR
+  | SET vers_session_global `versioning_alter_history`= DEFAULT
+;
+
+vers_session_global:
+  | | | SESSION | SESSION | GLOBAL
 ;
 
 vers_alter:
@@ -264,7 +283,7 @@ vers_ia_lock_unlock_table:
   | LOCK TABLE vers_existing_table READ
   | LOCK TABLE vers_existing_table WRITE
   | SELECT * FROM vers_existing_table FOR UPDATE
-  | UNLOCK TABLES
+  | UNLOCK TABLES | UNLOCK TABLES | UNLOCK TABLES
 ;
 
 vers_ia_alter_partitioning:
