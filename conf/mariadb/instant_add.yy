@@ -43,8 +43,10 @@ ia_alter_list:
 ;
 
 ia_alter_item:
-    ia_add_column | ia_add_column | ia_add_column | ia_add_column | ia_add_column
-  | ia_modify_column | ia_alter_column
+    ia_add_column | ia_add_column | ia_add_column | ia_add_column | ia_add_column | ia_add_column
+  | ia_modify_column
+  | ia_change_column
+  | ia_alter_column
   | ia_add_index | ia_add_index | ia_add_index
   | ia_drop_column | ia_drop_column
   | ia_drop_index | ia_drop_index
@@ -155,19 +157,19 @@ ia_ind_name:
 ;
 
 ia_col_name_and_definition:
-    ia_bit_col_name ia_bit_type ia_null ia_default_int_or_auto_increment
-  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_int_or_auto_increment
-  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_int_or_auto_increment
-  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_int_or_auto_increment
-  | ia_num_col_name ia_num_type ia_unsigned ia_zerofill ia_null ia_default
-  | ia_temporal_col_name ia_temporal_type ia_null ia_default
-  | ia_timestamp_col_name ia_timestamp_type ia_null ia_default_or_current_timestamp
-  | ia_text_col_name ia_text_type ia_null ia_default_car
-  | ia_text_col_name ia_text_type ia_null ia_default_car
-  | ia_text_col_name ia_text_type ia_null ia_default_car
-  | ia_enum_col_name ia_enum_type ia_null ia_default
+    ia_bit_col_name ia_bit_type ia_null ia_default_optional_int_or_auto_increment
+  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_optional_int_or_auto_increment
+  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_optional_int_or_auto_increment
+  | ia_int_col_name ia_int_type ia_unsigned ia_zerofill ia_null ia_default_optional_int_or_auto_increment
+  | ia_num_col_name ia_num_type ia_unsigned ia_zerofill ia_null ia_optional_default
+  | ia_temporal_col_name ia_temporal_type ia_null ia_optional_default
+  | ia_timestamp_col_name ia_timestamp_type ia_null ia_optional_default_or_current_timestamp
+  | ia_text_col_name ia_text_type ia_null ia_optional_default_char
+  | ia_text_col_name ia_text_type ia_null ia_optional_default_char
+  | ia_text_col_name ia_text_type ia_null ia_optional_default_char
+  | ia_enum_col_name ia_enum_type ia_null ia_optional_default
   | ia_virt_col_name ia_virt_col_definition ia_virt_type
-  | ia_geo_col_name ia_geo_type ia_null ia_geo_default
+  | ia_geo_col_name ia_geo_type ia_null ia_geo_optional_default
 ;
 
 ia_virt_col_definition:
@@ -184,11 +186,15 @@ ia_virt_type:
   STORED | VIRTUAL
 ;
 
-ia_default_or_current_timestamp:
-    DEFAULT '1970-01-01'
-  | DEFAULT CURRENT_TIMESTAMP
-  | DEFAULT CURRENT_TIESTAMP ON UPDATE CURRENT_TIMESTAMP
-  | DEFAULT 0
+ia_optional_default_or_current_timestamp:
+  | DEFAULT ia_default_or_current_timestamp_val
+;
+
+ia_default_or_current_timestamp_val:
+    '1970-01-01'
+  | CURRENT_TIMESTAMP
+  | CURRENT_TIESTAMP ON UPDATE CURRENT_TIMESTAMP
+  | 0
 ;
 
 
@@ -200,13 +206,9 @@ ia_zerofill:
   | | | | ZEROFILL
 ;
 
-ia_default_int_or_auto_increment:
-  ia_default_int | ia_default_int | ia_default_int | ia_auto_increment
+ia_default_optional_int_or_auto_increment:
+  ia_optional_default_int | ia_optional_default_int | ia_optional_default_int | ia_optional_auto_increment
 ;
-
-#ia_column_definition:
-#  ia_data_type ia_null ia_default ia_auto_increment ia_inline_key ia_comment ia_compressed
-#;
 
 ia_create_or_replace:
   CREATE OR REPLACE ia_temporary TABLE ia_table_name (ia_col_name_and_definition) ia_table_flags
@@ -272,12 +274,18 @@ ia_add_column_list:
 ;
 
 ia_modify_column:
-  MODIFY COLUMN ia_if_exists ia_col_name_and_definition ia_algorithm ia_lock
+  MODIFY COLUMN ia_if_exists ia_col_name_and_definition ia_col_location ia_algorithm ia_lock
 ;
 
+ia_change_column:
+  CHANGE COLUMN ia_if_exists ia_col_name ia_col_name_and_definition ia_algorithm ia_lock
+;
+
+# MDEV-14694 - ALTER COLUMN does not accept IF EXISTS
+# ia_if_exists
 ia_alter_column:
-    ALTER COLUMN ia_if_exists ia_col_name SET DEFAULT ia_default
-  | ALTER COLUMN ia_if_exists ia_col_name DROP DEFAULT
+    ALTER COLUMN ia_col_name SET DEFAULT ia_default_val
+  | ALTER COLUMN ia_col_name DROP DEFAULT
 ;
 
 ia_if_exists:
@@ -378,23 +386,36 @@ ia_geo_type:
 ia_null:
   | NULL | NOT NULL ;
   
-ia_default:
-  | DEFAULT NULL | ia_default_char | ia_default_int
+ia_optional_default:
+  | DEFAULT ia_default_val
 ;
 
-ia_default_char:
-  | DEFAULT NULL | DEFAULT ''
+ia_default_val:
+  NULL | ia_default_char_val | ia_default_int_val
 ;
 
-ia_default_int:
-  | DEFAULT NULL | 0
+ia_optional_default_char:
+  | DEFAULT ia_default_char_val
 ;
 
-ia_geo_default:
+ia_default_char_val:
+  NULL | ''
+;
+
+ia_optional_default_int:
+  | DEFAULT ia_default_int_val
+;
+
+ia_default_int_val:
+  NULL | 0 | _digit
+;
+
+ia_geo_optional_default:
   | DEFAULT ST_GEOMFROMTEXT('Point(1 1)') ;
 
-ia_auto_increment:
-  | | | | | | AUTO_INCREMENT ;
+ia_optional_auto_increment:
+  | | | | | | AUTO_INCREMENT
+;
   
 ia_inline_key:
   | | | ia_index ;
