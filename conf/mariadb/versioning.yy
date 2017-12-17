@@ -36,6 +36,7 @@ vers_query:
   | vers_truncate | vers_truncate | vers_truncate
   | vers_tx_history
   | vers_show_table
+  | vers_drop_table
 ;
 
 vers_show_table:
@@ -59,7 +60,11 @@ vers_with_system_versioning:
   | WITH SYSTEM VERSIONING
   | WITH SYSTEM VERSIONING
   | WITH SYSTEM VERSIONING
-; 
+;
+
+vers_drop_table:
+  DROP TABLE vers_ia_if_exists vers_ia_table_name
+;
 
 vers_with_without_system_versioning:
   | | | | | | WITH SYSTEM VERSIONING | WITHOUT SYSTEM VERSIONING
@@ -261,7 +266,9 @@ vers_ia_alter_list:
 
 vers_ia_alter_item:
     vers_ia_add_column | vers_ia_add_column | vers_ia_add_column | vers_ia_add_column | vers_ia_add_column
-  | vers_ia_modify_column | vers_ia_modify_column
+  | vers_ia_modify_column
+  | vers_ia_change_column
+  | vers_ia_alter_column
   | vers_ia_add_index | vers_ia_add_index | vers_ia_add_index
   | vers_ia_drop_column | vers_ia_drop_column
   | vers_ia_drop_index | vers_ia_drop_index
@@ -385,18 +392,18 @@ vers_ia_virt_col_name_and_definition:
 ;
 
 vers_ia_real_col_name_and_definition:
-    vers_ia_bit_col_name vers_ia_bit_type vers_ia_null vers_ia_default_int_or_auto_increment
-  | vers_ia_int_col_name vers_ia_int_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_default_int_or_auto_increment
-  | vers_ia_int_col_name vers_ia_int_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_default_int_or_auto_increment
-  | vers_ia_int_col_name vers_ia_int_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_default_int_or_auto_increment
-  | vers_ia_num_col_name vers_ia_num_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_default
-  | vers_ia_temporal_col_name vers_ia_temporal_type vers_ia_null vers_ia_default
-  | vers_ia_timestamp_col_name vers_ia_timestamp_type vers_ia_null vers_ia_default_or_current_timestamp
-  | vers_ia_text_col_name vers_ia_text_type vers_ia_null vers_ia_default_char
-  | vers_ia_text_col_name vers_ia_text_type vers_ia_null vers_ia_default_char
-  | vers_ia_text_col_name vers_ia_text_type vers_ia_null vers_ia_default_char
-  | vers_ia_enum_col_name vers_ia_enum_type vers_ia_null vers_ia_default
-  | vers_ia_geo_col_name vers_ia_geo_type vers_ia_null vers_ia_geo_default
+    vers_ia_bit_col_name vers_ia_bit_type vers_ia_null vers_ia_optional_default_int_or_auto_increment
+  | vers_ia_int_col_name vers_ia_int_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_optional_default_int_or_auto_increment
+  | vers_ia_int_col_name vers_ia_int_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_optional_default_int_or_auto_increment
+  | vers_ia_int_col_name vers_ia_int_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_optional_default_int_or_auto_increment
+  | vers_ia_num_col_name vers_ia_num_type vers_ia_unsigned vers_ia_zerofill vers_ia_null vers_ia_optional_default
+  | vers_ia_temporal_col_name vers_ia_temporal_type vers_ia_null vers_ia_optional_default
+  | vers_ia_timestamp_col_name vers_ia_timestamp_type vers_ia_null vers_ia_optional_default_or_current_timestamp
+  | vers_ia_text_col_name vers_ia_text_type vers_ia_null vers_ia_optional_default_char
+  | vers_ia_text_col_name vers_ia_text_type vers_ia_null vers_ia_optional_default_char
+  | vers_ia_text_col_name vers_ia_text_type vers_ia_null vers_ia_optional_default_char
+  | vers_ia_enum_col_name vers_ia_enum_type vers_ia_null vers_ia_optional_default
+  | vers_ia_geo_col_name vers_ia_geo_type vers_ia_null vers_ia_optional_geo_default
 ;
 
 vers_ia_virt_col_definition:
@@ -413,11 +420,15 @@ vers_ia_virt_type:
   STORED | VIRTUAL
 ;
 
-vers_ia_default_or_current_timestamp:
-    DEFAULT '1970-01-01'
-  | DEFAULT CURRENT_TIMESTAMP
-  | DEFAULT CURRENT_TIESTAMP ON UPDATE CURRENT_TIMESTAMP
-  | DEFAULT 0
+vers_ia_optional_default_or_current_timestamp:
+  | DEFAULT vers_ia_default_or_current_timestamp_val
+;
+  
+vers_ia_default_or_current_timestamp_val:
+    '1970-01-01'
+  | CURRENT_TIMESTAMP
+  | CURRENT_TIESTAMP ON UPDATE CURRENT_TIMESTAMP
+  | 0
 ;
 
 
@@ -429,12 +440,15 @@ vers_ia_zerofill:
   | | | | ZEROFILL
 ;
 
-vers_ia_default_int_or_auto_increment:
-  vers_ia_default_int | vers_ia_default_int | vers_ia_default_int | vers_ia_auto_increment
+vers_ia_optional_default_int_or_auto_increment:
+  | vers_ia_optional_default_int
+  | vers_ia_optional_default_int
+  | vers_ia_optional_default_int
+  | vers_ia_optional_auto_increment
 ;
 
 #vers_ia_column_definition:
-#  vers_ia_data_type vers_ia_null vers_ia_default vers_ia_auto_increment vers_ia_inline_key vers_ia_comment vers_ia_compressed
+#  vers_ia_data_type vers_ia_null vers_ia_default vers_ia_optional_auto_increment vers_ia_inline_key vers_ia_comment vers_ia_compressed
 #;
 
 vers_ia_create:
@@ -508,11 +522,26 @@ vers_ia_empty_value_list:
 ;
 
 vers_ia_add_column:
-  ADD COLUMN vers_ia_if_not_exists vers_ia_col_name_and_definition vers_ia_algorithm vers_ia_lock
+  ADD COLUMN vers_ia_if_not_exists vers_ia_col_name_and_definition vers_ia_col_location vers_ia_algorithm vers_ia_lock
 ;
 
 vers_ia_modify_column:
-  MODIFY COLUMN vers_ia_if_exists vers_ia_col_name_and_definition vers_ia_algorithm vers_ia_lock
+  MODIFY COLUMN vers_ia_if_exists vers_ia_col_name_and_definition vers_ia_col_location vers_ia_algorithm vers_ia_lock
+;
+
+vers_ia_change_column:
+  CHANGE COLUMN vers_ia_if_exists vers_ia_col_name vers_ia_col_name_and_definition vers_ia_algorithm vers_ia_lock
+;
+
+vers_ia_col_location:
+  | | | | | FIRST | AFTER ia_col_name
+;
+
+# MDEV-14694 - ALTER COLUMN does not accept IF EXISTS
+# vers_ia_if_exists
+vers_ia_alter_column:
+    ALTER COLUMN vers_ia_col_name SET DEFAULT vers_ia_default_val
+  | ALTER COLUMN vers_ia_col_name DROP DEFAULT
 ;
 
 vers_ia_if_exists:
@@ -613,22 +642,33 @@ vers_ia_geo_type:
 vers_ia_null:
   | NULL | NOT NULL ;
   
-vers_ia_default:
-  | DEFAULT NULL | vers_ia_default_char | vers_ia_default_int
+vers_ia_optional_default:
+  | DEFAULT vers_ia_default_val
 ;
 
-vers_ia_default_char:
-  | DEFAULT NULL | DEFAULT ''
+vers_ia_default_val:
+  NULL | vers_ia_default_char_val | vers_ia_default_int_val
 ;
 
-vers_ia_default_int:
-  | DEFAULT NULL | DEFAULT 0
+vers_ia_optional_default_char:
+  | DEFAULT vers_ia_default_char_val
 ;
 
-vers_ia_geo_default:
+vers_ia_default_char_val:
+  NULL | ''
+;
+
+vers_ia_optional_default_int:
+  | DEFAULT vers_ia_default_int_val;
+
+vers_ia_optional_default_int_val:
+  NULL | 0 | _digit
+;
+
+vers_ia_optional_geo_default:
   | DEFAULT ST_GEOMFROMTEXT('Point(1 1)') ;
 
-vers_ia_auto_increment:
+vers_ia_optional_auto_increment:
   | | | | | | AUTO_INCREMENT ;
   
 vers_ia_inline_key:
