@@ -646,15 +646,30 @@ sub isMySQLCompatible {
         next if $self->config->dsn->[$i] eq '';
         $is_mysql_compatible = 0 if ($self->config->dsn->[$i] !~ m{mysql|drizzle}sio);
     }
-
     return $is_mysql_compatible;
 }
 
 sub initReporters {
     my $self = shift;
 
+    # Initialize the array to avoid further checks on its existence
     if (not defined $self->config->reporters or $#{$self->config->reporters} < 0) {
-        $self->config->reporters([]);
+      $self->config->reporters([]);
+    }
+
+    # If reporters were set to None or empty string explicitly,
+    # remove the "None" reporter and don't add any reporters automatically
+    my $no_reporters= 0;
+    foreach my $i (0..$#{$self->config->reporters}) {
+        if ($self->config->reporters->[$i] eq "None"
+            or $self->config->reporters->[$i] eq '')
+        {
+          delete $self->config->reporters->[$i];
+          $no_reporters= 1;
+        }
+    }
+
+    if (not $no_reporters) {
         if ($self->isMySQLCompatible()) {
             $self->config->reporters(['ErrorLog', 'Backtrace']);
             push @{$self->config->reporters}, 'ValgrindXMLErrors' if (defined $self->config->property('valgrind-xml'));
@@ -662,27 +677,20 @@ sub initReporters {
             push @{$self->config->reporters}, 'ReplicationSlaveStatus' 
                 if $self->config->rpl_mode ne '' && $self->isMySQLCompatible();
         }
-    } else {
-        ## Remove the "None" reporter
-        foreach my $i (0..$#{$self->config->reporters}) {
-            delete $self->config->reporters->[$i] 
-                if $self->config->reporters->[$i] eq "None" 
-                or $self->config->reporters->[$i] eq '';
-        }
-    }
-    if ($self->config->property('upgrade-test') and $self->config->property('upgrade-test') =~ /undo/) {
-        push @{$self->config->reporters}, 'UpgradeUndoLogs';
-    }
-    elsif ($self->config->property('upgrade-test')) {
-        push @{$self->config->reporters}, 'Upgrade';
-    }
-    elsif ($#{$self->config->reporters} > -1) {
-        foreach (@{$self->config->reporters}) {
-            if ($_ eq 'Upgrade') {
-                 say("WARNING: Upgrade reporter is requested, but --upgrade-test option is not set, the behavior is undefined");
-                 last;
-            }
-        }
+      if ($self->config->property('upgrade-test') and $self->config->property('upgrade-test') =~ /undo/) {
+          push @{$self->config->reporters}, 'UpgradeUndoLogs';
+      }
+      elsif ($self->config->property('upgrade-test')) {
+          push @{$self->config->reporters}, 'Upgrade';
+      }
+      else {
+          foreach (@{$self->config->reporters}) {
+              if ($_ eq 'Upgrade') {
+                   say("WARNING: Upgrade reporter is requested, but --upgrade-test option is not set, the behavior is undefined");
+                   last;
+              }
+          }
+      }
     }
 
     say("Reporters: ".($#{$self->config->reporters} > -1 ? join(', ', @{$self->config->reporters}) : "(none)"));
