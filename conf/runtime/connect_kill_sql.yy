@@ -1061,9 +1061,9 @@ table_in_select:
 
 addition:
 	# Involve one (simple where condition) or two tables (subquery | join | union)
-	where /* WHERE */ procedure_analyze       |
-	subquery /* SUBQUERY */ procedure_analyze    |
-	join where /* JOIN WHERE */ procedure_analyze  |
+	where procedure_analyze       |
+	subquery procedure_analyze    |
+	join where procedure_analyze  |
 	union where ;
 
 addition_no_procedure:
