@@ -75,6 +75,9 @@ ia_lock_unlock_table:
   | LOCK TABLE ia_table_name WRITE
   | SELECT * FROM ia_table_name FOR UPDATE
   | UNLOCK TABLES
+  | UNLOCK TABLES
+  | UNLOCK TABLES
+  | UNLOCK TABLES
 ;
 
 ia_alter_partitioning:
@@ -432,8 +435,8 @@ ia_key_column:
   | ia_enum_col_name
   | ia_temporal_col_name
   | ia_timestamp_col_name
-  | ia_text_col_name(_tinyint_unsigned)
-  | ia_text_col_name(_smallint_unsigned)
+  | ia_text_col_name(_tinyint_positive)
+  | ia_text_col_name(_smallint_positive)
 ;
 
 ia_key_column_list:
