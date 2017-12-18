@@ -117,6 +117,7 @@ use constant  ER_AUTOINCREMENT                                   => 167;
 use constant  ER_INCOMPATIBLE_FRM                                => 190;
 
 use constant  ER_DB_CREATE_EXISTS                               => 1007;
+use constant  ER_DB_DROP_EXISTS                                 => 1008;
 use constant  ER_CANT_LOCK                                      => 1015;
 use constant  ER_FILE_NOT_FOUND                                 => 1017;
 use constant  ER_CHECKREAD                                      => 1020;
@@ -417,6 +418,7 @@ my %err2type = (
     ER_DATA_TOO_LONG()                                  => STATUS_SEMANTIC_ERROR,
     ER_DBACCESS_DENIED_ERROR()                          => STATUS_SEMANTIC_ERROR,
     ER_DB_CREATE_EXISTS()                               => STATUS_SEMANTIC_ERROR,
+    ER_DB_DROP_EXISTS()                                 => STATUS_SEMANTIC_ERROR,
     ER_DISK_FULL()                                      => STATUS_ENVIRONMENT_FAILURE,
     ER_DROP_LAST_PARTITION()                            => STATUS_SEMANTIC_ERROR,
     ER_DROP_PARTITION_NON_EXISTENT()                    => STATUS_SEMANTIC_ERROR,
