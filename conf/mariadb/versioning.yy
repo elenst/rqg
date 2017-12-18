@@ -661,7 +661,7 @@ vers_ia_default_char_val:
 vers_ia_optional_default_int:
   | DEFAULT vers_ia_default_int_val;
 
-vers_ia_optional_default_int_val:
+vers_ia_default_int_val:
   NULL | 0 | _digit
 ;
 
