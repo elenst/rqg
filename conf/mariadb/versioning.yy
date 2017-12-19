@@ -33,7 +33,7 @@ vers_query:
   | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select 
   | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select | vers_select 
   | vers_change_variable
-  | vers_truncate | vers_truncate | vers_truncate
+  | vers_delete_history | vers_delete_history | vers_delete_history
   | vers_tx_history
   | vers_show_table
   | vers_drop_table
@@ -152,8 +152,8 @@ vers_comparison_operator:
   > | < | = | <= | >= | !=
 ;
 
-vers_truncate:
-  TRUNCATE vers_existing_table TO system_time vers_system_time
+vers_delete_history:
+  DELETE HISTORY FROM vers_existing_table BEFORE system_time vers_system_time
 ;
 
 vers_tx_history:
@@ -203,7 +203,7 @@ vers_partitioning:
   | vers_partitioning_definition
   | REMOVE PARTITIONING
   | DROP PARTITION vers_ia_if_exists { 'ver_p'.$prng->int(1,5) }
-  | ADD PARTITION vers_ia_if_not_exists (PARTITION { 'ver_p'.++$parts } VERSIONING)
+  | ADD PARTITION vers_ia_if_not_exists (PARTITION { 'ver_p'.++$parts } HISTORY)
 ;
 
 vers_partitioning_optional:
@@ -214,7 +214,7 @@ vers_partitioning_definition:
   { $parts=0 ; '' } 
   PARTITION BY system_time INTERVAL _positive_digit vers_interval vers_subpartitioning_optional (
     vers_partition_list ,
-    PARTITION ver_pn AS OF CURRENT_TIMESTAMP
+    PARTITION ver_pn CURRENT
   )
 ;
     
@@ -227,8 +227,8 @@ vers_hash_key:
 ;
 
 vers_partition_list:
-    PARTITION { 'ver_p'.++$parts } VERSIONING
-  | PARTITION { 'ver_p'.++$parts } VERSIONING, 
+    PARTITION { 'ver_p'.++$parts } HISTORY
+  | PARTITION { 'ver_p'.++$parts } HISTORY,
     vers_partition_list
 ;
 
