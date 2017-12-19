@@ -72,12 +72,19 @@ vers_with_without_system_versioning:
 
 vers_change_variable:
     vers_tx_isolation
+  | vers_innodb_algorithm_simple
+  | vers_transaction_history
   | vers_alter_history
 ;
 
+vers_transaction_history:
+    SET vers_session_global `system_versioning_transaction_history` = ON
+  | SET vers_session_global `system_versioning_transaction_history` = OFF
+;
+
 vers_innodb_algorithm_simple:
-    SET vers_session_global versioning_innodb_algorithm_simple = ON
-  | SET vers_session_global versioning_innodb_algorithm_simple = OFF
+    SET vers_session_global `system_versioning_innodb_algorithm_simple` = ON
+  | SET vers_session_global `system_versioning_innodb_algorithm_simple` = OFF
 ;
 
 vers_tx_isolation:
@@ -88,9 +95,9 @@ vers_tx_isolation:
 ;
 
 vers_alter_history:
-    SET vers_session_global `versioning_alter_history`= KEEP
-  | SET vers_session_global `versioning_alter_history`= ERROR
-  | SET vers_session_global `versioning_alter_history`= DEFAULT
+    SET vers_session_global `system_versioning_alter_history`= KEEP
+  | SET vers_session_global `system_versioning_alter_history`= ERROR
+  | SET vers_session_global `system_versioning_alter_history`= DEFAULT
 ;
 
 vers_session_global:
