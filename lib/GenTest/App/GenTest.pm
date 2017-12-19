@@ -198,7 +198,7 @@ sub run {
     my @log_files_to_report;
     foreach my $i (0..2) {
         last if $self->config->property('upgrade-test') and $i>0;
-        next if $self->config->dsn->[$i] eq '';
+        next unless $self->config->dsn->[$i];
         next if $self->config->dsn->[$i] !~ m{mysql}sio;
         my $metadata_executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
         $metadata_executor->init();
@@ -444,7 +444,7 @@ sub workerProcess {
     my @executors;
     foreach my $i (0..2) {
         last if $self->config->property('upgrade-test') and $i>0;
-        next if $self->config->dsn->[$i] eq '';
+        next unless $self->config->dsn->[$i];
         my $executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
         $executor->sqltrace($self->config->sqltrace);
         $executor->setId($i+1);
@@ -510,7 +510,7 @@ sub doGenData {
     foreach my $dsn (@{$self->config->dsn}) {
         $i++;
         last if $self->config->property('upgrade-test') and $i>0;
-        next if $dsn eq '';
+        next unless $dsn;
         my $gendata_result;
         if (defined $self->config->property('gendata-advanced')) {
             $gendata_result = GenTest::App::GendataAdvanced->new(
@@ -700,7 +700,7 @@ sub initReporters {
     # pass option debug server to the reporter, for detecting the binary type.
     foreach my $i (0..2) {
         last if $self->config->property('upgrade-test') and $i>0;
-        next if $self->config->dsn->[$i] eq '';
+        next unless $self->config->dsn->[$i];
         foreach my $reporter (@{$self->config->reporters}) {
             my $add_result = $reporter_manager->addReporter($reporter, {
                 dsn => $self->config->dsn->[$i],
@@ -830,8 +830,8 @@ sub initXMLReport {
             grammar => $self->config->grammar,
             threads => $self->config->threads,
             queries => $self->config->queries,
-            validators => join (',', @{$self->config->validators}),
-            reporters => join (',', @{$self->config->reporters}),
+            validators => ($self->config->validators ? join (',', @{$self->config->validators}) : ''),
+            reporters => ($self->config->reporters ? join (',', @{$self->config->reporters}) : ''),
             seed => $self->config->seed,
             mask => $self->config->mask,
             mask_level => $self->config->property('mask-level'),
