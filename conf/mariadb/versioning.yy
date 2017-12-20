@@ -110,9 +110,9 @@ vers_alter:
 ;
 
 vers_set_statement_alter_history:
-  | SET STATEMENT versioning_alter_history=KEEP FOR
-  | SET STATEMENT versioning_alter_history=KEEP FOR
-  | SET STATEMENT versioning_alter_history=KEEP FOR
+  | SET STATEMENT system_versioning_alter_history=KEEP FOR
+  | SET STATEMENT system_versioning_alter_history=KEEP FOR
+  | SET STATEMENT system_versioning_alter_history=KEEP FOR
 ;
 
 vers_alter_table_list:
