@@ -41,11 +41,11 @@ sub transform {
 	return STATUS_WONT_HANDLE if $orig_query =~ m{GROUP\s+BY|LIMIT|HAVING}sio
 		|| $orig_query =~ m{(OUTFILE|INFILE|PROCESSLIST)}sio;
 
-	my ($select_list) = $orig_query =~ m{SELECT (.*?) FROM}sio;
+	my ($select_list) = $orig_query =~ m{SELECT\s+(.*?)\s+FROM}sio;
 
 	if ($select_list =~ m{AVG|BIT|CONCAT|DISTINCT|GROUP|MAX|MIN|STD|SUM|VAR|STRAIGHT_JOIN|SQL_SMALL_RESULT}sio) {
 		return STATUS_WONT_HANDLE;
-	} elsif ($select_list =~ m{SELECT\s?\*}sio) {
+	} elsif ($select_list =~ m{\*}sio) {
 		# "SELECT *" was matched. Cannot have both * and COUNT(...) in SELECT list.
 		$orig_query =~ s{SELECT (.*?) FROM}{SELECT COUNT(*) FROM}sio;
 	} elsif ($select_list !~ m{COUNT}sio) {
