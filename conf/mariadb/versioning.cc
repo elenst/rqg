@@ -5,11 +5,11 @@ $combinations = [
 		--no-mask
 		--seed=time
 		--threads=6
-		--duration=900
+		--duration=600
 		--queries=100M
 		--reporters=Backtrace,ErrorLog,Deadlock
     --validators=TransformerNoComparator
-    --transformers=ConvertSubqueriesToViews,ConvertTablesToDerived,ConvertTablesToViews,Count,DisableIndexes,DisableOptimizations,Distinct,EnableOptimizations,ExecuteAsCTE,ExecuteAsDeleteReturning,ExecuteAsDerived,ExecuteAsExcept,ExecuteAsExecuteImmediate,ExecuteAsFunctionTwice,ExecuteAsInsertSelect,ExecuteAsIntersect,ExecuteAsSelectItem,ExecuteAsTrigger,ExecuteAsUnion,ExecuteAsUpdateDelete,ExecuteAsView,ExecuteAsWhereSubquery,Having,InlineSubqueries,InlineVirtualColumns,LimitRowsExamined,OrderBy,StraightJoin
+    --transformers=ConvertSubqueriesToViews,ConvertTablesToDerived,ConvertTablesToViews,Count,DisableIndexes,DisableOptimizations,Distinct,EnableOptimizations,ExecuteAsCTE,ExecuteAsDeleteReturning,ExecuteAsDerived,ExecuteAsExcept,ExecuteAsExecuteImmediate,ExecuteAsFunctionTwice,ExecuteAsInsertSelect,ExecuteAsIntersect,ExecuteAsSelectItem,ExecuteAsTrigger,ExecuteAsUnion,ExecuteAsUpdateDelete,ExecuteAsView,ExecuteAsWhereSubquery,Having,InlineSubqueries,InlineVirtualColumns,LimitRowsExamined,OrderBy,StraightJoin,ExecuteAsPreparedTwice,ExecuteAsSPTwice
 		--redefine=conf/mariadb/general-workarounds.yy
 		--mysqld=--log_output=FILE
 		--mysqld=--log_bin_trust_function_creators=1
