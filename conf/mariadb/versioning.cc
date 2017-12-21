@@ -1,4 +1,4 @@
-# ExecuteAsTrigger,ExecuteAsSPTwice
+# ExecuteAsTrigger,ExecuteAsSPTwice,ExecuteAsFunctionTwice,
 $combinations = [
 	[
 	'
@@ -9,7 +9,7 @@ $combinations = [
 		--queries=100M
 		--reporters=Backtrace,ErrorLog,Deadlock
     --validators=TransformerNoComparator
-    --transformers=ConvertSubqueriesToViews,ConvertTablesToDerived,ConvertTablesToViews,Count,DisableIndexes,DisableOptimizations,Distinct,EnableOptimizations,ExecuteAsCTE,ExecuteAsDeleteReturning,ExecuteAsDerived,ExecuteAsExcept,ExecuteAsExecuteImmediate,ExecuteAsFunctionTwice,ExecuteAsInsertSelect,ExecuteAsIntersect,ExecuteAsSelectItem,ExecuteAsUnion,ExecuteAsUpdateDelete,ExecuteAsView,ExecuteAsWhereSubquery,Having,InlineSubqueries,InlineVirtualColumns,LimitRowsExamined,OrderBy,StraightJoin,ExecuteAsPreparedTwice
+    --transformers=ConvertSubqueriesToViews,ConvertTablesToDerived,ConvertTablesToViews,Count,DisableIndexes,DisableOptimizations,Distinct,EnableOptimizations,ExecuteAsCTE,ExecuteAsDeleteReturning,ExecuteAsDerived,ExecuteAsExcept,ExecuteAsExecuteImmediate,ExecuteAsInsertSelect,ExecuteAsIntersect,ExecuteAsSelectItem,ExecuteAsUnion,ExecuteAsUpdateDelete,ExecuteAsView,ExecuteAsWhereSubquery,Having,InlineSubqueries,InlineVirtualColumns,LimitRowsExamined,OrderBy,StraightJoin,ExecuteAsPreparedTwice
 		--redefine=conf/mariadb/general-workarounds.yy
 		--mysqld=--log_output=FILE
 		--mysqld=--log_bin_trust_function_creators=1
