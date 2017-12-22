@@ -285,11 +285,13 @@ vers_ia_alter_item:
 ;
 
 vers_ia_transaction:
-    BEGIN
+    BEGIN | BEGIN | BEGIN
   | SAVEPOINT sp
   | ROLLBACK TO SAVEPOINT sp
-  | COMMIT
-  | ROLLBACK
+  | COMMIT | COMMIT | COMMIT
+  | ROLLBACK | ROLLBACK
+  | SET AUTOCOMMIT=OFF
+  | SET AUTOCOMMIT=ON
 ;
 
 vers_ia_lock_unlock_table:
