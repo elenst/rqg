@@ -16,11 +16,7 @@
 
 # Re-defining grammar for SYSTEM VERSIONING testing
 
-thread2:
-  vers_query
-;
-
-thread3:
+query_add:
   vers_query
 ;
 
@@ -71,33 +67,33 @@ vers_with_without_system_versioning:
 ;
 
 vers_change_variable:
-    vers_tx_isolation
-  | vers_innodb_algorithm_simple
-  | vers_transaction_history
-  | vers_alter_history
+    SET vers_session_global TRANSACTION ISOLATION LEVEL vers_tx_isolation_value
+  | SET vers_session_global `system_versioning_innodb_algorithm_simple` = vers_on_off
+  | SET GLOBAL `system_versioning_transaction_registry` = vers_on_off
+  | SET vers_session_global `system_versioning_alter_history`= vers_alter_history_value
+# Disabled due to MDEV-14765
+#  | SET vers_session_global `system_versioning_asof` = vers_as_of_value
+  | SET vers_session_global `system_versioning_hide` = vers_hide_value
 ;
 
-vers_transaction_history:
-    SET vers_session_global `system_versioning_transaction_history` = ON
-  | SET vers_session_global `system_versioning_transaction_history` = OFF
+vers_as_of_value:
+  vers_ia_systime | DEFAULT
 ;
 
-vers_innodb_algorithm_simple:
-    SET vers_session_global `system_versioning_innodb_algorithm_simple` = ON
-  | SET vers_session_global `system_versioning_innodb_algorithm_simple` = OFF
+vers_hide_value:
+  AUTO | IMPLICIT | FULL | NEVER
 ;
 
-vers_tx_isolation:
-    SET vers_session_global TRANSACTION ISOLATION LEVEL READ UNCOMMITTED
-  | SET vers_session_global TRANSACTION ISOLATION LEVEL READ COMMITTED
-  | SET vers_session_global TRANSACTION ISOLATION LEVEL REPEATABLE READ
-  | SET vers_session_global TRANSACTION ISOLATION LEVEL SERIALIZABLE
+vers_on_off:
+  ON | OFF
 ;
 
-vers_alter_history:
-    SET vers_session_global `system_versioning_alter_history`= KEEP
-  | SET vers_session_global `system_versioning_alter_history`= ERROR
-  | SET vers_session_global `system_versioning_alter_history`= DEFAULT
+vers_tx_isolation_value:
+  READ UNCOMMITTED | READ COMMITTED | REPEATABLE READ | SERIALIZABLE
+;
+
+vers_alter_history_value:
+  KEEP | ERROR | DEFAULT
 ;
 
 vers_session_global:
