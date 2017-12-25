@@ -32,21 +32,35 @@ sub transform {
 	my ($class, $orig_query, $executor) = @_;
 	
 	# We skip: - [OUTFILE | INFILE] queries because these are not data producing and fail (STATUS_ENVIRONMENT_FAILURE)
-	return STATUS_WONT_HANDLE if $orig_query =~ m{(OUTFILE|INFILE|PROCESSLIST)}sio
-		|| $orig_query !~ m{\s*SELECT}sio
-		|| $orig_query =~ m{LIMIT}sio;
+  #          - everything that causes explicit/implicit COMMIT
+	return STATUS_WONT_HANDLE if $orig_query =~ m{(?:OUTFILE|INFILE|PROCESSLIST|CREATE|ALTER|DROP|GRANT|FLUSH|START|BEGIN|COMMIT|ROLLBACK|SHOW)}sio;
 
-	return [
-		#Include database transforms creation DDL so that it appears in the simplified testcase.
-		"CREATE DATABASE IF NOT EXISTS transforms",
-		"DROP TABLE IF EXISTS trigger1".abs($$).",  transforms.trigger2".abs($$),
-		"CREATE TABLE IF NOT EXISTS trigger1".abs($$)." (f1 INTEGER)",
-		"CREATE TABLE IF NOT EXISTS transforms.trigger2".abs($$)." $orig_query LIMIT 0",
-		"CREATE TRIGGER trigger1".abs($$)." BEFORE INSERT ON trigger1".abs($$)." FOR EACH ROW INSERT INTO transforms.trigger2".abs($$)." $orig_query;",
-		"INSERT INTO trigger1".abs($$)." VALUES (1)",
-		"SELECT * FROM transforms.trigger2".abs($$)." /* TRANSFORM_OUTCOME_UNORDERED_MATCH */",
-		"DROP TABLE IF EXISTS trigger1".abs($$).",  transforms.trigger2".abs($$)
-	];
+  if ($orig_query =~ m{\s*SELECT}sio and $orig_query !~ m{\s*INSERT|INTO}sio) {
+    # For true SELECTs, check the result
+    return [
+      #Include database transforms creation DDL so that it appears in the simplified testcase.
+      "CREATE DATABASE IF NOT EXISTS transforms",
+      "DROP TABLE IF EXISTS trigger1".abs($$).",  transforms.trigger2".abs($$),
+      "CREATE TABLE IF NOT EXISTS trigger1".abs($$)." (f1 INTEGER)",
+      "CREATE TABLE IF NOT EXISTS transforms.trigger2".abs($$)." $orig_query LIMIT 0",
+      "CREATE TRIGGER trigger1".abs($$)." BEFORE INSERT ON trigger1".abs($$)." FOR EACH ROW INSERT INTO transforms.trigger2".abs($$)." $orig_query;",
+      "INSERT INTO trigger1".abs($$)." VALUES (1)",
+      "SELECT * FROM transforms.trigger2".abs($$)." /* TRANSFORM_OUTCOME_UNORDERED_MATCH */",
+      "DROP TABLE IF EXISTS trigger1".abs($$).",  transforms.trigger2".abs($$)
+    ];
+  }
+  else {
+    # For other statements, just do it for the sake of crash checks, but don't verify the result
+    # (because it can be anything -- duplicate keys, whatever)
+    return [
+      "CREATE DATABASE IF NOT EXISTS transforms",
+      "DROP TABLE IF EXISTS trigger".abs($$),
+      "CREATE TABLE IF NOT EXISTS trigger".abs($$)." (f1 INTEGER)",
+      "CREATE TRIGGER trigger".abs($$)." BEFORE INSERT ON trigger".abs($$)." FOR EACH ROW $orig_query;",
+      "INSERT INTO trigger".abs($$)." VALUES (1)"." /* TRANSFORM_OUTCOME_ANY */",
+      "DROP TABLE IF EXISTS trigger".abs($$)
+    ];
+  }
 }
 
 1;
