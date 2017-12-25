@@ -42,6 +42,7 @@ sub transform {
 		|| $orig_query =~ m{(OUTFILE|INFILE|PROCESSLIST)}sio;
 
 	my ($select_list) = $orig_query =~ m{SELECT\s+(.*?)\s+FROM}sio;
+  return STATUS_WONT_HANDLE if not $select_list;
 
 	if ($select_list =~ m{AVG|BIT|CONCAT|DISTINCT|GROUP|MAX|MIN|STD|SUM|VAR|STRAIGHT_JOIN|SQL_SMALL_RESULT}sio) {
 		return STATUS_WONT_HANDLE;
