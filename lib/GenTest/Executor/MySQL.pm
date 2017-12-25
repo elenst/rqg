@@ -364,6 +364,8 @@ use constant  ER_VERS_ALTER_SYSTEM_FIELD                        => 4137;
 use constant  ER_VERS_GENERATED_ALWAYS_NOT_EMPTY                => 4140;
 use constant  ER_VERS_DUPLICATE_ROW_START_END                   => 4142;
 use constant  ER_VERS_ALREADY_VERSIONED                         => 4143;
+use constant  ER_VERS_TRUNCATE_VIEW                             => 4145;
+use constant  ER_VERS_TEMPORARY                                 => 4146;
 
 #--- end of 10.3 errors ---
 
@@ -591,6 +593,8 @@ my %err2type = (
     ER_VERS_NO_COLS_DEFINED()                           => STATUS_SEMANTIC_ERROR,
     ER_VERS_NOT_VERSIONED()                             => STATUS_SEMANTIC_ERROR,
     ER_VERS_PERIOD_COLUMNS()                            => STATUS_SEMANTIC_ERROR,
+    ER_VERS_TEMPORARY()                                 => STATUS_SEMANTIC_ERROR,
+    ER_VERS_TRUNCATE_VIEW()                             => STATUS_SEMANTIC_ERROR,
     ER_VERSIONING_REQUIRED()                            => STATUS_SEMANTIC_ERROR,
     ER_VIEW_INVALID()                                   => STATUS_SEMANTIC_ERROR,
     ER_VIEW_SELECT_DERIVED()                            => STATUS_SEMANTIC_ERROR,
