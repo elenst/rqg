@@ -13,11 +13,15 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
-thread3_init:
+query_init_add:
   ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace ; ia_create_or_replace
 ;
  
-thread3:
+query_add:
+  ia_query
+;
+
+ia_query:
     ia_create_or_replace
   | ia_create_like
   | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert | ia_insert
@@ -55,12 +59,6 @@ ia_alter_item:
   | ENGINE=InnoDB
 ;
 
-thread4:
-  thread3;
-  
-thread5:
-  thread3;
-  
 ia_transaction:
     BEGIN
   | SAVEPOINT sp
