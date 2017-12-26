@@ -64,19 +64,21 @@ my %transform_outcomes = (
 # Subset of semantic errors that we may want to allow during transforms.
 my %mysql_grouping_errors = (
     1004 => 'ER_NON_GROUPING_FIELD_USED',
+    1028 => 'ER_FILSORT_ABORT',
     1055 => 'ER_WRONG_FIELD_WITH_GROUP',
     1056 => 'ER_WRONG_GROUP_FIELD',
-    1140 => 'ER_MIX_OF_GROUP_FUNC_AND_FIELDS',
-    1317 => 'ER_QUERY_INTERRUPTED',
-    2013 => 'CR_SERVER_LOST',
-    2006 => 'CR_SERVER_GONE_ERROR',
-    1028 => 'ER_FILSORT_ABORT',
-    1111 => 'ER_INVALID_GROUP_FUNC_USE',
-    1615 => 'ER_NEED_REPREPARE',
     1060 => 'DUPLICATE_COLUMN_NAME',
     1104 => 'ER_TOO_BIG_SELECT',
+    1111 => 'ER_INVALID_GROUP_FUNC_USE',
+    1140 => 'ER_MIX_OF_GROUP_FUNC_AND_FIELDS',
     1247 => 'ER_ILLEGAL_REFERENCE',
-    1415 => 'ER_SP_NO_RETSET'
+    1304 => 'ER_SP_ALREADY_EXISTS',
+    1317 => 'ER_QUERY_INTERRUPTED',
+    1359 => 'ER_TRG_ALREADY_EXISTS',
+    1415 => 'ER_SP_NO_RETSET',
+    1615 => 'ER_NEED_REPREPARE',
+    2006 => 'CR_SERVER_GONE_ERROR',
+    2013 => 'CR_SERVER_LOST',
 );
 
 # List of encountered errors that we want to suppress later in the test run.
