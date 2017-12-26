@@ -37,12 +37,16 @@ sub transform {
 
   if ($orig_query =~ m{\s*SELECT}sio and $orig_query !~ m{\s*INSERT|INTO}sio) {
     # For true SELECTs, check the result
+    my $zero_query= $orig_query;
+    if (not $zero_query =~ s/LIMIT\s+\d+/LIMIT 0/sio) {
+      $zero_query .= ' LIMIT 0';
+    }
     return [
       #Include database transforms creation DDL so that it appears in the simplified testcase.
       "CREATE DATABASE IF NOT EXISTS transforms",
       "DROP TABLE IF EXISTS trigger1".abs($$).",  transforms.trigger2".abs($$),
       "CREATE TABLE IF NOT EXISTS trigger1".abs($$)." (f1 INTEGER)",
-      "CREATE TABLE IF NOT EXISTS transforms.trigger2".abs($$)." $orig_query LIMIT 0",
+      "CREATE TABLE IF NOT EXISTS transforms.trigger2".abs($$)." $zero_query",
       "CREATE TRIGGER trigger1".abs($$)." BEFORE INSERT ON trigger1".abs($$)." FOR EACH ROW INSERT INTO transforms.trigger2".abs($$)." $orig_query;",
       "INSERT INTO trigger1".abs($$)." VALUES (1)",
       "SELECT * FROM transforms.trigger2".abs($$)." /* TRANSFORM_OUTCOME_UNORDERED_MATCH */",

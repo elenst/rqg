@@ -47,6 +47,7 @@ sub transform {
 
     return STATUS_WONT_HANDLE unless $version_supported;
     return STATUS_WONT_HANDLE if $orig_query !~ m{SELECT|HANDLER}sio;
+    return STATUS_WONT_HANDLE if $orig_query =~ m{CREATE.*(?:PROCEDURE|TRIGGER)}sio;
 
     return "EXECUTE IMMEDIATE ".$executor->dbh()->quote($orig_query) . " /* TRANSFORM_OUTCOME_UNORDERED_MATCH */";
 }
