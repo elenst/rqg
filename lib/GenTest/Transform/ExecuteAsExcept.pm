@@ -36,15 +36,13 @@ sub transform {
 		|| $orig_query !~ m{^\s*SELECT}sio;
 
 	# We remove LIMIT/OFFSET if present in the (outer) query, because we are 
-	# using LIMIT 0 in some of the transformed queries. There can be comments
-	# like "/* 1 */" after the original LIMIT, hence the regex part 
-	# (\/\*\s*[a-zA-Z0-9 ]+\s*\*\/)*.
-	my $orig_query_no_limit = $orig_query;
-	$orig_query_no_limit =~ s{LIMIT\s+\d+\s+OFFSET\s+\d+\s*(\/\*\s*[\w ]+\s*\*\/)*\s*$}{}sio;
-	$orig_query_no_limit =~ s{LIMIT\s+\d+\s*(\/\*\s*[\w ]+\s*\*\/)*\s*$}{}sio;
+	# using LIMIT 0 in some of the transformed queries.
+	my $orig_query_zero_limit = $orig_query;
+	$orig_query_zero_limit =~ s{LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?}{LIMIT 0}sio;
+	$orig_query_zero_limit =~ s{(FOR\s+UPDATE|LOCK\s+IN\s+(?:SHARE|EXCLUSIVE)\sMODE)\s+LIMIT 0}{LIMIT 0 $1}sio;
 
 	return [
-		"( $orig_query ) EXCEPT ( $orig_query_no_limit LIMIT 0 ) /* TRANSFORM_OUTCOME_DISTINCT */",
+		"( $orig_query ) EXCEPT ( $orig_query_zero_limit ) /* TRANSFORM_OUTCOME_DISTINCT */",
 		"( $orig_query ) EXCEPT ( $orig_query ) /* TRANSFORM_OUTCOME_EMPTY_RESULT */"
 	];
 }
