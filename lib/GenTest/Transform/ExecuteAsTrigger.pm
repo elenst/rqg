@@ -35,7 +35,7 @@ sub transform {
   #          - everything that causes explicit/implicit COMMIT
 	return STATUS_WONT_HANDLE if $orig_query =~ m{(?:OUTFILE|INFILE|PROCESSLIST|CREATE|ALTER|DROP|GRANT|FLUSH|START|BEGIN|COMMIT|ROLLBACK|SHOW|REVOKE|TRUNCATE)}sio;
 
-  if ($orig_query =~ m{\s*SELECT}sio and $orig_query !~ m{\s*INSERT|INTO}sio) {
+  if ($orig_query =~ m{^\s*(?:SELECT|WITH)}sio) {
     # For true SELECTs, check the result
     my $zero_query= $orig_query;
     if (not $zero_query =~ s/LIMIT\s+\d+/LIMIT 0/sio) {
