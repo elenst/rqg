@@ -33,7 +33,7 @@ sub transform {
 	
 	# We skip: - [OUTFILE | INFILE] queries because these are not data producing and fail (STATUS_ENVIRONMENT_FAILURE)
   #          - everything that causes explicit/implicit COMMIT
-	return STATUS_WONT_HANDLE if $orig_query =~ m{(?:OUTFILE|INFILE|PROCESSLIST|CREATE\s|ALTER\s|DROP\s|GRANT\s|FLUSH\s|START|BEGIN|COMMIT|ROLLBACK|SHOW\s|REVOKE\s|TRUNCATE\s|USE\s)}sio;
+	return STATUS_WONT_HANDLE if $orig_query =~ m{(?:OUTFILE|INFILE|PROCESSLIST|CREATE\s|ALTER\s|DROP\s|GRANT\s|FLUSH\s|START|BEGIN|COMMIT|ROLLBACK|SHOW\s|REVOKE\s|TRUNCATE\s|USE\s|UNLOCK\s)}sio;
 
   if ($orig_query =~ m{^\s*(?:SELECT|WITH)}sio) {
     # For true SELECTs, check the result
