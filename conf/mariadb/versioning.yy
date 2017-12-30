@@ -208,10 +208,19 @@ vers_partitioning_optional:
 
 vers_partitioning_definition:
   { $parts=0 ; '' } 
-  PARTITION BY system_time INTERVAL _positive_digit vers_interval vers_subpartitioning_optional (
+  PARTITION BY system_time vers_partitioning_interval_or_limit vers_subpartitioning_optional (
     vers_partition_list ,
     PARTITION ver_pn CURRENT
   )
+;
+
+vers_partitioning_interval_or_limit:
+    INTERVAL _positive_digit vers_interval
+  | INTERVAL _positive_digit vers_interval
+  | LIMIT _smallint_unsigned
+  | LIMIT _digit
+  | INTERVAL _positive_digit vers_interval LIMIT _tinyint_unsigned
+  | LIMIT _smallint_unsigned INTERVAL _positive_digit vers_interval
 ;
     
 vers_subpartitioning_optional:
