@@ -72,16 +72,18 @@ seq_drop_list:
   seq_name | seq_name | seq_name, seq_drop_list
 ;
 
+# Due to MDEV-14762, TEMPORARY sequences are disabled
 seq_temporary:
-  | | | TEMPORARY
+#  | | | TEMPORARY
 ;
 
 seq_set_val:
   SELECT SETVAL(seq_name, seq_start_value)
 ;
 
+# Due to MDEV-14761, cannot have more than one MINVALUE / MAXVALUE
 seq_alter:
-  ALTER SEQUENCE seq_if_exists_optional seq_name seq_alter_list
+  { $min_defined= 0; $max_defined= 0; '' } ALTER SEQUENCE seq_if_exists_optional seq_name seq_alter_list
 ;
 
 seq_if_exists_optional:
@@ -96,11 +98,12 @@ seq_insert:
   INSERT INTO seq_name VALUES (seq_start_value, seq_start_value, seq_end_value, seq_start_value, seq_increment_value, _tinyint_unsigned, seq_zero_or_one, seq_zero_or_one)
 ;
 
+# Due to MDEV-14761, cannot have more than one MINVALUE / MAXVALUE
 seq_alter_element:
     RESTART seq_with_or_equal_optional seq_start_value 
   | seq_increment
-  | seq_min
-  | seq_max
+  | seq_min_if_not_defined
+  | seq_max_if_not_defined
   | seq_start_with
 ;
 
@@ -111,13 +114,13 @@ seq_zero_or_one:
 seq_next_val:
     SELECT NEXT VALUE FOR seq_name
   | SELECT NEXTVAL( seq_name )
-  | SET STATEMENT sql_mode=ORACLE FOR SELECT seq_name.nextval
+  | SET STATEMENT `sql_mode`=ORACLE FOR SELECT seq_name.nextval
 ;
 
 seq_prev_val:
     SELECT PREVIOUS VALUE FOR seq_name
   | SELECT LASTVAL( seq_name )
-  | SET STATEMENT sql_mode=ORACLE FOR SELECT seq_name.currval
+  | SET STATEMENT `sql_mode`=ORACLE FOR SELECT seq_name.currval
 ;
 
 seq_create:
@@ -147,6 +150,16 @@ seq_engine:
 
 seq_engine_optional:
   | | | seq_engine
+;
+
+# Due to MDEV-14761, cannot have more than one MINVALUE / MAXVALUE
+
+seq_min_if_not_defined:
+  { if (! $min_defined) { $min_defined= 1; seq_min } else { '' } }
+;
+
+seq_max_if_not_defined:
+  { if (! $max_defined) { $max_defined= 1; seq_max } else { '' } }
 ;
 
 seq_min:
