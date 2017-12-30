@@ -71,9 +71,7 @@ vers_change_variable:
   | SET vers_session_global `system_versioning_innodb_algorithm_simple` = vers_on_off
   | SET GLOBAL `system_versioning_transaction_registry` = vers_on_off
   | SET vers_session_global `system_versioning_alter_history`= vers_alter_history_value
-# Disabled due to MDEV-14765
-#  | SET vers_session_global `system_versioning_asof` = vers_as_of_value
-  | SET vers_session_global `system_versioning_hide` = vers_hide_value
+  | SET vers_session_global `system_versioning_asof` = vers_as_of_value
 ;
 
 vers_as_of_value:
