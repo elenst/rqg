@@ -86,16 +86,19 @@ foreach my $o (@ARGV) {
     push @{$sc_opts{$1}}, $2;
   }
   elsif ($o =~ /^--([-_\w]+)=(\S+)$/) {
-    $1 =~ s/_/-/g;
-    $sc_opts{$1}= $2;
+    my $opt=$1;
+    $opt =~ s/_/-/g;
+    $sc_opts{$opt}= $2;
   }
   elsif ($o =~ /^--skip-([-_\w]+)$/) {
-    $1 =~ s/_/-/g;
-    $sc_opts{$1}= 0;
+    my $opt=$1;
+    $opt =~ s/_/-/g;
+    $sc_opts{$opt}= 0;
   }
   elsif ($o =~ /^--([-_\w]+)$/) {
-    $1 =~ s/_/-/g;
-    $sc_opts{$1}= 1;
+    my $opt=$1;
+    $opt =~ s/_/-/g;
+    $sc_opts{$opt}= 1;
   }
 }
 
