@@ -527,7 +527,7 @@ sub doGenData {
 
         next if not $self->config->gendata();
 
-        if ($self->config->gendata eq '') {
+        if ($self->config->gendata eq '' or $self->config->gendata eq '1') {
             $gendata_result = GenTest::App::GendataSimple->new(
                dsn => $dsn,
                vcols => (defined $self->config->property('vcols') ? ${$self->config->property('vcols')}[$i] : undef),
