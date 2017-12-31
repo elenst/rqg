@@ -32,13 +32,12 @@ sub transform {
 	my ($class, $orig_query, $executor, $original_result, $skip_result_validations) = @_;
 
 	# We skip [OUTFILE | INFILE] queries because these are not data producing and fail (STATUS_ENVIRONMENT_FAILURE)
-	return STATUS_WONT_HANDLE if $orig_query =~ m{(OUTFILE|INFILE|PROCESSLIST)}sio
-		|| $orig_query =~ m{RETURNING}sio
+  # SELECT HISTORY .. (versioning) does not work with RETURNING
+	return STATUS_WONT_HANDLE if $orig_query =~ m{(OUTFILE|INFILE|PROCESSLIST|RETURNING|HISTORY)}sio
 		|| $orig_query !~ m{^\s*(SELECT|DELETE)}sio
 		|| $orig_query =~ m{^\s*DELETE}sio && ! $skip_result_validations 
       || $orig_query =~ m{LIMIT\s+\d+\s*,\s*\d+}sio
-		|| $orig_query =~ m{(AVG|STD|STDDEV_POP|STDDEV_SAMP|STDDEV|SUM|VAR_POP|VAR_SAMP|VARIANCE)\s*\(}sio
-		|| $orig_query =~ m{(SYSDATE)\s*\(}sio
+		|| $orig_query =~ m{(AVG|STD|STDDEV_POP|STDDEV_SAMP|STDDEV|SUM|VAR_POP|VAR_SAMP|VARIANCE|SYSDATE)\s*\(}sio
 	;
 
 	# Two variants of transformations: for SELECT, we convert it into DELETE .. RETURNING

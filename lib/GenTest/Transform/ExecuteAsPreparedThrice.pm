@@ -37,6 +37,8 @@ sub transform {
 	#          - Certain HANDLER statements: they can not be re-run as prepared because they advance a cursor
 	return STATUS_WONT_HANDLE if $orig_query =~ m{(OUTFILE|INFILE|PROCESSLIST|PREPARE\s|OPEN\s|CLOSE\s|PREV\s|NEXT\s|INTO\s|FUNCTION|PROCEDURE)}sio
 		|| $orig_query !~ m{SELECT|HANDLER}sio;
+# TODO: Don't handle anything that looks like multi-statements for now
+    return STATUS_WONT_HANDLE if $orig_query =~ m{;}sio;
 
 	return [
 		"PREPARE prep_stmt_".abs($$)."_".(++$count)." FROM ".$executor->dbh()->quote($orig_query),
