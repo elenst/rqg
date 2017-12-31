@@ -218,7 +218,6 @@ vers_partitioning_interval_or_limit:
   | LIMIT _smallint_unsigned
   | LIMIT _digit
   | INTERVAL _positive_digit vers_interval LIMIT _tinyint_unsigned
-  | LIMIT _smallint_unsigned INTERVAL _positive_digit vers_interval
 ;
     
 vers_subpartitioning_optional:
