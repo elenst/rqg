@@ -16,7 +16,7 @@ query_add:
 ;
 
 fed_create_federated_table:
-    SELECT CONCAT('CREATE OR REPLACE TABLE fed_db.', table_name, ' ENGINE=FEDERATED CONNECTION=\'mysql://root@127.0.0.1:',@@port,'/test/', table_name, '\'') FROM information_schema.tables where table_schema = 'test' ORDER BY RAND() LIMIT 1 INTO @stmt
+    SELECT CONCAT('CREATE OR REPLACE TABLE fed_db.', table_name, ' ENGINE=FEDERATED CONNECTION=\'mysql://root@127.0.0.1:',@@port,'/test/', table_name, '\'') FROM information_schema.tables WHERE table_schema = 'test' AND table_type = 'BASE_TABLE' ORDER BY RAND() LIMIT 1 INTO @stmt
   ; PREPARE stmt FROM @stmt
   ; EXECUTE stmt
   ; DEALLOCATE PREPARE stmt
