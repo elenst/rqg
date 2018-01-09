@@ -39,6 +39,9 @@ sub transform {
 	my $orig_query_zero_limit = $orig_query;
 	$orig_query_zero_limit =~ s{LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?}{LIMIT 0}sio;
 	$orig_query_zero_limit =~ s{(FOR\s+UPDATE|LOCK\s+IN\s+(?:SHARE|EXCLUSIVE)\sMODE)\s+LIMIT 0}{LIMIT 0 $1}sio;
+  if (not $orig_query_zero_limit =~ /LIMIT 0/) {
+    $orig_query_zero_limit.= ' LIMIT 0';
+  }
 
 	return [
 		"( $orig_query ) UNION ALL ( $orig_query_zero_limit ) /* TRANSFORM_OUTCOME_UNORDERED_MATCH */",

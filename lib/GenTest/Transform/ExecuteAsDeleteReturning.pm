@@ -56,13 +56,15 @@ sub transform {
 		return STATUS_WONT_HANDLE if $col_list =~ m{AVG|COUNT|MAX|MIN|GROUP_CONCAT|BIT_AND|BIT_OR|BIT_XOR|STD|SUM|VAR_POP|VAR_SAMP|VARIANCE}sgio;
 		my $table_name = 'transforms.delete_returning_'.abs($$);
 
+    my $cols= join ',', map { '`'.$_.'`' unless $_ =~ /\`/ } ( split /,/, $col_list );
+
 		return [
 			#Include database transforms creation DDL so that it appears in the simplified testcase.
 			"CREATE DATABASE IF NOT EXISTS transforms",
 			"DROP TABLE IF EXISTS $table_name",
 			"CREATE TABLE $table_name $orig_query",
 
-			"DELETE FROM $table_name RETURNING $col_list /* TRANSFORM_OUTCOME_UNORDERED_MATCH */"
+			"DELETE FROM $table_name RETURNING $cols /* TRANSFORM_OUTCOME_UNORDERED_MATCH */"
 		];
 	} 
 	elsif ($orig_query =~ m{^\s*DELETE}sio )

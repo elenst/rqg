@@ -38,8 +38,11 @@ sub transform {
   if ($orig_query =~ m{^\s*(?:SELECT|WITH)}sio) {
     # For true SELECTs, check the result
     my $zero_query= $orig_query;
-    if (not $zero_query =~ s/LIMIT\s+\d+/LIMIT 0/sio) {
-      $zero_query .= ' LIMIT 0';
+
+    $zero_query =~ s{LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?}{LIMIT 0}sio;
+    $zero_query =~ s{(FOR\s+UPDATE|LOCK\s+IN\s+(?:SHARE|EXCLUSIVE)\sMODE)\s+LIMIT 0}{LIMIT 0 $1}sio;
+    if (not $zero_query =~ /LIMIT 0/) {
+      $zero_query.= ' LIMIT 0';
     }
     return [
       #Include database transforms creation DDL so that it appears in the simplified testcase.
