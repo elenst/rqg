@@ -39,7 +39,7 @@ alt_create:
 ;
 
 alt_dml:
-  | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert
+    alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert | alt_insert
   | alt_update | alt_update
   | alt_delete | alt_truncate
 ;  
@@ -109,9 +109,8 @@ alt_table_option:
   | STATS_PERSISTENT alt_eq_optional alt_zero_or_one_or_default
   | STATS_SAMPLE_PAGES alt_eq_optional alt_stats_sample_pages
 #  | TABLESPACE tablespace_name
-# "1" disabled due to MDEV-13982
+# Disabled due to MDEV-13982 (0 also fails)
 #  | TRANSACTIONAL alt_eq_optional alt_zero_or_one
-  | TRANSACTIONAL alt_eq_optional 0
 #  | UNION [=] (tbl_name[,tbl_name]...)
 ;
 
@@ -198,6 +197,7 @@ alt_truncate:
 
 alt_table_name:
     { $my_last_table = 't'.$prng->int(1,10) }
+  | { $my_last_table = 't'.$prng->int(1,10) }
   | _table
 ;
 
