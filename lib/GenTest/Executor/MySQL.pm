@@ -825,6 +825,7 @@ sub execute {
     if (defined $err) {            # Error on EXECUTE
 
         if (
+            ($err_type == STATUS_SKIP) ||
             ($err_type == STATUS_SYNTAX_ERROR) ||
             ($err_type == STATUS_SEMANTIC_ERROR) ||
             ($err_type == STATUS_TRANSACTION_ERROR)
