@@ -171,8 +171,9 @@ alt_transaction:
 ;
 
 alt_lock_unlock_table:
-    FLUSH TABLE alt_table_name FOR EXPORT
-  | LOCK TABLE alt_table_name READ
+# Disabled due to MDEV-13553 and MDEV-12466
+#    FLUSH TABLE alt_table_name FOR EXPORT
+    LOCK TABLE alt_table_name READ
   | LOCK TABLE alt_table_name WRITE
   | SELECT * FROM alt_table_name FOR UPDATE
   | UNLOCK TABLES
