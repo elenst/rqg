@@ -134,12 +134,14 @@ vers_add_drop_sys_column:
 
 vers_select:
     SELECT * from vers_existing_table FOR system_time vers_system_time_select
-  | SELECT * from vers_existing_table WHERE sys_trx_start vers_comparison_operator @trx
-  | SELECT * from vers_existing_table WHERE sys_trx_end vers_comparison_operator @trx
-  | SELECT * from vers_existing_table WHERE sys_trx_start IN (SELECT sys_trx_start FROM vers_existing_table)
-  | SELECT * from vers_existing_table WHERE sys_trx_end IN (SELECT sys_trx_start FROM vers_existing_table)
-  | SELECT sys_trx_start FROM vers_existing_table ORDER BY RAND() LIMIT 1 INTO @trx
-  | SELECT sys_trx_end FROM vers_existing_table ORDER BY RAND() LIMIT 1 INTO @trx
+  | SELECT * from vers_existing_table WHERE row_start vers_comparison_operator @trx
+  | SELECT * from vers_existing_table WHERE row_end vers_comparison_operator @trx
+  | SELECT * from vers_existing_table WHERE row_start IN (SELECT row_start FROM vers_existing_table)
+  | SELECT * from vers_existing_table WHERE row_end IN (SELECT row_start FROM vers_existing_table)
+  | SELECT * from vers_existing_table WHERE row_start IN (SELECT row_end FROM vers_existing_table)
+  | SELECT * from vers_existing_table WHERE row_end IN (SELECT row_end FROM vers_existing_table)
+  | SELECT row_start FROM vers_existing_table ORDER BY RAND() LIMIT 1 INTO @trx
+  | SELECT row_end FROM vers_existing_table ORDER BY RAND() LIMIT 1 INTO @trx
 ;
 
 vers_comparison_operator:
@@ -181,11 +183,11 @@ vers_col:
 ;
 
 vers_col_start:
-  `vers_start` | `sys_trx_start`
+  `vers_start` | `row_start`
 ;
 
 vers_col_end:
-  `vers_end` | `sys_trx_end`
+  `vers_end` | `row_end`
 ;
 
 vers_or_replace_if_not_exists:
