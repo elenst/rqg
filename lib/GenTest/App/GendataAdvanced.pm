@@ -473,7 +473,7 @@ sub gen_table {
             . ",\n";
     };
     $create_stmt .= "PRIMARY KEY(pk)\n";
-    $create_stmt .= ")" . ($engine ne '' ? " ENGINE=$engine" : "");
+    $create_stmt .= ") ROW_FORMAT=PAGE TABLE_CHECKSUM=1" . ($engine ne '' ? " ENGINE=$engine" : "");
     $executor->execute($create_stmt);
     
     if (defined $views) {

@@ -33,8 +33,12 @@
 #
 
 $tables = {
-	rows => [0, 1, 10 ],
-	pk => [ 'int' , 'int auto_increment' ]
+	rows => [0, 1, 10, 1000 ],
+	pk => [ 'int' , 'int auto_increment' ],
+  engines => [ 'Aria' ],
+  row_formats => [ undef, 'PAGE', 'FIXED', 'DYNAMIC' ],
+  options => [ undef, 'TABLE_CHECKSUM=1' ]
+
 };
 
 $fields = {

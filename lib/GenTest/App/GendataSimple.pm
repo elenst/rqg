@@ -177,7 +177,7 @@ sub gen_table {
                 KEY (col_time_key),
                 KEY (col_datetime_key),
                 KEY (col_varchar_key, col_int_key)
-            ) ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
+            ) ROW_FORMAT=PAGE TABLE_CHECKSUM=1 ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
                                # For tables named like CC and CCC, start auto_increment with some offset. This provides better test coverage since
                                # joining such tables on PK does not produce only 1-to-1 matches.
                 );
@@ -206,7 +206,7 @@ sub gen_table {
                 KEY (col_time_key),
                 KEY (col_datetime_key),
                 KEY (col_varchar_key, col_int_key)
-            ) ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
+            ) ROW_FORMAT=PAGE TABLE_CHECKSUM=1 ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
                                # For tables named like CC and CCC, start auto_increment with some offset. This provides better test coverage since
                                # joining such tables on PK does not produce only 1-to-1 matches.
                 );
@@ -267,7 +267,7 @@ sub gen_table {
 			col_varchar_nokey VARCHAR($varchar_length) $nullability,
 
 			PRIMARY KEY (pk)
-		) ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
+		) ROW_FORMAT=PAGE TABLE_CHECKSUM=1 ".(length($name) > 1 ? " AUTO_INCREMENT=".(length($name) * 5) : "").($engine ne '' ? " ENGINE=$engine" : "")
 						   # For tables named like CC and CCC, start auto_increment with some offset. This provides better test coverage since
 						   # joining such tables on PK does not produce only 1-to-1 matches.
 			);

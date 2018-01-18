@@ -20,8 +20,12 @@
 #
 
 $tables = {
-   rows => [0 ],
-   pk   => [ 'int' ]
+   rows => [ 0 ],
+   pk   => [ 'int' ],
+   engines => [ 'Aria' ],
+   row_formats => [ undef, 'PAGE', 'FIXED', 'DYNAMIC' ],
+   options => [ undef, 'TABLE_CHECKSUM=1' ]
+
 };
 
 $fields = {

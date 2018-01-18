@@ -23,15 +23,17 @@ $schemas = [ 'test' , 'test1' ];
 
 $tables = {
         # Example: table<rows>
-        rows => [ 0 , 1 , 10] ,
+        rows => [ 0 , 1 , 10, 1000] ,
         # partitions => [ undef , 'KEY (pk) PARTITIONS 2' ] ,
         # Example: table<rows> , table<rows>_<engine>
         # engines => [ undef , 'MyISAM' , 'InnoDB' ] ,
-        engines => [ undef , 'MyISAM' ] ,
+        engines => [ 'Aria' ] ,
         # Example: table<rows>_<engine>_<pk> like table0_myisam_int_autoinc
         # Enable the next line when the RPL team says it is time to do this.
         #    pk => [ 'int auto_increment' , 'int' , undef ]
-        pk   => [ 'int auto_increment' , 'int' ]
+        pk   => [ 'int auto_increment' , 'int' ],
+        row_formats => [ undef, 'PAGE', 'FIXED', 'DYNAMIC' ],
+        options => [ undef, 'TABLE_CHECKSUM=1' ]
 };
 
 $fields = {

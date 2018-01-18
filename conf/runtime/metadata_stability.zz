@@ -23,9 +23,12 @@
 #
 
 $tables = {
-	rows => [10, 11],
+	rows => [10, 11, 1000],
 	primary_key => [ undef ],
-	engine => [ 'Innodb' ]
+	engine => [ 'Aria' ],
+  row_formats => [ undef, 'PAGE', 'FIXED', 'DYNAMIC' ],
+  options => [ undef, 'TABLE_CHECKSUM=1' ]
+  
 };
 
 $fields = {
