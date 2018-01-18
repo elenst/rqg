@@ -60,9 +60,9 @@ sub report {
 
   my $databases = $dbh->selectcol_arrayref("SHOW DATABASES");
   foreach my $database (@$databases) {
-    next if $database =~ m{^(mysql|information_schema|pbxt|performance_schema)$}sio;
+    next if $database =~ m{^(mysql|information_schema|performance_schema)$}sio;
     $dbh->do("USE $database");
-    my $tables = $dbh->selectcol_arrayref("SHOW TABLES");
+    my $tables = $dbh->selectcol_arrayref("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='".$database."' AND TABLE_TYPE='BASE TABLE' AND ENGINE!='MRG_MYISAM'");
     foreach my $table (@$tables) {
       say("Verifying table: $table; database: $database");
 
