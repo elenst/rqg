@@ -400,7 +400,7 @@ sub createMysqlBase  {
 
     my $command;
 
-    if ($self->_olderThan(5,7,5)) {
+    if (not $self->_isMySQL or $self->_olderThan(5,7,5)) {
 
        # Add the whole init db logic to the bootstrap script
        print BOOT "CREATE DATABASE mysql;\n";
@@ -1294,7 +1294,7 @@ sub _logOptions {
 # 10.0 to 5.6
 # 10.1 to 5.6
 # 10.2 to 5.6
-# 10.3 to 5.7
+# 10.2 to 5.7
 
 sub _olderThan {
     my ($self,$b1,$b2,$b3) = @_;
@@ -1310,6 +1310,12 @@ sub _olderThan {
     my $v = $v1*1000 + $v2 * 100 + $v3;
 
     return $v < $b;
+}
+
+sub _isMySQL {
+    my $self = shift;
+    my ($v1, $v2, $v3) = $self->versionNumbers;
+    return $v1 == 8 or $v1 == 5 and ($v2 == 6 or $v2 == 7) ;
 }
 
 sub _notOlderThan {
