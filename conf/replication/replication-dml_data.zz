@@ -33,7 +33,7 @@ $tables = {
         #    pk => [ 'int auto_increment' , 'int' , undef ]
         pk   => [ 'int auto_increment' , 'int' ],
         row_formats => [ undef, 'PAGE', 'FIXED', 'DYNAMIC' ],
-        options => [ undef, 'TABLE_CHECKSUM=1' ]
+        options => [ 'TABLE_CHECKSUM=0 TRANSACTIONAL=0', 'TABLE_CHECKSUM=1 TRANSACTIONAL=0', 'TABLE_CHECKSUM=0 TRANSACTIONAL=1', 'TABLE_CHECKSUM=1 TRANSACTIONAL=1' ]
 };
 
 $fields = {

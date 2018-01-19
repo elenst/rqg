@@ -13,8 +13,7 @@ $combinations = [
 		--mysqld=--log_output=FILE
 		--mysqld=--log_bin_trust_function_creators=1
     --mysqld=--max-statement-time=30
-    --rpl_mode=mixed-nosync
-    --mysqld=--slave-skip-errors=1049,1305,1539,1505,1317,1568
+    --mysqld=--log-bin
     --mysqld=--loose-debug_assert_on_not_freed_memory=0
     --views
 	'], 

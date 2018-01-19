@@ -20,7 +20,7 @@ $tables = {
         partitions => [ undef , 'KEY (pk) PARTITIONS 2' ],
         engines => [ 'Aria' ],
         row_formats => [ undef, 'PAGE', 'FIXED', 'DYNAMIC' ],
-        options => [ undef, 'TABLE_CHECKSUM=1' ]
+        options => [ 'TABLE_CHECKSUM=0 TRANSACTIONAL=0', 'TABLE_CHECKSUM=1 TRANSACTIONAL=0', 'TABLE_CHECKSUM=0 TRANSACTIONAL=1', 'TABLE_CHECKSUM=1 TRANSACTIONAL=1' ]
 };
 
 ## TODO: Re-enable UTF16 in 'charsets' once WL#1213 is pushed.

@@ -39,21 +39,12 @@ sub report {
   $first_reporter = $reporter if not defined $first_reporter;
   return STATUS_OK if $reporter ne $first_reporter;
 
-  my $binary = $reporter->serverInfo('binary');
-  my $language = $reporter->serverVariable('language');
-  my $lc_messages_dir = $reporter->serverVariable('lc_messages_dir');
-  my $datadir = $reporter->serverVariable('datadir');
-  $datadir =~ s{[\\/]$}{}sgio;
-  my $socket = $reporter->serverVariable('socket');
-  my $port = $reporter->serverVariable('port');
-  my $pid = $reporter->serverInfo('pid');
-  my $maria_block_size = $reporter->serverVariable('maria_block_size');
-  my $plugin_dir = $reporter->serverVariable('plugin_dir');
-  my $plugins = $reporter->serverPlugins();
-
-  my $engine = $reporter->serverVariable('storage_engine');
-
   my $dbh = DBI->connect($reporter->dsn());
+  unless ($dbh) {
+    sayError("Could not connect to the server");
+    return STATUS_ENVIRONMENT_FAILURE;
+  }
+  
   my $consistency_status = STATUS_OK;
 
   say("Testing database consistency");
@@ -68,6 +59,11 @@ sub report {
 
       my $sth_keys = $dbh->prepare("SHOW KEYS FROM `$database`.`$table`");
       $sth_keys->execute();
+      if ($sth_keys->err()) {
+        sayError("SHOW KEYS FROM `$database`.`$table` failed: " . $sth_keys->errstr());
+        $consistency_status= STATUS_DATABASE_CORRUPTION;
+        next;
+      }
 
       my @walk_queries;
 
@@ -105,8 +101,9 @@ sub report {
         $sth_rows->execute();
 
         if (defined $sth_rows->err()) {
-          say("Failing query is $walk_query.");
-          return STATUS_DATABASE_CORRUPTION;
+          say("Failing query is $walk_query");
+          $consistency_status= STATUS_DATABASE_CORRUPTION;
+          next;
         }
 
         my $rows = $sth_rows->rows();
@@ -153,19 +150,23 @@ sub report {
         if (defined $sth) {
           $sth->execute();
 
-          return STATUS_DATABASE_CORRUPTION if $dbh->err() > 0 && $dbh->err() != 1178;
+          if ($dbh->err() > 0 && $dbh->err() != 1178) {
+            $consistency_status= STATUS_DATABASE_CORRUPTION;
+            next;
+          }
           if ($sth->{NUM_OF_FIELDS} > 0) {
             my $result = Dumper($sth->fetchall_arrayref());
             next if $result =~ m{is not BASE TABLE}sio;  # Do not process VIEWs
             if ($result =~ m{error|corrupt|repaired|invalid|crashed}sio) {
               print $result;
-              return STATUS_DATABASE_CORRUPTION
+              $consistency_status= STATUS_DATABASE_CORRUPTION;
             }
           };
           $sth->finish();
         } else {
           say("Prepare failed: ".$dbh->errrstr());
-          return STATUS_DATABASE_CORRUPTION;
+          $consistency_status= STATUS_DATABASE_CORRUPTION;
+          next;
         }
       }
     }

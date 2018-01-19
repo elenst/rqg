@@ -21,7 +21,7 @@ $tables = {
           rows => [ 5000 ] ,
         engines => [ 'Aria' ],
         row_formats => [ undef, 'PAGE', 'FIXED', 'DYNAMIC' ],
-        options => [ undef, 'TABLE_CHECKSUM=1' ],
+        options => [ 'TABLE_CHECKSUM=0 TRANSACTIONAL=0', 'TABLE_CHECKSUM=1 TRANSACTIONAL=0', 'TABLE_CHECKSUM=0 TRANSACTIONAL=1', 'TABLE_CHECKSUM=1 TRANSACTIONAL=1' ],
           pk => [ undef ] , 
           partitions => [
                           "RANGE COLUMNS(col_int_signed, col_varchar_5_utf8)
