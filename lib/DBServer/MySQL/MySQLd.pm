@@ -1315,7 +1315,7 @@ sub _olderThan {
 sub _isMySQL {
     my $self = shift;
     my ($v1, $v2, $v3) = $self->versionNumbers;
-    return $v1 == 8 or $v1 == 5 and ($v2 == 6 or $v2 == 7) ;
+    return ($v1 == 8 or $v1 == 5 and ($v2 == 6 or $v2 == 7));
 }
 
 sub _notOlderThan {
