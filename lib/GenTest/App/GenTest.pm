@@ -538,7 +538,7 @@ sub doGenData {
                rows => $self->config->rows,
                varchar_length => $self->config->property('varchar-length')
             )->run();
-        } elsif (defined $self->config->gendata()) {
+        } elsif ($self->config->gendata()) {
             $gendata_result = GenTest::App::Gendata->new(
                spec_file => $self->config->gendata,
                dsn => $dsn,
