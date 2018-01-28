@@ -352,6 +352,9 @@ use constant  ER_MYROCKS_CANT_NOPAD_COLLATION                   => 4077;
 
 #--- the codes below can still change---
 
+use constant  ER_SEQUENCE_RUN_OUT                               => 4084;
+use constant  ER_SEQUENCE_INVALID_DATA                          => 4085;
+use constant  ER_UNKNOWN_SEQUENCES                              => 4091;
 use constant  ER_UNKNOWN_VIEW                                   => 4092;
 use constant  ER_VERSIONING_REQUIRED                            => 4106;
 use constant  ER_VERS_FIELD_WRONG_TYPE                          => 4108;
@@ -534,6 +537,8 @@ my %err2type = (
     ER_SERVER_LOST()                                    => STATUS_SERVER_CRASHED,
     ER_SERVER_LOST_EXTENDED()                           => STATUS_SERVER_CRASHED,
     ER_SERVER_SHUTDOWN()                                => STATUS_SERVER_KILLED,
+    ER_SEQUENCE_INVALID_DATA()                          => STATUS_SEMANTIC_ERROR,
+    ER_SEQUENCE_RUN_OUT()                               => STATUS_SEMANTIC_ERROR,
     ER_SIGNAL_BAD_CONDITION_TYPE()                      => STATUS_SEMANTIC_ERROR,
     ER_SIGNAL_EXCEPTION()                               => STATUS_SEMANTIC_ERROR,
     ER_SP_ALREADY_EXISTS()                              => STATUS_SEMANTIC_ERROR,
@@ -578,6 +583,7 @@ my %err2type = (
     ER_UNIQUE_KEY_NEED_ALL_FIELDS_IN_PF()               => STATUS_SEMANTIC_ERROR,
     ER_UNKNOWN_KEY_CACHE()                              => STATUS_SEMANTIC_ERROR,
     ER_UNKNOWN_PARTITION()                              => STATUS_SEMANTIC_ERROR,
+    ER_UNKNOWN_SEQUENCES()                              => STATUS_SEMANTIC_ERROR,
     ER_UNKNOWN_STMT_HANDLER()                           => STATUS_SEMANTIC_ERROR,
     ER_UNKNOWN_STORAGE_ENGINE()                         => STATUS_ENVIRONMENT_FAILURE,
     ER_UNKNOWN_SYSTEM_VARIABLE()                        => STATUS_SEMANTIC_ERROR,
