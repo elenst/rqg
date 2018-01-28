@@ -145,7 +145,7 @@ seq_cycle_optional:
 ;
 
 seq_engine:
-  ENGINE=InnoDB | ENGINE=MyISAM | ENGINE=Aria | ENGINE=MEMORY
+  ENGINE=InnoDB | ENGINE=MyISAM | ENGINE=Aria
 ;
 
 seq_engine_optional:
