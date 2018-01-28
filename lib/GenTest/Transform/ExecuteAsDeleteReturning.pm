@@ -56,7 +56,8 @@ sub transform {
 		return STATUS_WONT_HANDLE if $col_list =~ m{AVG|COUNT|MAX|MIN|GROUP_CONCAT|BIT_AND|BIT_OR|BIT_XOR|STD|SUM|VAR_POP|VAR_SAMP|VARIANCE}sgio;
 		my $table_name = 'transforms.delete_returning_'.abs($$);
 
-    my $cols= join ',', map { '`'.$_.'`' unless $_ =~ /\`/ } ( split /,/, $col_list );
+    # If a column has non-"word" symbols, it should already be quoted anyway
+    my $cols= join ',', map { '`'.$_.'`' unless $_ =~ /\W/ } ( split /,/, $col_list );
 
 		return [
 			#Include database transforms creation DDL so that it appears in the simplified testcase.
