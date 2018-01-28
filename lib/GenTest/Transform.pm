@@ -68,6 +68,9 @@ my %mysql_grouping_errors = (
     1055 => 'ER_WRONG_FIELD_WITH_GROUP',
     1056 => 'ER_WRONG_GROUP_FIELD',
     1060 => 'DUPLICATE_COLUMN_NAME',
+    # Union, intersect, except can complain about missing locks even if
+    # the origina query went all right
+    1100 => 'ER_TABLE_NOT_LOCKED',
     1104 => 'ER_TOO_BIG_SELECT',
     1111 => 'ER_INVALID_GROUP_FUNC_USE',
     1140 => 'ER_MIX_OF_GROUP_FUNC_AND_FIELDS',
@@ -81,6 +84,9 @@ my %mysql_grouping_errors = (
     1615 => 'ER_NEED_REPREPARE',
     2006 => 'CR_SERVER_GONE_ERROR',
     2013 => 'CR_SERVER_LOST',
+    # Sequence numbers are used on every call, they can run out during
+    # transformations even if the original query went all right
+    4084 => 'ER_SEQUENCE_RUN_OUT'
 );
 
 # List of encountered errors that we want to suppress later in the test run.
