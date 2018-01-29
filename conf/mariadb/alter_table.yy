@@ -14,7 +14,8 @@
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 query_init_add:
-  alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace
+    alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace
+  ; alt_create_or_replace_sequence ; alt_create_or_replace_sequence
 ;
  
 query_add:
@@ -26,6 +27,8 @@ alt_query:
   | alt_dml | alt_dml | alt_dml
   | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter
   | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter
+# Disable with ASAN due to MDEV-13828
+  | alt_rename_multi
   | alt_alter_partitioning
   | alt_flush
   | alt_optimize
@@ -36,6 +39,10 @@ alt_query:
 alt_create:
     alt_create_or_replace
   | alt_create_like
+;
+
+alt_rename_multi:
+  DROP TABLE IF EXISTS { 'tmp_rename_'.abs($$) } ; RENAME TABLE alt_table_name TO { 'tmp_rename_'.abs($$) }, { 'tmp_rename_'.abs($$) } TO { $my_last_table }
 ;
 
 alt_dml:
@@ -74,6 +81,8 @@ alt_alter_item:
   | alt_drop_column | alt_drop_column
   | alt_drop_index | alt_drop_index
   | FORCE alt_lock alt_algorithm
+#  | ORDER BY alt_column_list
+  | RENAME TO alt_table_name
 ;
 
 alt_table_option:
@@ -113,6 +122,7 @@ alt_table_option:
 #  | TRANSACTIONAL alt_eq_optional alt_zero_or_one
 #  | UNION [=] (tbl_name[,tbl_name]...)
 ;
+
 
 alt_stats_sample_pages:
   DEFAULT | _smallint_unsigned
@@ -199,7 +209,7 @@ alt_truncate:
 alt_table_name:
     { $my_last_table = 't'.$prng->int(1,10) }
   | { $my_last_table = 't'.$prng->int(1,10) }
-  | _table
+  | _table { $my_last_table = $last_table; '' }
 ;
 
 alt_col_name:
@@ -320,6 +330,10 @@ alt_default_optional_int_or_auto_increment:
 
 alt_create_or_replace:
   CREATE OR REPLACE alt_temporary TABLE alt_table_name (alt_col_name_and_definition_list) alt_table_flags
+;
+
+alt_create_or_replace_sequence:
+  /*!100303 CREATE OR REPLACE SEQUENCE alt_table_name */
 ;
 
 alt_col_name_and_definition_list:
@@ -443,11 +457,11 @@ alt_optimize:
 ;
 
 alt_algorithm:
-  | | , ALGORITHM=INPLACE | , ALGORITHM=COPY
+  | | , ALGORITHM=INPLACE | , ALGORITHM=COPY | , ALGORITHM=DEFAULT
 ;
 
 alt_lock:
-  | | , LOCK=NONE | , LOCK=SHARED
+  | | , LOCK=NONE | , LOCK=SHARED | , LOCK=EXCLUSIVE | , LOCK=DEFAULT
 ;
   
 alt_data_type:
@@ -563,6 +577,7 @@ alt_any_key:
   | alt_index(alt_key_column)
   | alt_index(alt_key_column_list)
   | alt_index(alt_key_column_list)
+  | FULLTEXT KEY(alt_text_col_name)
   | FULLTEXT KEY(alt_text_col_name)
   | SPATIAL INDEX(alt_geo_col_name)
 ;
