@@ -14,7 +14,7 @@ $combinations = [
     --mysqld=--max-statement-time=30
     --redefine=conf/mariadb/alter_table.yy
     --mysqld=--plugin-load-add=file_key_management
-    --mysqld=--loose-file-key-management-keyfile='.getcwd().'/data/file_key_management_keys.txt
+    --mysqld=--loose-file-key-management-filename='.getcwd().'/data/file_key_management_keys.txt
     --mysqld=--loose-debug_assert_on_not_freed_memory=0
     --rpl_mode=mixed-nosync
     --mysqld=--slave-skip-errors=1049,1305,1539,1505,1317,1568
