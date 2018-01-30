@@ -205,7 +205,6 @@ sub parseFromString {
 
         if ($rule_name =~ /^query_add$/) {
             push @query_adds, $components_string;
-            say("HERE: query adds is now @query_adds");
         }
         elsif ($rule_name =~ /^thread(\d+)_add$/) {
             @{$thread_adds{$1}} = () unless defined $thread_adds{$1};
@@ -250,8 +249,6 @@ sub parseFromString {
                 )
         );
     }
-
-    say("HERE: query rule: ".$rules{'query'});
 
     # Now we have all the rules extracted from grammar files, time to parse
 
