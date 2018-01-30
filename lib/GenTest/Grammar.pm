@@ -205,6 +205,7 @@ sub parseFromString {
 
         if ($rule_name =~ /^query_add$/) {
             push @query_adds, $components_string;
+            say("HERE: query adds is now @query_adds");
         }
         elsif ($rule_name =~ /^thread(\d+)_add$/) {
             @{$thread_adds{$1}} = () unless defined $thread_adds{$1};
@@ -224,12 +225,12 @@ sub parseFromString {
     }
 
     if (@query_adds) {
-        my $adds = join '; ', @query_adds;
+        my $adds = join ' | ', @query_adds;
         $rules{'query'} = ( defined $rules{'query'} ? $rules{'query'} . ' | ' . $adds : $adds );
     }
 
     foreach my $tid (keys %thread_adds) {
-        my $adds = join '; ', @{$thread_adds{$tid}};
+        my $adds = join ' | ', @{$thread_adds{$tid}};
         $rules{'thread'.$tid} = ( defined $rules{'thread'.$tid} ? $rules{'thread'.$tid} . ' | ' . $adds : $adds );
     }
     
@@ -249,6 +250,8 @@ sub parseFromString {
                 )
         );
     }
+
+    say("HERE: query rule: ".$rules{'query'});
 
     # Now we have all the rules extracted from grammar files, time to parse
 
