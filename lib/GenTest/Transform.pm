@@ -65,6 +65,8 @@ my %transform_outcomes = (
 my %mysql_grouping_errors = (
     1004 => 'ER_NON_GROUPING_FIELD_USED',
     1028 => 'ER_FILSORT_ABORT',
+    # Transformation for CREATE statement can cause ER_TABLE_EXISTS_ERROR
+    1050 => 'ER_TABLE_EXISTS_ERROR',
     1055 => 'ER_WRONG_FIELD_WITH_GROUP',
     1056 => 'ER_WRONG_GROUP_FIELD',
     1060 => 'DUPLICATE_COLUMN_NAME',
