@@ -221,8 +221,12 @@ sub run {
     $self->printStep("Running mysql_upgrade");
     $status= $new_server->upgradeDb;
     if ($status != STATUS_OK) {
-      sayError("mysql_upgrade failed");
-      return $self->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
+      sayError("mysql_upgrade failed, it can happen due to MDEV-14990, trying again");
+      $status= $new_server->upgradeDb;
+      if ($status != STATUS_OK) {
+        sayError("mysql_upgrade failed");
+        return $self->finalize(STATUS_UPGRADE_FAILURE,[$new_server]);
+      }
     }
   }
   else {
