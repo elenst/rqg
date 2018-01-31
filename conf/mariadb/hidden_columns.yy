@@ -13,5 +13,9 @@ set_debug_invisible:
   | SET debug_dbug=""
   | SET debug_dbug=""
   | SET debug_dbug=""
+  | SET debug_dbug=""
+  | SET debug_dbug=""
+  | SET debug_dbug=""
+  | SET debug_dbug=""
 ;
 
