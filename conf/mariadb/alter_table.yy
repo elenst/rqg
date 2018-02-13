@@ -78,6 +78,10 @@ alt_alter_item:
   | alt_change_column
   | alt_alter_column
   | alt_add_index | alt_add_index | alt_add_index
+  | alt_add_foreign_key | alt_add_foreign_key
+  | alt_drop_foreign_key
+  | alt_add_check_constraint | alt_add_check_constraint
+  | alt_drop_check_constraint
   | alt_drop_column | alt_drop_column
   | alt_drop_index | alt_drop_index
   | FORCE alt_lock alt_algorithm
@@ -87,24 +91,29 @@ alt_alter_item:
 
 alt_table_option:
     alt_storage_optional ENGINE alt_eq_optional alt_engine
+  | alt_storage_optional ENGINE alt_eq_optional alt_engine
+  | AUTO_INCREMENT alt_eq_optional _int_unsigned
   | AUTO_INCREMENT alt_eq_optional _int_unsigned
   | AVG_ROW_LENGTH alt_eq_optional _tinyint_unsigned
   | alt_default_optional CHARACTER SET alt_eq_optional alt_character_set
+  | alt_default_optional CHARACTER SET alt_eq_optional alt_character_set
+  | CHECKSUM alt_eq_optional alt_zero_or_one
   | CHECKSUM alt_eq_optional alt_zero_or_one
   | alt_default_optional COLLATE alt_eq_optional alt_collation
+  | COMMENT alt_eq_optional _english
   | COMMENT alt_eq_optional _english
 #  | CONNECTION [=] 'connect_string'
 #  | DATA DIRECTORY [=] 'absolute path to directory'
   | DELAY_KEY_WRITE alt_eq_optional alt_zero_or_one
 # alt_eq_optional disabled due to MDEV-14859
 #  | ENCRYPTED alt_eq_optional alt_yes_or_no_no_no
-  | ENCRYPTED = alt_yes_or_no_no_no
+  | /*!100104 ENCRYPTED = alt_yes_or_no_no_no */
 # alt_eq_optional disabled due to MDEV-14861
 #  | ENCRYPTION_KEY_ID alt_eq_optional _digit
-  | ENCRYPTION_KEY_ID = _digit
+  | /*!100104 ENCRYPTION_KEY_ID = _digit */
 # alt_eq_optional disabled due to MDEV-14859
 #  | IETF_QUOTES alt_eq_optional alt_yes_or_no_no_no
-  | IETF_QUOTES = alt_yes_or_no_no_no
+  | /*!100108 IETF_QUOTES = alt_yes_or_no_no_no */
 #  | INDEX DIRECTORY [=] 'absolute path to directory'
 #  | INSERT_METHOD [=] { NO | FIRST | LAST }
   | KEY_BLOCK_SIZE alt_eq_optional alt_key_block_size
@@ -114,6 +123,7 @@ alt_table_option:
   | PAGE_CHECKSUM alt_eq_optional alt_zero_or_one
   | PASSWORD alt_eq_optional _english
   | alt_change_row_format
+  | alt_change_row_format
   | STATS_AUTO_RECALC alt_eq_optional alt_zero_or_one_or_default
   | STATS_PERSISTENT alt_eq_optional alt_zero_or_one_or_default
   | STATS_SAMPLE_PAGES alt_eq_optional alt_stats_sample_pages
@@ -122,7 +132,6 @@ alt_table_option:
 #  | TRANSACTIONAL alt_eq_optional alt_zero_or_one
 #  | UNION [=] (tbl_name[,tbl_name]...)
 ;
-
 
 alt_stats_sample_pages:
   DEFAULT | _smallint_unsigned
@@ -271,23 +280,36 @@ alt_ind_name:
 ;
 
 alt_col_name_and_definition:
-    alt_bit_col_name alt_bit_type alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional
-  | alt_int_col_name alt_int_type alt_unsigned alt_zerofill alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional
-  | alt_int_col_name alt_int_type alt_unsigned alt_zerofill alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional
-  | alt_int_col_name alt_int_type alt_unsigned alt_zerofill alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional
-  | alt_num_col_name alt_num_type alt_unsigned alt_zerofill alt_null alt_optional_default alt_invisible_optional
-  | alt_temporal_col_name alt_temporal_type alt_null alt_optional_default alt_invisible_optional
-  | alt_timestamp_col_name alt_timestamp_type alt_null alt_optional_default_or_current_timestamp alt_invisible_optional
-  | alt_text_col_name alt_text_type alt_null alt_optional_default_char alt_invisible_optional
-  | alt_text_col_name alt_text_type alt_null alt_optional_default_char alt_invisible_optional
-  | alt_text_col_name alt_text_type alt_null alt_optional_default_char alt_invisible_optional
-  | alt_enum_col_name alt_enum_type alt_null alt_optional_default alt_invisible_optional
-  | alt_virt_col_name alt_virt_col_definition alt_virt_type alt_invisible_optional
-  | alt_geo_col_name alt_geo_type alt_null alt_geo_optional_default alt_invisible_optional
+    alt_bit_col_name alt_bit_type alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional alt_check_optional
+  | alt_int_col_name alt_int_type alt_unsigned alt_zerofill alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional alt_check_optional
+  | alt_int_col_name alt_int_type alt_unsigned alt_zerofill alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional alt_check_optional
+  | alt_int_col_name alt_int_type alt_unsigned alt_zerofill alt_null alt_default_optional_int_or_auto_increment alt_invisible_optional alt_check_optional
+  | alt_num_col_name alt_num_type alt_unsigned alt_zerofill alt_null alt_optional_default alt_invisible_optional alt_check_optional
+  | alt_temporal_col_name alt_temporal_type alt_null alt_optional_default alt_invisible_optional alt_check_optional
+  | alt_timestamp_col_name alt_timestamp_type alt_null alt_optional_default_or_current_timestamp alt_invisible_optional alt_check_optional
+  | alt_text_col_name alt_text_type alt_null alt_optional_default_char alt_invisible_optional alt_check_optional
+  | alt_text_col_name alt_text_type alt_null alt_optional_default_char alt_invisible_optional alt_check_optional
+  | alt_text_col_name alt_text_type alt_null alt_optional_default_char alt_invisible_optional alt_check_optional
+  | alt_enum_col_name alt_enum_type alt_null alt_optional_default alt_invisible_optional alt_check_optional
+  | alt_virt_col_name alt_virt_col_definition alt_virt_type alt_invisible_optional alt_check_optional
+  | alt_geo_col_name alt_geo_type alt_null alt_geo_optional_default alt_invisible_optional alt_check_optional
 ;
 
- alt_invisible_optional:
+
+alt_check_optional:
+  | | | | /*!100201 CHECK (alt_check_constraint_expression) */
+;
+
+alt_invisible_optional:
   | | | | /*!100303 INVISIBLE */
+;
+
+alt_col_versioning_optional:
+ | | | | | /*!100304 alt_with_without SYSTEM VERSIONING */
+;
+
+alt_with_without:
+  WITH | WITHOUT
 ;
 
 alt_virt_col_definition:
@@ -551,7 +573,68 @@ alt_inline_key:
   | | | alt_index ;
   
 alt_index:
-  KEY | PRIMARY KEY | UNIQUE ;
+    alt_index_or_key
+  | alt_constraint_optional PRIMARY KEY
+  | alt_constraint_optional UNIQUE alt_optional_index_or_key
+;
+
+alt_add_foreign_key:
+  ADD alt_constraint_optional FOREIGN KEY alt_index_name_optional (alt_column_or_list) REFERENCES alt_table_name (alt_column_or_list) alt_optional_on_delete alt_optional_on_update
+;
+
+alt_add_check_constraint:
+  ADD CONSTRAINT alt_index_name_optional CHECK (alt_check_constraint_expression)
+;
+
+alt_drop_check_constraint:
+  DROP CONSTRAINT alt_if_exists _letter
+;
+
+# TODO: extend
+alt_check_constraint_expression:
+    alt_col_name alt_operator alt_col_name
+  | alt_col_name alt_operator _digit
+;
+
+alt_operator:
+  = | != | LIKE | NOT LIKE | < | <= | > | >=
+;
+
+alt_drop_foreign_key:
+  DROP FOREIGN KEY alt_if_exists _letter
+;
+
+alt_column_or_list:
+  alt_col_name | alt_col_name | alt_col_name | alt_column_list
+;
+
+alt_optional_on_delete:
+  | | ON DELETE alt_reference_option
+;
+
+alt_optional_on_update:
+  | | ON UPDATE alt_reference_option
+;
+
+alt_reference_option:
+  RESTRICT | CASCADE | SET NULL | NO ACTION | SET DEFAULT
+;
+
+alt_constraint_optional:
+  | CONSTRAINT alt_index_name_optional
+;
+
+alt_index_name_optional:
+  | _letter
+;
+
+alt_index_or_key:
+  KEY | INDEX
+;
+
+alt_optional_index_or_key:
+  | alt_index_or_key
+;
   
 alt_key_column:
     alt_bit_col_name
