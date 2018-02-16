@@ -314,6 +314,7 @@ sub run {
 		foreach (keys %finished) {
 			delete $worker_threads{$_};
 		}
+    last unless scalar (keys %worker_threads);
 		say("HERE: remaining workers: ".scalar(keys %worker_threads));
 		%finished= ();
         sleep 5;
