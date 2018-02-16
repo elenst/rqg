@@ -534,6 +534,7 @@ sub startServer {
 
         say("Starting MySQL ".$self->version.": $command");
 
+		say("HERE: in MySQLd: using fork");
         $self->[MYSQLD_AUXPID] = fork();
         if ($self->[MYSQLD_AUXPID]) {
             

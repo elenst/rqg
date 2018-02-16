@@ -54,6 +54,7 @@ sub start {
 	$processes{$thr->tid()} = $self->[PROCESS_OBJECT];
 	say "".(ref $self->[PROCESS_OBJECT])."(".$thr->tid().") started\n";
     } else {
+	say("HERE: in Process: using fork");
 	my $pid = fork();
 	if ($pid == 0 ) {
 	    ## Forked process

@@ -106,6 +106,7 @@ sub new {
 
 sub say {
 	my $text = shift;
+	require threads;
 
 	# Suppress warnings "Wide character in print". 
 	# We already know that our UTFs in some grammars are ugly.
@@ -115,16 +116,16 @@ sub say {
     if ($text =~ m{[\r\n]}sio) {
         foreach my $line (split (m{[\r\n]}, $text)) {
             if (defined $logger) {
-                $logger->info("[$$] ".$line);
+                $logger->info("[$$][".threads->tid."] ".$line);
             } else {
-                print "# ".isoTimestamp()." [$$] $line\n";
+                print "# ".isoTimestamp()." [$$][".threads->tid."] $line\n";
             }
         }
     } else {
         if (defined $logger) {
-            $logger->info("[$$] ".$text);
+            $logger->info("[$$][".threads->tid."] ".$text);
         } else {
-            print "# ".isoTimestamp()." [$$] $text\n";
+            print "# ".isoTimestamp()." [$$][".threads->tid."] $text\n";
         }
     }
 }

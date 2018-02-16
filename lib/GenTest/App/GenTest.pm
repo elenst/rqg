@@ -76,6 +76,11 @@ use constant GT_TEST_END => 10;
 use constant GT_QUERY_FILTERS => 11;
 use constant GT_LOG_FILES_TO_REPORT => 12;
 
+use threads;
+use threads::shared;
+
+my ($killed) :shared;
+
 sub new {
     my $class = shift;
     
@@ -254,19 +259,20 @@ sub run {
         $errorfilter_p->start($self->config->property('upgrade-test') ? [$self->config->servers->[0]] : $self->config->servers);
     }
 
-    my $reporter_pid = $self->reportingProcess();
-    
     ### Start worker children ###
 
-    my %worker_pids;
+    my %worker_threads;
 
     if ($self->config->threads > 0) {
         foreach my $worker_id (1..$self->config->threads) {
-            my $worker_pid = $self->workerProcess($worker_id);
-            $worker_pids{$worker_pid} = 1;
+            my $worker_thread = $self->workerProcess($worker_id);
+            $worker_threads{$worker_id} = $worker_thread;
             Time::HiRes::sleep(0.1); # fork slowly for more predictability
         }
     }
+
+#	    my $reporter_thread = $self->workerProcess();
+    
 
     ### Main process
         
@@ -278,64 +284,52 @@ sub run {
 
     # We are the parent process, wait for for all spawned processes to terminate
     my $total_status = STATUS_OK;
-    my $reporter_died = 0;
         
     ## Parent thread does not use channel
     $self->channel()->close;
 
-    # Worker & Reporter processes that were spawned.
-    my @spawned_pids = (keys %worker_pids, $reporter_pid);
-    
+	$killed= 1;
+	sleep(2);
     OUTER: while (1) {
         # Wait for processes to complete, i.e only processes spawned by workers & reporters. 
-        foreach my $spawned_pid (@spawned_pids) {
-            my $child_pid = waitpid($spawned_pid, WNOHANG);
-            next if $child_pid == 0;
-            my $child_exit_status = $? > 0 ? ($? >> 8) : 0;
-
+		my %finished= ();
+        foreach my $worker (sort keys %worker_threads) 
+		{
+			say("HERE: getting worker $worker");
+			my $thread= $worker_threads{$worker};
+			say("HERE: thread is running: ".$thread->is_running());
+			say("HERE: thread is joinable: ".$thread->is_joinable());
+			say("HERE: thread is detached: ".$thread->is_detached());
+			say("HERE: waiting for the thread ".$thread." to join");
+            my $child_exit_status= $thread->join();
+			say("HERE: calculating the status");
             $total_status = $child_exit_status if $child_exit_status > $total_status;
-            say("Process with pid $child_pid ended with status ".status2text($child_exit_status));
+            say("Worker thread " . $thread->tid . " ended with status ".status2text($child_exit_status));
             
-            if ($child_pid == $reporter_pid) {
-                $reporter_died = 1;
-                last OUTER;
-            } else {
-                delete $worker_pids{$child_pid};
-            }
+            $finished{$worker}= 1;
             
             last OUTER if $child_exit_status >= STATUS_CRITICAL_FAILURE;
-            last OUTER if keys %worker_pids == 0;
-            last OUTER if $child_pid == -1;
+            last OUTER if keys %worker_threads == 0;
         }
+		foreach (keys %finished) {
+			delete $worker_threads{$_};
+		}
+		say("HERE: remaining workers: ".scalar(keys %worker_threads));
+		%finished= ();
         sleep 5;
     }
 
-    foreach my $worker_pid (keys %worker_pids) {
-        say("Killing remaining worker process with pid $worker_pid...");
-        kill(15, $worker_pid);
+    foreach my $worker_thread (values %worker_threads) {
+        say("Killing remaining worker thread " . $worker_thread->tid . "...");
+        $worker_thread->join();
     }
+
+#	say("HERE: killing reporter");
+#	my $reporter_status= $reporter_thread->join();
+#	$reporter_status= STATUS_UNKNOWN_ERROR unless defined $reporter_status;
+#	say("Reporter status " . status2text($reporter_status));
         
-    if ($reporter_died == 0) {
-        # Wait for periodic process to return the status of its last execution
-        Time::HiRes::sleep(1);
-        say("Killing periodic reporting process with pid $reporter_pid...");
-        kill(15, $reporter_pid);
-            
-        if (osWindows()) {
-            # We use sleep() + non-blocking waitpid() due to a bug in ActiveState Perl
-            Time::HiRes::sleep(1);
-            waitpid($reporter_pid, &POSIX::WNOHANG() );
-        } else {
-            waitpid($reporter_pid, 0);
-        }
-            
-        if ($? > -1 ) {
-            my $reporter_status = $? > 0 ? $? >> 8 : 0;
-            say("For pid $reporter_pid reporter status " . status2text($reporter_status));
-            $total_status = $reporter_status if $reporter_status > $total_status;
-        }
-    }
-        
+	say("HERE: killing error filter");
     $errorfilter_p->kill();
 
     return $self->reportResults($total_status);
@@ -396,47 +390,55 @@ sub stopChild {
     }
 }
 
+sub reporter_thread {
+	my $self= shift;
+#    my $reporter_killed = 0;
+    my $reporter_status= STATUS_OK;
+#    local $SIG{STOP} = sub { say("HERE: received SIGSTOP"); $reporter_killed = 1 };
+#    local $SIG{TERM} = sub { say("HERE: received SIGTERM"); $reporter_killed = 1 };
+#	local $SIG{KILL} = sub { say("HERE: received SIGKILL"); threads->exit() };
+
+	say("HERE: in reporter_thread");
+
+#    $self->channel()->close();
+
+    while (1) {
+#        $reporter_status = $self->reporterManager()->monitor(REPORTER_TYPE_PERIODIC);
+		say("HERE: in reporter_thread: status = $reporter_status, killed = $killed");
+        last if $reporter_status > STATUS_CRITICAL_FAILURE or $killed == 1;
+        Time::HiRes::sleep(0.1);
+    }
+
+    undef $self->[GT_QUERY_FILTERS];
+
+	say("HERE: returning $reporter_status");
+	return $reporter_status;
+}
+
 sub reportingProcess {
     my $self = shift;
-
-    my $reporter_pid = fork();
-
-    if ($reporter_pid != 0) {
-        return $reporter_pid;
-    }
-
-    my $reporter_killed = 0;
-    local $SIG{TERM} = sub { $reporter_killed = 1 };
-
-    ## Reporter process does not use channel
-    $self->channel()->close();
-
-    Time::HiRes::sleep(($self->config->threads + 1) / 10);
-    say("Started periodic reporting process...");
-
-    my $reporter_status= STATUS_OK;
-    while (1) {
-        $reporter_status = $self->reporterManager()->monitor(REPORTER_TYPE_PERIODIC);
-        last if $reporter_status > STATUS_CRITICAL_FAILURE or $reporter_killed == 1;
-        sleep(10);
-    }
-
-    $self->stopChild($reporter_status);
+#	require threads;
+    return threads->create( \&reporter_thread, $self );
 }
 
 sub workerProcess {
     my ($self, $worker_id) = @_;
-
-    my $worker_pid = fork();
+#	require threads;
+	
     $self->channel()->writer;
+    return threads->create( \&worker_thread, $self, $worker_id );
+}
 
-    if ($worker_pid != 0) {
-        return $worker_pid;
-    }
+sub worker_thread {
+	my ($self, $worker_id)= @_;
+#    my $worker_killed= 0;
+
+#    local $SIG{STOP} = sub { say("HERE: received SIGSTOP"); $worker_killed= 1 };
+#    local $SIG{INT} = sub { $worker_killed= 1 };
+#    local $SIG{TERM} = sub { say("HERE: received SIGTERM"); $worker_killed= 1 };
+#	local $SIG{KILL} = sub { say("HERE: received SIGKILL"); threads->exit() };
 
     $| = 1;
-    my $ctrl_c = 0;
-    local $SIG{INT} = sub { $ctrl_c = 1 };
 
     $self->generator()->setSeed($self->config->seed() + $worker_id);
     $self->generator()->setThreadId($worker_id);
@@ -463,7 +465,7 @@ sub workerProcess {
 
     if (not defined $mixer) {
         sayError("GenTest failed to create a Mixer, status will be set to ENVIRONMENT_FAILURE");
-        $self->stopChild(STATUS_ENVIRONMENT_FAILURE);
+        return STATUS_ENVIRONMENT_FAILURE;
     }
         
     my $worker_result = 0;
@@ -475,11 +477,13 @@ sub workerProcess {
         if ($query_result > STATUS_CRITICAL_FAILURE) {
 				say("GenTest: Server crash or critical failure (". status2text($query_result) . ") reported, the child will be stopped");
             undef $mixer;	# so that destructors are called
-            $self->stopChild($query_result);
+            return $query_result;
         }
 
+		say("HERE: in worker_thread: result = $query_result, killed = $killed");
+
         last if $query_result == STATUS_EOF;
-        last if $ctrl_c == 1;
+        last if $killed == 1;
         last if time() > $self->[GT_TEST_END];
     }
         
@@ -494,10 +498,10 @@ sub workerProcess {
         
     if ($worker_result > 0) {
         say("GenTest: Child worker process completed with error code $worker_result.");
-        $self->stopChild($worker_result);
+        return $worker_result;
     } else {
         say("GenTest: Child worker process completed successfully.");
-        $self->stopChild(STATUS_OK);
+        return STATUS_OK;
     }
 }
 
