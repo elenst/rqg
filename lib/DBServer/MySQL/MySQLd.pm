@@ -413,11 +413,11 @@ sub createMysqlBase  {
 
         push(@$boot_options,"--bootstrap") ;
         $command = $self->generateCommand($boot_options);
-        if (osWindows()) {
+#        if (osWindows()) {
             $command = "$command < \"$boot\"";
-        } else {
-            $command = "cat \"$boot\" | $command";
-        }
+#        } else {
+#            $command = "cat \"$boot\" | $command";
+#        }
     } else {
         push @$boot_options, "--initialize-insecure", "--init-file=$boot";
         $command = $self->generateCommand($boot_options);
@@ -481,7 +481,7 @@ sub startServer {
     # (before the server is considered hanging)
     my $startup_timeout= 600;
     
-    if (osWindows) {
+    if (!osWindows) {
         my $proc;
         my $exe = $self->binary;
         my $vardir = $self->[MYSQLD_VARDIR];
@@ -536,13 +536,6 @@ sub startServer {
 
         $self->[MYSQLD_AUXPID] = fork();
         if ($self->[MYSQLD_AUXPID]) {
-            
-            sub get_pid_from_file {
-                my $fname= shift;
-                my $p = `cat \"$fname\"`;
-                $p =~ s/.*?([0-9]+).*/$1/;
-                return $p;
-            }
             
             ## Wait for the pid file to have been created
             my $wait_time = 0.2;
@@ -641,7 +634,7 @@ sub startServer {
 
             # We should only get here if the pid file was created
             my $pidfile = $self->pidfile;
-            my $pid_from_file = `cat \"$pidfile\"`;
+            my $pid_from_file= get_pid_from_file($self->pidfile);
 
             $pid_from_file =~ s/.*?([0-9]+).*/$1/;
             if ($pid and $pid != $pid_from_file) {
@@ -667,7 +660,7 @@ sub kill {
         my $pidfile= $self->pidfile;
 
         if (not defined $self->serverpid and -f $pidfile) {
-            $self->[MYSQLD_SERVERPID] = `cat \"$pidfile\"`;
+            $self->[MYSQLD_SERVERPID]= get_pid_from_file($self->pidfile);
         }
 
         if (defined $self->serverpid and $self->serverpid =~ /^\d+$/) {
@@ -1322,4 +1315,15 @@ sub _notOlderThan {
     return not _olderThan(@_);
 }
 
+sub get_pid_from_file {
+	my $fname= shift;
+	my $separ= $/;
+	$/= undef;
+	open(PID,$fname) || croak("Could not open pid file $fname for reading");
+	my $p = <PID>;
+	close(PID);
+	$p =~ s/.*?([0-9]+).*/$1/;
+	$/= $separ;
+	return $p;
+}
 

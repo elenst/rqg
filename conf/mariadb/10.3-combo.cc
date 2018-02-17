@@ -6,12 +6,13 @@ $combinations = [
     --duration=350
     --threads=6
     --seed=time
-    --reporters=Backtrace,ErrorLog,Deadlock
+    --reporters=Backtrace
     --validators=TransformerNoComparator
     --transformers=ExecuteAsCTE,ExecuteAsDeleteReturning,ExecuteAsExcept,ExecuteAsExecuteImmediate,ExecuteAsInsertSelect,ExecuteAsIntersect,ExecuteAsUnion,ExecuteAsUpdateDelete,ExecuteAsView,ExecuteAsPreparedTwice,ExecuteAsSPTwice
     --redefine=conf/mariadb/general-workarounds.yy
     --mysqld=--log_output=FILE
     --views
+	--vcols
     --redefine=conf/mariadb/alter_table.yy
     --redefine=conf/mariadb/bulk_insert.yy
     --redefine=conf/mariadb/xa.yy
