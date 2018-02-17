@@ -690,7 +690,7 @@ sub term {
     my $res;
     if (osWindows()) {
         ### Not for windows
-        say("Don't know how to do SIGTERM on Windows");
+        say("Don't know how to do SIGTERM on Windows, killing instead");
         $self->kill;
         $res= DBSTATUS_OK;
     } else {
@@ -1099,11 +1099,12 @@ sub serverVariable {
 
 sub running {
     my($self) = @_;
-    if (osWindows()) {
-        ## Need better solution fir windows. This is actually the old
-        ## non-working solution for unix....
-        return -f $self->pidfile;
-    } elsif ($self->serverpid and $self->serverpid =~ /^\d+$/) {
+#    if (osWindows()) {
+#        ## Need better solution fir windows. This is actually the old
+#        ## non-working solution for unix....
+#        return -f $self->pidfile;
+#    } elsif ($self->serverpid and $self->serverpid =~ /^\d+$/) {
+    if ($self->serverpid and $self->serverpid =~ /^\d+$/) {
         ## Check if the child process is active.
         return kill(0,$self->serverpid);
     } elsif (-f $self->pidfile) {
