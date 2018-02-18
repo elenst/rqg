@@ -639,7 +639,7 @@ sub kill {
                 $waits++;
             }
             if ($waits >= 100) {
-                croak("Unable to kill process ".$self->serverpid);
+                sayError("Unable to kill process ".$self->serverpid);
             } else {
                 say("Killed process ".$self->serverpid);
             }
