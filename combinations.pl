@@ -361,10 +361,10 @@ sub doCombination {
             my $to = $workdir.'/vardir'.$s.'_'.$trial_id;
             say("[$thread_id] Copying $from to $to") if $logToStd;
             if (osWindows() and -e $from) {
-                system("$ENV{RQG_HOME}\util\unlock_handles.bat \"$from\"");
+                system("$ENV{RQG_HOME}\\util\\unlock_handles.bat \"$from\"");
                 system("move \"$from\" \"$to\"");
                 if (-e $from.'_slave') {
-                  system("$ENV{RQG_HOME}\util\unlock_handles.bat \"$from"."_slave\"");
+                  system("$ENV{RQG_HOME}\\util\\unlock_handles.bat \"$from"."_slave\"");
                   system("move \"$from"."_slave\" \"$to\"");
                 }
                 open(OUT, ">$to/command");
