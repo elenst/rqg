@@ -1,4 +1,4 @@
-@echo on 
+@echo off
 REM unlocks all open handles in subdirectory using Sysinternals' handle.exe tool
 REM Necessary on Windows,  if buildbot runs git + parallel builds. 
 REM Often git would fail, because an open file from one of the old builds is still left
