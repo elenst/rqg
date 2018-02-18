@@ -619,12 +619,12 @@ sub startServer {
 sub kill {
     my ($self) = @_;
 
-    if (osWindows()) {
-        if (defined $self->[MYSQLD_WINDOWS_PROCESS]) {
-            $self->[MYSQLD_WINDOWS_PROCESS]->Kill(0);
-            say("Killed process ".$self->[MYSQLD_WINDOWS_PROCESS]->GetProcessID());
-        }
-    } else {
+#    if (osWindows()) {
+#        if (defined $self->[MYSQLD_WINDOWS_PROCESS]) {
+#            $self->[MYSQLD_WINDOWS_PROCESS]->Kill(0);
+#            say("Killed process ".$self->[MYSQLD_WINDOWS_PROCESS]->GetProcessID());
+#        }
+#    } else {
         my $pidfile= $self->pidfile;
 
         if (not defined $self->serverpid and -f $pidfile) {
@@ -644,7 +644,7 @@ sub kill {
                 say("Killed process ".$self->serverpid);
             }
         }
-    }
+#    }
 
     # clean up when the server is not alive.
     unlink $self->socketfile if -e $self->socketfile;
@@ -656,12 +656,12 @@ sub term {
     my ($self) = @_;
 
     my $res;
-    if (osWindows()) {
-        ### Not for windows
-        say("Don't know how to do SIGTERM on Windows, killing instead");
-        $self->kill;
-        $res= DBSTATUS_OK;
-    } else {
+#    if (osWindows()) {
+#        ### Not for windows
+#        say("Don't know how to do SIGTERM on Windows, killing instead");
+#        $self->kill;
+#        $res= DBSTATUS_OK;
+#    } else {
         if (defined $self->serverpid) {
             kill TERM => $self->serverpid;
             my $waits = 0;
@@ -678,7 +678,7 @@ sub term {
                 $res= DBSTATUS_OK;
             }
         }
-    }
+#    }
     if (-e $self->socketfile) {
         unlink $self->socketfile;
     }
@@ -688,15 +688,15 @@ sub term {
 sub crash {
     my ($self) = @_;
     
-    if (osWindows()) {
-        ## How do i do this?????
-        $self->kill; ## Temporary
-    } else {
+#    if (osWindows()) {
+#        ## How do i do this?????
+#        $self->kill; ## Temporary
+#    } else {
         if (defined $self->serverpid) {
             kill SEGV => $self->serverpid;
             say("Crashed process ".$self->serverpid);
         }
-    }
+#    }
 
     # clean up when the server is not alive.
     unlink $self->socketfile if -e $self->socketfile;
