@@ -560,7 +560,7 @@ sub startServer {
             for (;;) {
                 do {
                     $_= readline $errlog_fh;
-                    if (/\[Note\]\s+\S+?\/mysqld\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
+                    if (/\[Note\]\s+\S+?[\/\\]mysqld(?:\.exe)\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
                         $pid= $1;
                         last TAIL;
                     }
@@ -609,6 +609,7 @@ sub startServer {
             say("WARNING: pid extracted from the error log ($pid) is different from the pid in the pidfile ($pid_from_file). Assuming the latter is correct");
         }
         $self->[MYSQLD_SERVERPID] = int($pid_from_file);
+        say("Server started with PID ".$self->[MYSQLD_SERVERPID]);
     } else {
         exec("$command >> \"$errorlog\"  2>&1") || croak("Could not start mysql server");
     }
