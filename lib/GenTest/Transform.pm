@@ -81,6 +81,9 @@ my %mysql_grouping_errors = (
     1304 => 'ER_SP_ALREADY_EXISTS',
     1317 => 'ER_QUERY_INTERRUPTED',
     1359 => 'ER_TRG_ALREADY_EXISTS',
+    # Sometimes the original query doesn't violate XA state (e.g. "SELECT 1" for IDLE),
+    # but the transformed one does
+    1399 => 'ER_XAER_RMFAIL',
     1415 => 'ER_SP_NO_RETSET',
     1560 => 'ER_STORED_FUNCTION_PREVENTS_SWITCH_BINLOG_FORMAT',
     1615 => 'ER_NEED_REPREPARE',
