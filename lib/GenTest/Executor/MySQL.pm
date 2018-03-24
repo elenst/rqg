@@ -351,6 +351,7 @@ use constant  ER_JSON_DOCUMENT_NULL_KEY                         => 3158;
 
 use constant  ER_EXPRESSION_REFERS_TO_UNINIT_FIELD              => 4026;
 use constant  ER_REFERENCED_TRG_DOES_NOT_EXIST                  => 4031;
+use constant  ER_ISOLATION_MODE_NOT_SUPPORTED                   => 4057;
 use constant  ER_MYROCKS_CANT_NOPAD_COLLATION                   => 4077;
 
 #--- end of 10.2 errors ---
@@ -473,6 +474,7 @@ my %err2type = (
     ER_INVALID_JSON_TEXT_IN_PARAM()                     => STATUS_SEMANTIC_ERROR,
     ER_INVALID_JSON_VALUE_FOR_CAST()                    => STATUS_SEMANTIC_ERROR,
     ER_INVALID_TYPE_FOR_JSON()                          => STATUS_SEMANTIC_ERROR,
+    ER_ISOLATION_MODE_NOT_SUPPORTED()                   => STATUS_SEMANTIC_ERROR,
     ER_JSON_BAD_ONE_OR_ALL_ARG()                        => STATUS_SEMANTIC_ERROR,
     ER_JSON_DOCUMENT_NULL_KEY()                         => STATUS_SEMANTIC_ERROR,
     ER_JSON_DOCUMENT_TOO_DEEP()                         => STATUS_SEMANTIC_ERROR,
