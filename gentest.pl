@@ -161,6 +161,7 @@ my $config = GenTest::Properties->new(
               'multi-master',
               'annotate-rules',
               'upgrade-test',
+              'ps-protocol',
               'restart-timeout'],
     help => \&help);
 
