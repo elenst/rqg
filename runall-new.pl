@@ -2,7 +2,7 @@
 
 # Copyright (c) 2010, 2012, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab
-# Copyright (C) 2016 MariaDB Corporatin Ab
+# Copyright (C) 2016, 2018 MariaDB Corporation Ab
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -75,7 +75,7 @@ my $user = 'rqg';
 my @dsns;
 
 my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
-    @engine, $help, $debug, @validators, @reporters, @transformers, 
+    @engine, $help, $debug, @validators, @reporters, @transformers,
     $grammar_file, $skip_recursive_rules,
     @redefine_files, $seed, $mask, $mask_level, $mem, $rows,
     $varchar_len, $xml_output, $valgrind, @valgrind_options, @vcols, @views,
@@ -85,7 +85,7 @@ my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
     $short_column_names, $strict_fields, $freeze_time, $wait_debugger, @debug_server,
     $skip_gendata, $skip_shutdown, $galera, $use_gtid, $genconfig, $annotate_rules,
     $restart_timeout, $gendata_advanced, $scenario, $upgrade_test, $store_binaries,
-    $ps_protocol);
+    $ps_protocol,@gendata_sql_files);
 
 my $gendata=''; ## default simple gendata
 my $genconfig=''; # if template is not set, the server will be run with --no-defaults
@@ -133,6 +133,7 @@ my $opt_result = GetOptions(
     'reporters=s@' => \@reporters,
     'transformers=s@' => \@transformers,
     'gendata:s' => \$gendata,
+    'gendata_sql:s' => \@gendata_sql_files,
     'gendata_advanced' => \$gendata_advanced,
     'gendata-advanced' => \$gendata_advanced,
     'skip-gendata' => \$skip_gendata,
@@ -223,12 +224,12 @@ if (!$opt_result) {
 }
 
 if (defined $sqltrace) {
-    # --sqltrace may have a string value (optional). 
+    # --sqltrace may have a string value (optional).
     # Allowed values for --sqltrace:
     my %sqltrace_legal_values = (
         'MarkErrors'    => 1  # Prefixes invalid SQL statements for easier post-processing
     );
-    
+
     if (length($sqltrace) > 0) {
         # A value is given, check if it is legal.
         if (not exists $sqltrace_legal_values{$sqltrace}) {
@@ -273,7 +274,7 @@ say("master_port : $ports[0] slave_port : $ports[1] ports : @ports MTR_BUILD_THR
 
 # Different servers can be defined either by providing separate basedirs (basedir1, basedir2[, basedir3]),
 # or by providing separate vardirs (vardir1, vardir2[, vardir3]).
-# Now it's time to clean it all up and define for sure how many servers we need to run, and with options 
+# Now it's time to clean it all up and define for sure how many servers we need to run, and with options
 
 if ($basedirs[1] eq '' and $basedirs[0] ne '') {
     # We need at least one server anyway
@@ -325,7 +326,7 @@ $vardirs[0] ||= $vardirs[1];
 push @{$mysqld_options[0]}, "--sql-mode=no_engine_substitution" if join(' ', @ARGV_saved) !~ m{sql-mode}io;
 
 foreach my $i (1..3) {
-    @{$mysqld_options[$i]} = ( defined $mysqld_options[$i] 
+    @{$mysqld_options[$i]} = ( defined $mysqld_options[$i]
             ? ( @{$mysqld_options[0]}, @{$mysqld_options[$i]} )
             : @{$mysqld_options[0]}
     );
@@ -433,7 +434,7 @@ if ($rpl_mode ne '') {
         }
         croak("Could not start replicating server pair");
     }
-    
+
     $dsns[0] = $rplsrv->master->dsn($database,$user);
     $dsns[1] = undef; ## passed to gentest. No dsn for slave!
     $server[0] = $rplsrv->master;
@@ -461,9 +462,9 @@ if ($rpl_mode ne '') {
         start_dirty => $start_dirty,
         node_count => length($galera)
     );
-    
+
     my $status = $rplsrv->startServer();
-    
+
     if ($status > DBSTATUS_OK) {
         stopServers($status);
 
@@ -488,7 +489,7 @@ if ($rpl_mode ne '') {
     $upgrade_test= 'normal' if $upgrade_test !~ /(?:crash|undo|recovery)/i;
 
     $upgrade_test= lc($upgrade_test);
-    
+
     # recovery is an alias for 'crash' test when the basedir before and after is the same
     # undo-recovery is an alias for 'undo' test when the basedir before and after is the same
     if ($upgrade_test =~ /recovery/) {
@@ -550,9 +551,22 @@ if ($rpl_mode ne '') {
 
 } else {
 
+    # "Simple" test with either
+    # - one server
+    # - two or three servers and checks maybe (some variants might be not yet supported) like
+    #   a) same or different (origin like MariaDB, MySQL, versions like 10.1, 10.2) servers
+    #      - show the same reaction (pass/fail) when running the same SQL statement
+    #      - show logical the same result sets when running the same SELECTs
+    #      - have finally the same content in user defined tables and similar
+    #      Basically some RQG builtin statement based replication is used.
+    #   b) same server binaries
+    #      Show logical the same result sets when running some SELECT on the first server
+    #      and transformed SELECTs on some other server
+    #
+
     foreach my $server_id (0..2) {
         next unless $basedirs[$server_id+1];
-        
+
         $server[$server_id] = DBServer::MySQL::MySQLd->new(basedir => $basedirs[$server_id+1],
                                                            vardir => $vardirs[$server_id+1],
                                                            debug_server => $debug_server[$server_id],
@@ -564,9 +578,16 @@ if ($rpl_mode ne '') {
                                                            general_log => 1,
                                                            config => $cnf_array_ref,
                                                            user => $user);
-        
+
+        if (not defined $server[$server_id]) {
+           say("ERROR: Preparing the server[$server_id] for the start failed.");
+           say("ERROR: Will call   exit_test(STATUS_ENVIRONMENT_FAILURE)  ");
+           # sayError("Preparing the server[$server_id] for the start failed.");
+           exit_test(STATUS_ENVIRONMENT_FAILURE);
+        }
+
         my $status = $server[$server_id]->startServer;
-        
+
         if ($status > DBSTATUS_OK) {
             stopServers($status);
             if (osWindows()) {
@@ -577,11 +598,11 @@ if ($rpl_mode ne '') {
             sayError("Could not start all servers");
             exit_test(STATUS_CRITICAL_FAILURE);
         }
-        
+
         if ( ($server_id == 0) || ($rpl_mode eq '') ) {
             $dsns[$server_id] = $server[$server_id]->dsn($database,$user);
         }
-    
+
         if ((defined $dsns[$server_id]) && (defined $engine[$server_id])) {
             my $dbh = DBI->connect($dsns[$server_id], undef, undef, { mysql_multi_statements => 1, RaiseError => 1 } );
             $dbh->do("SET GLOBAL default_storage_engine = '$engine[$server_id]'");
@@ -591,7 +612,7 @@ if ($rpl_mode ne '') {
 
 
 #
-# Wait for user interaction before continuing, allowing the user to attach 
+# Wait for user interaction before continuing, allowing the user to attach
 # a debugger to the server process(es).
 # Will print a message and ask the user to press a key to continue.
 # User is responsible for actually attaching the debugger if so desired.
@@ -620,6 +641,7 @@ my $gentestProps = GenTest::Properties->new(
               'engine',
               'gendata',
               'gendata-advanced',
+              'gendata_sql',
               'generator',
               'redefine',
               'threads',
@@ -686,11 +708,16 @@ if ($#redefine_files == 0 and $redefine_files[0] =~ m/,/) {
     @redefine_files = split(/,/,$redefine_files[0]);
 }
 
+if ($#gendata_sql_files == 0 and $gendata_sql_files[0] =~ m/,/) {
+    @gendata_sql_files = split(/,/,$gendata_sql_files[0]);
+}
+
 $gentestProps->property('generator','FromGrammar') if not defined $gentestProps->property('generator');
 
 $gentestProps->property('start-dirty',1) if defined $start_dirty;
 $gentestProps->gendata($gendata) unless defined $skip_gendata;
 $gentestProps->property('gendata-advanced',1) if defined $gendata_advanced;
+$gentestProps->gendata_sql(\@gendata_sql_files) if @gendata_sql_files;
 $gentestProps->engine(\@engine) if @engine;
 $gentestProps->rpl_mode($rpl_mode) if defined $rpl_mode;
 $gentestProps->validators(\@validators) if @validators;
@@ -750,7 +777,7 @@ my $gentest_result = $gentest->run();
 say("GenTest exited with exit status ".status2text($gentest_result)." ($gentest_result)");
 
 # If Gentest produced any failure then exit with its failure code,
-# otherwise if the test is replication/with two servers compare the 
+# otherwise if the test is replication/with two servers compare the
 # server dumps for any differences else if there are no failures exit with success.
 
 if (($gentest_result == STATUS_OK) && !$upgrade_test && ( ($rpl_mode && $rpl_mode !~ /nosync/) || (defined $basedirs[2]) || (defined $basedirs[3]) || $galera))
@@ -765,18 +792,18 @@ if (($gentest_result == STATUS_OK) && !$upgrade_test && ( ($rpl_mode && $rpl_mod
             exit_test(STATUS_INTERNAL_ERROR);
         }
     }
-  
+
     my @dump_files;
-  
+
     foreach my $i (0..$#server) {
         $dump_files[$i] = tmpdir()."server_".abs($$)."_".$i.".dump";
-      
+
         my $dump_result = $server[$i]->dumpdb($database,$dump_files[$i]);
         exit_test($dump_result >> 8) if $dump_result > 0;
     }
-  
+
     say("Comparing SQL dumps...");
-    
+
     foreach my $i (1..$#server) {
         my $diff = system("diff -u $dump_files[$i-1] $dump_files[$i]");
         if ($diff == STATUS_OK) {
@@ -793,7 +820,7 @@ if (($gentest_result == STATUS_OK) && !$upgrade_test && ( ($rpl_mode && $rpl_mod
     exit_test($diff_result);
 } else {
     # If test was not sucessfull or not rpl/multiple servers.
-    
+
     if ($gentest_result != STATUS_OK and $store_binaries) {
       foreach my $i ($#server) {
         my $file= $server[$i]->binary;
@@ -834,12 +861,12 @@ sub stopServers {
 
 
 sub help {
-    
+
     print <<EOF
 Copyright (c) 2010,2011 Oracle and/or its affiliates. All rights reserved. Use is subject to license terms.
 
 $0 - Run a complete random query generation test, including server start with replication and master/slave verification
-    
+
     Options related to one standalone MySQL server:
 
     --basedir   : Specifies the base directory of the stand-alone MySQL installation;
@@ -878,17 +905,19 @@ $0 - Run a complete random query generation test, including server start with re
     --validator : The validators to use
     --reporter  : The reporters to use
     --transformer: The transformers to use (turns on --validator=transformer). Accepts comma separated list
-    --querytimeout: The timeout to use for the QueryTimeout reporter 
+    --querytimeout: The timeout to use for the QueryTimeout reporter
     --gendata   : Generate data option. Passed to gentest.pl / GenTest. Takes a data template (.zz file)
                   as an optional argument. Without an argument, indicates the use of GendataSimple (default)
     --gendata-advanced: Generate the data using GendataAdvanced instead of default GendataSimple
+    --gendata_sql : Generate data option. Passed to gentest.pl / GenTest. Takes files with SQL as argument.
+                    These files get processed after running Gendata, GendataSimple or GendataAdvanced.
     --logfile   : Generates rqg output log at the path specified.(Requires the module Log4Perl)
     --seed      : PRNG seed. Passed to gentest.pl
     --mask      : Grammar mask. Passed to gentest.pl
     --mask-level: Grammar mask level. Passed to gentest.pl
     --notnull   : Generate all fields with NOT NULL
     --rows      : No of rows. Passed to gentest.pl
-    --sqltrace  : Print all generated SQL statements. 
+    --sqltrace  : Print all generated SQL statements.
                   Optional: Specify --sqltrace=MarkErrors to mark invalid statements.
     --varchar-length: length of strings. passed to gentest.pl
     --xml-outputs: Passed to gentest.pl
@@ -903,7 +932,7 @@ $0 - Run a complete random query generation test, including server start with re
     --short_column_names: use short column names in gendata (c<number>)
     --strict_fields: Disable all AI applied to columns defined in \$fields in the gendata file. Allows for very specific column definitions
     --freeze_time: Freeze time for each query so that CURRENT_TIMESTAMP gives the same result for all transformers/validators
-    --annotate-rules: Add to the resulting query a comment with the rule name before expanding each rule. 
+    --annotate-rules: Add to the resulting query a comment with the rule name before expanding each rule.
                       Useful for debugging query generation, otherwise makes the query look ugly and barely readable.
     --wait-for-debugger: Pause and wait for keypress after server startup to allow attaching a debugger to the server process.
     --restart-timeout: If the server has gone away, do not fail immediately, but wait to see if it restarts (it might be a part of the test)
@@ -922,6 +951,6 @@ EOF
 sub exit_test {
     my $status = shift;
     stopServers($status);
-    say("[$$] $0 will exit with exit status ".status2text($status). " ($status)");
+    say("$0 will exit with exit status " . status2text($status) . "($status)");
     safe_exit($status);
 }

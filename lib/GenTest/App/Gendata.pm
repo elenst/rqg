@@ -1,5 +1,6 @@
 # Copyright (C) 2009, 2012 Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab.
+# Copyright (c) 2018, MariaDB Corporation Ab
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -179,6 +180,9 @@ sub run {
 
     my $executor = GenTest::Executor->newFromDSN($self->dsn());
     $executor->init();
+
+    # If sqltrace enabled than trace even the SQL here.
+    $executor->sqltrace($self->sqltrace);
 
 #  
 # The specification file is actually a perl script, so we read it by

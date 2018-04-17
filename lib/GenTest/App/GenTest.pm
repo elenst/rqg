@@ -2,7 +2,7 @@
 
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab.
-# Copyright (c) 2016, MariaDB Corporation
+# Copyright (c) 2016, 2018 MariaDB Corporation Ab
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -37,6 +37,7 @@ use GenTest::Constants;
 use GenTest::App::Gendata;
 use GenTest::App::GendataSimple;
 use GenTest::App::GendataAdvanced;
+use GenTest::App::GendataSQL;
 use GenTest::IPC::Channel;
 use GenTest::IPC::Process;
 use GenTest::ErrorFilter;
@@ -181,6 +182,7 @@ sub run {
     return $gendata_result if $gendata_result != STATUS_OK;
 
     $self->[GT_TEST_START] = time();
+    say("INFO: GenTest: Start of running queries : " . $self->[GT_TEST_START]);
     $self->[GT_TEST_END] = $self->[GT_TEST_START] + $self->config->duration;
 
     $self->[GT_CHANNEL] = GenTest::IPC::Channel->new();
@@ -197,7 +199,7 @@ sub run {
     # Cache metadata and other info that may be needed later
     my @log_files_to_report;
     foreach my $i (0..2) {
-        last if $self->config->property('upgrade-test') and $i>0;
+        last if $self->config->property('upgrade-test') and $i > 0;
         next unless $self->config->dsn->[$i];
         if ($self->config->property('ps-protocol') and $self->config->dsn->[$i] !~ /mysql_server_prepare/) {
           $self->config->dsn->[$i] .= ';mysql_server_prepare=1';
@@ -560,12 +562,45 @@ sub doGenData {
             
         return $gendata_result if $gendata_result > STATUS_OK;
 
-        # For multi-master setup, e.g. Galera, we only need to do generatoion once
-        return STATUS_OK if $self->config->property('multi-master');
-    }
+      # $self->config->gendata_sql might be just a string containing a file name.
+      # Transform it to an array with one element.
+      if ( $self->config->gendata_sql and not ref $self->config->gendata_sql eq 'ARRAY' ) {
+         my $gendata_sql = [ split /,/, $self->config->gendata_sql ];
+         $self->config->gendata_sql($gendata_sql);
+      }
+      foreach my $file ( @{$self->config->gendata_sql} )
+      {
+         if ( not -e $file ) {
+            # In case of missing file rather abort before
+            # - running any script processing at all (Scenario: The previous files exist.)
+            # - creating an Executor etc. (Scenario: The current file does not exist.)
+            say("ERROR: lib::GenTest::App::GenTest::doGenData : The SQL file '$file' " .
+                "does not exist.");
+            say("ERROR: Will return status STATUS_ENVIRONMENT_FAILURE");
+            return STATUS_ENVIRONMENT_FAILURE;
+         }
+      }
+      foreach my $file ( @{$self->config->gendata_sql} )
+      {
+         say("INFO: Start processing the SQL file '$file'.");
+         $gendata_result = GenTest::App::GendataSQL->new(
+               sql_file    => $file,
+               debug       => $self->config->debug,
+               dsn         => $dsn,
+               server_id   => $i, # 'server_id'   => GDS_SERVER_ID,
+               sqltrace    => $self->config->sqltrace,
+         )->run();
+      }
 
-    return STATUS_OK;
-}
+      return $gendata_result if $gendata_result > STATUS_OK;
+
+      # For multi-master setup, e.g. Galera, we only need to do generation once
+      return STATUS_OK if $self->config->property('multi-master');
+   }
+
+   return STATUS_OK;
+
+} # End of sub doGenData
 
 sub initSeed {
     my $self = shift;

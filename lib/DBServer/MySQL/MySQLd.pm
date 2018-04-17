@@ -1,5 +1,5 @@
 # Copyright (c) 2010, 2012, Oracle and/or its affiliates. All rights reserved. 
-# Copyright (c) 2013, 2017, MariaDB
+# Copyright (c) 2013, 2018, MariaDB Corporation Ab
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -66,10 +66,13 @@ use constant MYSQLD_CONFIG_FILE => 27;
 use constant MYSQLD_USER => 28;
 use constant MYSQLD_MAJOR_VERSION => 29;
 use constant MYSQLD_CLIENT_BINDIR => 30;
-use constant MYSLQD_SERVER_VARIABLES => 31;
+use constant MYSQLD_SERVER_VARIABLES => 31;
+use constant MYSQLD_SQL_RUNNER => 32;
 
 use constant MYSQLD_PID_FILE => "mysql.pid";
 use constant MYSQLD_ERRORLOG_FILE => "mysql.err";
+use constant MYSQLD_BOOTSQL_FILE => "boot.sql";
+use constant MYSQLD_BOOTLOG_FILE => "boot.log";
 use constant MYSQLD_LOG_FILE => "mysql.log";
 use constant MYSQLD_DEFAULT_PORT =>  19300;
 use constant MYSQLD_DEFAULT_DATABASE => "test";
@@ -131,7 +134,7 @@ sub new {
                 croak "--debug-server needs a mysqld debug server, the server found is $self->[MYSQLD_SERVER_TYPE]"; 
             }
         }
-    }else {
+    } else {
         # If mysqld server is found use it.
         eval {
             $self->[MYSQLD_MYSQLD] = $self->_find([$self->basedir],
@@ -178,12 +181,12 @@ sub new {
                                                              "valgrind.supp")
     };
     
-    foreach my $file ("mysql_system_tables.sql", 
+    foreach my $file ("mysql_system_tables.sql",
                       "mysql_performance_tables.sql",
-                      "mysql_system_tables_data.sql", 
+                      "mysql_system_tables_data.sql",
                       "mysql_test_data_timezone.sql",
                       "fill_help_tables.sql") {
-        my $script = 
+        my $script =
              eval { $self->_find(defined $self->sourcedir?[$self->basedir,$self->sourcedir]:[$self->basedir],
                           ["scripts","share/mysql","share"], $file) };
         push(@{$self->[MYSQLD_BOOT_SQL]},$script) if $script;
@@ -194,13 +197,13 @@ sub new {
                        ["sql/share","share/mysql","share"], "english/errmsg.sys");
 
     $self->[MYSQLD_CHARSETS] =
-        $self->_findDir(defined $self->sourcedir?[$self->basedir,$self->sourcedir]:[$self->basedir], 
+        $self->_findDir(defined $self->sourcedir?[$self->basedir,$self->sourcedir]:[$self->basedir],
                         ["sql/share/charsets","share/mysql/charsets","share/charsets"], "Index.xml");
                          
     
-    #$self->[MYSQLD_LIBMYSQL] = 
-    #   $self->_findDir([$self->basedir], 
-    #                   osWindows()?["libmysql/Debug","libmysql/RelWithDebInfo","libmysql/Release","lib","lib/debug","lib/opt","bin"]:["libmysql","libmysql/.libs","lib/mysql","lib"], 
+    #$self->[MYSQLD_LIBMYSQL] =
+    #   $self->_findDir([$self->basedir],
+    #                   osWindows()?["libmysql/Debug","libmysql/RelWithDebInfo","libmysql/Release","lib","lib/debug","lib/opt","bin"]:["libmysql","libmysql/.libs","lib/mysql","lib"],
     #                   osWindows()?"libmysql.dll":osMac()?"libmysqlclient.dylib":"libmysqlclient.so");
     
     $self->[MYSQLD_STDOPTS] = ["--basedir=".$self->basedir,
@@ -213,7 +216,8 @@ sub new {
     } else {
         say("Creating MySQL " . $self->version . " database at ".$self->datadir);
         if ($self->createMysqlBase != DBSTATUS_OK) {
-            croak("FATAL ERROR: Bootstrap failed, cannot proceed!");
+            say("ERROR: Bootstrap failed. Will return undef.");
+            return undef;
         }
     }
 
@@ -378,7 +382,7 @@ sub createMysqlBase  {
 
     ## Create boot file
 
-    my $boot = $self->vardir."/boot.sql";
+    my $boot = $self->vardir . "/" . MYSQLD_BOOTSQL_FILE;
     open BOOT,">$boot";
     print BOOT "CREATE DATABASE test;\n";
 
@@ -439,8 +443,15 @@ sub createMysqlBase  {
     close BOOT;
 
     say("Bootstrap command: $command");
-    system("$command > \"".$self->vardir."/boot.log\" 2>&1");
-    return $?;
+    my $bootlog = $self->vardir . "/" . MYSQLD_BOOTLOG_FILE;
+    system("$command > \"" . $bootlog . "\" 2>&1");
+    my $rc = $? >> 8;
+    if ($rc != DBSTATUS_OK) {
+       say("ERROR: Bootstrap failed");
+       sayFile($bootlog);
+       say("ERROR: Will return the status got for Bootstrap : $rc");
+    }
+    return $rc
 }
 
 sub _reportError {
@@ -1084,7 +1095,7 @@ sub checkErrorLogForErrors {
 
 sub serverVariables {
     my $self = shift;
-    if (not keys %{$self->[MYSLQD_SERVER_VARIABLES]}) {
+    if (not keys %{$self->[MYSQLD_SERVER_VARIABLES]}) {
         my $dbh = $self->dbh;
         return undef if not defined $dbh;
         my $sth = $dbh->prepare("SHOW VARIABLES");
@@ -1094,9 +1105,9 @@ sub serverVariables {
             $vars{$array_ref->[0]} = $array_ref->[1];
         }
         $sth->finish();
-        $self->[MYSLQD_SERVER_VARIABLES] = \%vars;
+        $self->[MYSQLD_SERVER_VARIABLES] = \%vars;
     }
-    return $self->[MYSLQD_SERVER_VARIABLES];
+    return $self->[MYSQLD_SERVER_VARIABLES];
 }
 
 sub serverVariable {
@@ -1202,7 +1213,7 @@ sub _absPath {
     my ($self, $path) = @_;
     
     if (osWindows()) {
-        return 
+        return
             $path =~ m/^[A-Z]:[\/\\]/i;
     } else {
         return $path =~ m/^\//;
@@ -1280,10 +1291,10 @@ sub _logOptions {
     my ($self) = @_;
 
     if ($self->_olderThan(5,1,29)) {
-        return ["--log=".$self->logfile]; 
+        return ["--log=".$self->logfile];
     } else {
         if ($self->[MYSQLD_GENERAL_LOG]) {
-            return ["--general-log", "--general-log-file=".$self->logfile]; 
+            return ["--general-log", "--general-log-file=".$self->logfile];
         } else {
             return ["--general-log-file=".$self->logfile];
         }
@@ -1322,4 +1333,4 @@ sub _notOlderThan {
     return not _olderThan(@_);
 }
 
-
+1;
