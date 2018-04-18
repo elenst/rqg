@@ -38,7 +38,7 @@ eval
 };
 
 my $DEFAULT_THREADS = 10;
-my $DEFAULT_QUERIES = 1000;
+my $DEFAULT_QUERIES = 10000000;
 my $DEFAULT_DURATION = 3600;
 my $DEFAULT_DSN = 'dbi:mysql:host=127.0.0.1:port=9306:user=root:database=test';
 my @debug_server;
