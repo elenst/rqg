@@ -1,0 +1,98 @@
+
+This RQG version is focussed on taking care that
+- single RQG test runs with
+  - serious concurrency (threads > 1) and
+    invoking KILL session, KILL QUERY, ....
+  - intentional crashing of the server
+  tend to a smaller fraction of false alarms and work more like wished
+- problem analysis becomes more comfortable and faster
+- parallel RQG test runs on the same box have a lower risk to clash on the same
+  ressources and use a smaller amount of ressources possible
+- grammar simplification becomes faster
+- some RQG run with "perl -w" throws far significant less warnings than today.
+
+The "start" was a fork of https://github.com/elenst/rqg 2018-04-11.
+The forking was done in order to avoid any thinkable damage to Elena's RQG
+repository which is used in production.
+Per my experiences with some other RQG version between 2012 - 2018 a lot
+improvements to RQG were required and doable.
+
+Please excuse
+- any problems of my RQG when using it with
+  - complicated usage variants of combinations.pl
+  - optimizer tests
+  - sophisticated setups with Galera, whatever replication, multi server setup etc.
+  because I do not see me able to check any modification regarding usability in
+  in these areas in the moment.
+- that some
+     git blame ....
+  shows me surprising frequent as last person who modified a line.
+  I could not resist to adjust the code to my personal standards regarding
+  readability. This this leads frequent to
+  - replacing tabs by some fixed amount of white spaces
+  - removal of trailing white spaces
+  - breaking lines longer than 100 characters
+  and similar.
+  When looking for the last person making more probable significant changes use
+     git blame -w .....
+  which ignores at least changes around white spaces.
+
+Collection of hints (under construction)
+----------------------------------------
+1. Please be aware that the name of the exit statuses of the RQG runner (runall*.pl ...) are
+   not 100% accurate regarding some bad effect met or its reason.
+   Sometimes the name is nothing more than a more or less qualified (~ pick the most likely
+   reason) guess.
+   Just one example of some thinkable scenario:
+      (1) Prepare test ground                                   --> success
+      (2) Start server                                          --> success
+      (3) Whatever which finally causes that the server is down --> success
+      (4) Start server (again)                                  --> fail
+      ==> get STATUS_ENVIRONMENT_FAILURE
+      (*) success == The expectations checked are fulfilled but some some deeper inspection
+                     might show that already some states are not intended.
+   (4) could for example fail because of
+       a) The RQG runner made some internal error before.
+          Than some STATUS_INTERNAL_ERROR would be more correct but the RQG runner
+          is unable to throw that in case he has no consistency check indicating
+          that he must have done something wrong.
+       b) Something bad on the testing box happened like another MariaDB server
+          occupies ports or required files were deleted or file system full etc.
+          Than STATUS_ENVIRONMENT_FAILURE is quite perfect except somebody assumes to get
+          this status only at begin of the test.
+       c) In (3) the server misbehaved so that his data is non recoverable damaged.
+          And that prevents to get success on server restart.
+          Than STATUS_DATABASE_CORRUPTION or similar would be better.
+   The reason why a STATUS_ENVIRONMENT_FAILURE might be thrown instead of some maybe better
+   status might be:
+   - A low level routine throws STATUS_ENVIRONMENT_FAILURE and the calling routines
+     have no additional thoughts and just pass that status through.
+   - The low level routine returns that it failed maybe including basic/low-level reason
+     like file missing/crash/....
+     Some caller routine transforms that status to what it assumes.
+   I am working on making the status name reported more accurate.
+2. The status STATUS_SERVER_CRASHED and/or its use is frequent very misleading up till plain wrong.
+   There are many different reasons why the communication between the client and some server
+   does not work like expected like timeout for response exceeded because
+   - the server has really crashed
+   - the server was crashed intentional
+   - the server has not crashed but somehow hangs/is no more responsive
+   - the server is healthy but under too high load for the timeouts given
+   - shortages in free OS ressources etc.
+   and so on.
+   IMHO routines need to have some status for describing communication trouble with unclear reason.
+   But the name for that should be rather STATUS_COMMUNICATION_TROUBLE.
+   STATUS_SERVER_CRASHED should be only used if
+   - we have a core file or
+   - the process of the server within the OS has disappeared.
+   But even than a clean distinction between
+   - real server crash because of server code failure -- ok, STATUS_SERVER_CRASHED
+   - real server crash because of intentional server kill -- ok, STATUS_SERVER_KILLED
+   - real server crash because of misbehaviour of concurrent programs on testing box
+   - real server crash because of OS kills server because of whatever reason
+   - intentional and simple shut down of the server
+   is quite complicated.
+
+
+Matthias 2018-04
+
