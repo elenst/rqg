@@ -111,7 +111,7 @@ sub new {
 
 
 sub spec_file {
-return $_[0]->[GD_SPEC];
+   return $_[0]->[GD_SPEC];
 }
 
 
@@ -171,6 +171,8 @@ sub strict_fields {
 sub run {
     my ($self) = @_;
 
+    say("INFO: Starting GenTest::App::Gendata");
+
     my $spec_file = $self->spec_file();
     
     my $prng = GenTest::Random->new(
@@ -179,10 +181,17 @@ sub run {
         );
 
     my $executor = GenTest::Executor->newFromDSN($self->dsn());
-    $executor->init();
-
+    # Set the number to which server we will connect.
+    # This number is
+    # - used for more detailed messages only
+    # - not used for to which server to connect etc. There only the dsn rules.
+    # Hint:
+    # Server id reported: n ----- dsn(n-1) !
+    $executor->setId($self->server_id);
     # If sqltrace enabled than trace even the SQL here.
     $executor->sqltrace($self->sqltrace);
+    $executor->setRole("Gendata");
+    $executor->init();
 
 #  
 # The specification file is actually a perl script, so we read it by

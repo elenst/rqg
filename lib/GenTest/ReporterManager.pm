@@ -1,4 +1,5 @@
 # Copyright (C) 2008-2009 Sun Microsystems, Inc. All rights reserved.
+# Copyright (C) 2016, 2018 MariaDB Corporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -63,6 +64,9 @@ sub report {
 			my @reporter_results = $reporter->report();
 			my $reporter_result = shift @reporter_results;
 			push @incidents, @reporter_results if $#reporter_results > -1;
+            if ($reporter_result >= STATUS_CRITICAL_FAILURE) {
+               say("ERROR: ReporterManager : Reporter '" . $reporter->name() . "' reported $reporter_result ");
+            }
 			$max_result = $reporter_result if $reporter_result > $max_result;
 		}
 	}
@@ -70,20 +74,21 @@ sub report {
 }
 
 sub addReporter {
-	my ($manager, $reporter, $params) = @_;
+   my ($manager, $reporter, $params) = @_;
 
-	if (ref($reporter) eq '') {
-		my $module = "GenTest::Reporter::".$reporter;
-		eval "use $module" or print $@;
-		$reporter = $module->new(%$params);
-		if (not defined $reporter) {
-				sayError("Reporter could not be added. Status will be set to ENVIRONMENT_FAILURE");
-				return STATUS_ENVIRONMENT_FAILURE;
-		}
-	}
+   if (ref($reporter) eq '') {
+      my $reporter_name = $reporter;
+      my $module = "GenTest::Reporter::".$reporter;
+      eval "use $module" or print $@;
+      $reporter = $module->new(%$params, 'name' => $reporter_name);
+      if (not defined $reporter) {
+         sayError("Reporter '$module' could not be added. Status will be set to ENVIRONMENT_FAILURE");
+         return STATUS_ENVIRONMENT_FAILURE;
+      }
+   }
 
-	push @{$manager->[MANAGER_REPORTERS]}, $reporter;
-	return STATUS_OK;
+   push @{$manager->[MANAGER_REPORTERS]}, $reporter;
+   return STATUS_OK;
 }
 
 sub reporters {

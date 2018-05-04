@@ -88,9 +88,11 @@ sub sqltrace {
 sub run {
    my ($self) = @_;
 
-   my $bad_status=  STATUS_ENVIRONMENT_FAILURE;
+   say("INFO: Starting GenTest::App::GendataSQL");
 
-   my $sql_file= $self->sql_file();
+   my $bad_status =  STATUS_ENVIRONMENT_FAILURE;
+
+   my $sql_file = $self->sql_file();
    if (not -e $sql_file) {
       say("ERROR: GenTest::App::GendataSQL::run : The SQL file '$sql_file' " .
           "does no more exist.");
@@ -99,10 +101,17 @@ sub run {
    }
 
    my $executor = GenTest::Executor->newFromDSN($self->dsn());
-   $executor->init();
-
-   # Trace all SQL if sqltrace enabled.
+   # Set the number to which server we will connect.
+   # This number is
+   # - used for more detailed messages only
+   # - not used for to which server to connect etc. There only the dsn rules.
+   # Hint:
+   # Server id reported: n ----- dsn(n-1) !
+   $executor->setId($self->server_id);
+   # If sqltrace enabled than trace even the SQL here.
    $executor->sqltrace($self->sqltrace);
+   $executor->setRole("GendataSQL");
+   $executor->init();
 
    sub run_sql_cmd {
       my ($sql_cmd) = @_;
@@ -112,12 +121,12 @@ sub run {
       #    the SQL statement fails. These messages would have some unfortunate format.
       # 3. In case of failing statements we need to write the corresponding information because
       #    SQL tracing might be not enabled and EXECUTOR_FLAG_SILENT is used anyway.
-      my $result= $executor->execute($sql_cmd, EXECUTOR_FLAG_SILENT);
+      my $result = $executor->execute($sql_cmd, EXECUTOR_FLAG_SILENT);
       if(STATUS_OK != $result->status) {
          # Report the SQL command and the error because the tracing might be not enabled.
-         say("ERROR: GenTest::App::GendataScript::run::run_sql_cmd : Executing ->$sql_cmd<- " .
+         say("ERROR: GenTest::App::GendataSQL run_sql_cmd : Executing ->$sql_cmd<- " .
              "failed: " .  $result->err() . " " . $result->errstr());
-         say("HINT: A SQL statement must not extend over more than one line.");
+         say("HINT: A SQL statement in '$sql_file' must not extend over more than one line.");
          say("ERROR: Will return STATUS_ENVIRONMENT_FAILURE.");
          return 1;
       } else {
@@ -126,16 +135,16 @@ sub run {
     }
 
    if($executor->type == DB_MYSQL) {
-      my $sql_cmd= "SET SQL_MODE= CONCAT(\@\@sql_mode,',NO_ENGINE_SUBSTITUTION')";
-      my $status= run_sql_cmd($sql_cmd);
+      my $sql_cmd = "SET SQL_MODE= CONCAT(\@\@sql_mode, ',NO_ENGINE_SUBSTITUTION')";
+      my $status = run_sql_cmd($sql_cmd);
       if ($status) {
          return $bad_status;
       }
    }
 
    if ($self->engine() ne '' and ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE)) {
-      my $sql_cmd= "SET DEFAULT_STORAGE_ENGINE='" . $self->engine() . "'";
-      my $status= run_sql_cmd($sql_cmd);
+      my $sql_cmd = "SET DEFAULT_STORAGE_ENGINE='" . $self->engine() . "'";
+      my $status = run_sql_cmd($sql_cmd);
       if ($status) {
          return $bad_status;
       }
@@ -154,7 +163,7 @@ sub run {
          # Do not try to execute comment lines.
          next;
       } else {
-         my $status= run_sql_cmd($line);
+         my $status = run_sql_cmd($line);
          if ($status) {
             return $bad_status;
          }

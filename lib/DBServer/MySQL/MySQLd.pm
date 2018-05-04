@@ -119,7 +119,7 @@ sub new {
     
     # Use mysqld-debug server if --debug-server option used.
     if ($self->[MYSQLD_DEBUG_SERVER]) {
-        # Catch excpetion, dont exit contine search for other mysqld if debug.
+        # Catch exception, dont exit continue search for other mysqld if debug.
         eval{
             $self->[MYSQLD_MYSQLD] = $self->_find([$self->basedir],
                                                   osWindows()?["sql/Debug","sql/RelWithDebInfo","sql/Release","bin"]:["sql","libexec","bin","sbin"],

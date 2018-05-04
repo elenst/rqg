@@ -28,11 +28,7 @@ Please excuse
      git blame ....
   shows me surprising frequent as last person who modified a line.
   I could not resist to adjust the code to my personal standards regarding
-  readability. This this leads frequent to
-  - replacing tabs by some fixed amount of white spaces
-  - removal of trailing white spaces
-  - breaking lines longer than 100 characters
-  and similar.
+  readability.
   When looking for the last person making more probable significant changes use
      git blame -w .....
   which ignores at least changes around white spaces.
@@ -92,7 +88,63 @@ Collection of hints (under construction)
    - real server crash because of OS kills server because of whatever reason
    - intentional and simple shut down of the server
    is quite complicated.
+3. My preference regarding formatting in order to improve readability:
+   - removal of trailing white spaces
+   - line length <= 100 characters
+   - no use of tabs because authors frequent
+     - mix tabs and spaces which looks than ugly in case you go with some diffent tabstop value
+     - do not agree on how many spaces a tabstop should be
+   - indentation unit of 3 white spaces
+     I am aware that a few spaces more would increase the readability.
+     But more spaces would also frequent cause that the line length limit of 100 is exceeded.
+   - Avoid dense code like: $m+1 or $part1.$part2."ABC"
+   - Comments must have one or more white spaces after '#'
+4. Other preferences
+   - Messages should be mostly complete sentences.
+   - Messages about serious failures should start with "ERROR: "
+   - Messages about important states reached should start with "INFO: "
+   - Especially in case of serious bad statuses handed from low level (1) routines to high level
+     routines (2) we could have transformations of the status. Such intentional transformations
+     need to get reported.
+     We need to understand why some lost connection, DBSTATUS_ERROR etc. finally leads to
+     that the RQG runner exits with STATUS_ENVIRONMENT_FAILURE ro similar.
+     (1) Low level routines are usually quite good in "describing" detailed what happened
+         physically. But they also usually lack the overview for judging if that is an error
+         (deviation from expectation) or not.
+     (2) High level routines call low level routines and get usually statuses returned.
+         These statuses lack often details which were known to the low level routine.
+         So we have some loss of information.
+         But high level routines have also some better overview about what is to be expected
+         than low level routines. So they can better judge if they have met an error
+         including giving some qualified guess about the most lileky reason.
+   - Try to use some more accurate wording.
+     Call a vague though qualified guess a "guess".
+     Feel free to
+     - give a list of guesses per event of interest
+     - call a guess which is with a likelihood of lets say >= 95% true "truth"
+   - A bunch of extra output lines, lets assume 100 per RQG run, which start with "INFO: "
+     and allow to conclude in which phase of the RQG test work flow we are might help a lot
+     in failure analysis.
+   - As soon as its obvious that GenTest will have to exit with a status code > 0 the amount
+     of extra information is allowed to be big.
+   - Make messages "grep friendly"
+   - Reduce the use of "croak"
+     - We might want some more specific exit status than just "2".
+     - Carp::cluck gives frequent a serious better information how we reached the routine
+       where the problem showed up.
+     - There might be cases where the immediate exit prevents to make some cleanup like
+       throw valueless files away or stop running servers or similar.
+       Whatever test runs being executed in parallel or successing might be serious harmed
+       by such a missing cleanup.
+       Typical bad effects of more or less serious extend:
+       - Server start fails because there is already some old server using that port.
+       - Short or long timespans with masses of zombie processes
+       - A client which belongs to some old long gone test fiddles in the server of our
+         current test.
+       - Reach tmpfs full far way more often
+       - Server for test Y starts somehow on data belonging to the the server of the 
+         already gone test X instead of his own data.
 
 
-Matthias 2018-04
+Matthias 2018-05
 

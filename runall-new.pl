@@ -23,9 +23,9 @@
 
 
 unless (defined $ENV{RQG_HOME}) {
-  use File::Basename qw(dirname);
-  use Cwd qw(abs_path);
-  $ENV{RQG_HOME}= abs_path(dirname($0));
+   use File::Basename qw(dirname);
+   use Cwd qw(abs_path);
+   $ENV{RQG_HOME} = abs_path(dirname($0));
 }
 
 use lib 'lib';
@@ -47,22 +47,22 @@ $| = 1;
 my $logger;
 eval
 {
-    require Log::Log4perl;
-    Log::Log4perl->import();
-    $logger = Log::Log4perl->get_logger('randgen.gentest');
+   require Log::Log4perl;
+   Log::Log4perl->import();
+   $logger = Log::Log4perl->get_logger('randgen.gentest');
 };
 
 $| = 1;
 if (osWindows()) {
-    $SIG{CHLD} = "IGNORE";
+   $SIG{CHLD} = "IGNORE";
 }
 
 if (defined $ENV{RQG_HOME}) {
-    if (osWindows()) {
-        $ENV{RQG_HOME} = $ENV{RQG_HOME}.'\\';
-    } else {
-        $ENV{RQG_HOME} = $ENV{RQG_HOME}.'/';
-    }
+   if (osWindows()) {
+      $ENV{RQG_HOME} = $ENV{RQG_HOME}.'\\';
+   } else {
+      $ENV{RQG_HOME} = $ENV{RQG_HOME}.'/';
+   }
 }
 
 use Getopt::Long;
@@ -87,8 +87,8 @@ my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
     $restart_timeout, $gendata_advanced, $scenario, $upgrade_test, $store_binaries,
     $ps_protocol,@gendata_sql_files);
 
-my $gendata=''; ## default simple gendata
-my $genconfig=''; # if template is not set, the server will be run with --no-defaults
+my $gendata   = ''; ## default simple gendata
+my $genconfig = ''; # if template is not set, the server will be run with --no-defaults
 
 my $threads = my $default_threads = 10;
 my $queries = my $default_queries = 100000000;
@@ -153,7 +153,6 @@ my $opt_result = GetOptions(
     'report-xml-tt-type=s' => \$report_xml_tt_type,
     'report-xml-tt-dest=s' => \$report_xml_tt_dest,
     'restart_timeout=i' => \$restart_timeout,
-    'restart-timeout=i' => \$restart_timeout,
     'testname=s'        => \$testname,
     'valgrind!'    => \$valgrind,
     'valgrind_options=s@'    => \@valgrind_options,
@@ -191,59 +190,59 @@ my $opt_result = GetOptions(
 );
 
 if (defined $scenario) {
-  system("perl $ENV{RQG_HOME}/run-scenario.pl @ARGV_saved");
-  exit $? >> 8;
+   system("perl $ENV{RQG_HOME}/run-scenario.pl @ARGV_saved");
+   exit $? >> 8;
 }
 
 if (defined $logfile && defined $logger) {
-    setLoggingToFile($logfile);
+   setLoggingToFile($logfile);
 } else {
-    if (defined $logconf && defined $logger) {
-        setLogConf($logconf);
-    }
+   if (defined $logconf && defined $logger) {
+      setLogConf($logconf);
+   }
 }
 
 if ($help) {
-    help();
-    exit 0;
+   help();
+   exit 0;
 }
 if ($basedirs[0] eq '' and $basedirs[1] eq '') {
-    print STDERR "\nERROR: Basedir is not defined\n\n";
-    help();
-    exit 1;
+   print STDERR "\nERROR: Basedir is not defined\n\n";
+   help();
+   exit 1;
 }
 if (not defined $grammar_file) {
-    print STDERR "\nERROR: Grammar file is not defined\n\n";
-    help();
-    exit 1;
+   print STDERR "\nERROR: Grammar file is not defined\n\n";
+   help();
+   exit 1;
 }
 if (!$opt_result) {
-    print STDERR "\nERROR: Error occured while reading options\n\n";
-    help();
-    exit 1;
+   print STDERR "\nERROR: Error occured while reading options\n\n";
+   help();
+   exit 1;
 }
 
 if (defined $sqltrace) {
-    # --sqltrace may have a string value (optional).
-    # Allowed values for --sqltrace:
-    my %sqltrace_legal_values = (
-        'MarkErrors'    => 1  # Prefixes invalid SQL statements for easier post-processing
-    );
+   # --sqltrace may have a string value (optional).
+   # Allowed values for --sqltrace:
+   my %sqltrace_legal_values = (
+      'MarkErrors'    => 1  # Prefixes invalid SQL statements for easier post-processing
+   );
 
-    if (length($sqltrace) > 0) {
-        # A value is given, check if it is legal.
-        if (not exists $sqltrace_legal_values{$sqltrace}) {
-            say("Invalid value for --sqltrace option: '$sqltrace'");
-            say("Valid values are: ".join(', ', keys(%sqltrace_legal_values)));
-            say("No value means that default/plain sqltrace will be used.");
-            exit(STATUS_ENVIRONMENT_FAILURE);
-        }
-    } else {
-        # If no value is given, GetOpt will assign the value '' (empty string).
-        # We interpret this as plain tracing (no marking of errors, prefixing etc.).
-        # Better to use 1 instead of empty string for comparisons later.
-        $sqltrace = 1;
-    }
+   if (length($sqltrace) > 0) {
+      # A value is given, check if it is legal.
+      if (not exists $sqltrace_legal_values{$sqltrace}) {
+          say("ERROR: Invalid value for --sqltrace option: '$sqltrace'");
+          say("       Valid values are: ".join(', ', keys(%sqltrace_legal_values)));
+          say("       No value means that default/plain sqltrace will be used.");
+          exit(STATUS_ENVIRONMENT_FAILURE);
+      }
+   } else {
+      # If no value is given, GetOpt will assign the value '' (empty string).
+      # We interpret this as plain tracing (no marking of errors, prefixing etc.).
+      # Better to use 1 instead of empty string for comparisons later.
+      $sqltrace = 1;
+   }
 }
 
 say("Copyright (c) 2010,2011 Oracle and/or its affiliates. All rights reserved. Use is subject to license terms.");
@@ -264,7 +263,8 @@ if (not defined $build_thread) {
 }
 
 if ( $build_thread eq 'auto' ) {
-    say ("Please set the environment variable MTR_BUILD_THREAD to a value <> 'auto' (recommended) or unset it (will take the value ".DEFAULT_MTR_BUILD_THREAD.") ");
+    say ("Please set the environment variable MTR_BUILD_THREAD to a value <> 'auto' " .
+         "(recommended) or unset it (will take the value ".DEFAULT_MTR_BUILD_THREAD.") ");
     exit (STATUS_ENVIRONMENT_FAILURE);
 }
 
@@ -304,7 +304,8 @@ foreach my $i (1..3) {
     foreach my $j ($i+1..3) {
         next unless $basedirs[$j] or $vardirs[$j];
         if ($basedirs[$i] eq $basedirs[$j] and $vardirs[$i] eq $vardirs[$j]) {
-            croak("Please specify either different --basedir[$i]/--basedir[$j] or different --vardir[$i]/--vardir[$j] in order to start two MySQL servers");
+            croak("Please specify either different --basedir[$i]/--basedir[$j] or different " .
+                  "--vardir[$i]/--vardir[$j] in order to start two MySQL servers");
         }
     }
 }
@@ -312,7 +313,7 @@ foreach my $i (1..3) {
 # Make sure that "default" values ([0]) are also set, for compatibility,
 # in case they are used somewhere
 $basedirs[0] ||= $basedirs[1];
-$vardirs[0] ||= $vardirs[1];
+$vardirs[0]  ||= $vardirs[1];
 
 # Now sort out other options that can be set differently for different servers:
 # - mysqld_options
@@ -326,14 +327,14 @@ $vardirs[0] ||= $vardirs[1];
 push @{$mysqld_options[0]}, "--sql-mode=no_engine_substitution" if join(' ', @ARGV_saved) !~ m{sql-mode}io;
 
 foreach my $i (1..3) {
-    @{$mysqld_options[$i]} = ( defined $mysqld_options[$i]
+   @{$mysqld_options[$i]} = ( defined $mysqld_options[$i]
             ? ( @{$mysqld_options[0]}, @{$mysqld_options[$i]} )
             : @{$mysqld_options[0]}
-    );
-    $debug_server[$i] = $debug_server[0] if $debug_server[$i] eq '';
-    $vcols[$i] = $vcols[0] if $vcols[$i] eq '';
-    $views[$i] = $views[0] if $views[$i] eq '';
-    $engine[$i] ||= $engine[0];
+   );
+   $debug_server[$i] = $debug_server[0] if $debug_server[$i] eq '';
+   $vcols[$i]        = $vcols[0]        if $vcols[$i] eq '';
+   $views[$i]        = $views[0]        if $views[$i] eq '';
+   $engine[$i]     ||= $engine[0];
 }
 
 shift @mysqld_options;
@@ -451,16 +452,16 @@ if ($rpl_mode ne '') {
     }
 
     $rplsrv = DBServer::MySQL::GaleraMySQLd->new(
-        basedir => $basedirs[0],
-        parent_vardir => $vardirs[0],
-        debug_server => $debug_server[1],
-        first_port => $ports[0],
-        server_options => $mysqld_options[1],
-        valgrind => $valgrind,
-        valgrind_options => \@valgrind_options,
-        general_log => 1,
-        start_dirty => $start_dirty,
-        node_count => length($galera)
+        basedir            => $basedirs[0],
+        parent_vardir      => $vardirs[0],
+        debug_server       => $debug_server[1],
+        first_port         => $ports[0],
+        server_options     => $mysqld_options[1],
+        valgrind           => $valgrind,
+        valgrind_options   => \@valgrind_options,
+        general_log        => 1,
+        start_dirty        => $start_dirty,
+        node_count         => length($galera)
     );
 
     my $status = $rplsrv->startServer();
@@ -789,6 +790,8 @@ if (($gentest_result == STATUS_OK) && !$upgrade_test && ( ($rpl_mode && $rpl_mod
     if ($rpl_mode ne '') {
         $diff_result = $rplsrv->waitForSlaveSync;
         if ($diff_result != STATUS_OK) {
+            # FIXME: Shouldn't that be rather STATUS_REPLICATION_FAILURE or similar?
+            # But we get only DBSTATUS_FAILURE or DBSTATUS_OK returned!
             exit_test(STATUS_INTERNAL_ERROR);
         }
     }
@@ -890,6 +893,7 @@ $0 - Run a complete random query generation test, including server start with re
 
     --grammar   : Grammar file to use when generating queries (REQUIRED);
     --redefine  : Grammar file(s) to redefine and/or add rules to the given grammar
+                  Write: --redefine='A B'    or    --redefine='A' --redefine='B'
     --rpl_mode  : Replication type to use (statement|row|mixed) (default: no replication).
                   The mode can contain modifier 'nosync', e.g. row-nosync. It means that at the end the test
                   will not wait for the slave to catch up with master and perform the consistency check

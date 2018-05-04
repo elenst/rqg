@@ -1,4 +1,5 @@
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018 MariaDB Coporration Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -53,8 +54,9 @@ sub nativeReport {
 
 	foreach my $log ( $main_log, $main_log.'-old' ) {
 		if ((-e $log) && (-s $log > 0)) {
-			say("The last 200 lines from $log :");
-			system("tail -200 $log | cut -c 1-4096");
+			say("The last 2000 lines from $log ------------------------------ Begin");
+			system("tail -2000 $log | cut -c 1-4096");
+			say("$log                          ------------------------------ End");
 		}
 	}
 	

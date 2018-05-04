@@ -60,299 +60,354 @@ use GenTest::ReporterManager;
 use GenTest::Filter::Regexp;
 use GenTest::Incident;
 
-use constant PROCESS_TYPE_PARENT	=> 0;
-use constant PROCESS_TYPE_PERIODIC	=> 1;
-use constant PROCESS_TYPE_CHILD		=> 2;
+use constant PROCESS_TYPE_PARENT    => 0;
+use constant PROCESS_TYPE_PERIODIC  => 1;
+use constant PROCESS_TYPE_CHILD     => 2;
 
-use constant GT_CONFIG => 0;
-use constant GT_XML_TEST => 3;
-use constant GT_XML_REPORT => 4;
-use constant GT_CHANNEL => 5;
+use constant GT_CONFIG              => 0;
+use constant GT_XML_TEST            => 3;
+use constant GT_XML_REPORT          => 4;
+use constant GT_CHANNEL             => 5;
 
-use constant GT_GRAMMAR => 6;
-use constant GT_GENERATOR => 7;
-use constant GT_REPORTER_MANAGER => 8;
-use constant GT_TEST_START => 9;
-use constant GT_TEST_END => 10;
-use constant GT_QUERY_FILTERS => 11;
+use constant GT_GRAMMAR             => 6;
+use constant GT_GENERATOR           => 7;
+use constant GT_REPORTER_MANAGER    => 8;
+use constant GT_TEST_START          => 9;
+use constant GT_TEST_END            => 10;
+use constant GT_QUERY_FILTERS       => 11;
 use constant GT_LOG_FILES_TO_REPORT => 12;
 
 sub new {
-    my $class = shift;
-    
-    my $self = $class->SUPER::new({
+   my $class = shift;
+
+   my $self = $class->SUPER::new({
         'config' => GT_CONFIG},@_);
-    
-    if ($self->config->reporters and not ref $self->config->reporters eq 'ARRAY') {
-        $self->config->reporters([ split /,/, $self->config->reporters ]);
-    }
-    if ($self->config->validators and not ref $self->config->validators eq 'ARRAY') {
-        $self->config->validators([ split /,/, $self->config->validators ]);
-    }
-    if ($self->config->transformers and not ref $self->config->transformers eq 'ARRAY') {
-        $self->config->transformers([ split /,/, $self->config->transformers ]);
-    }
-    if ($self->config->redefine and not ref $self->config->redefine eq 'ARRAY') {
-        $self->config->redefine([ split /,/, $self->config->redefine ]);
-    }
-    if ($self->config->engine and not ref $self->config->engine eq 'ARRAY') {
-        $self->config->engine([ split /,/, $self->config->engine ]);
-    }
-    if ($self->config->dsn and not ref $self->config->dsn eq 'ARRAY') {
-        $self->config->dsn([ split /,/, $self->config->dsn ]);
-    }
-    if ($self->config->vcols and not ref $self->config->vcols eq 'ARRAY') {
-        $self->config->vcols([ split /,/, $self->config->vcols ]);
-    }
-    if ($self->config->views and not ref $self->config->views eq 'ARRAY') {
-        $self->config->views([ split /,/, $self->config->views ]);
-    }
-    if ($self->config->debug_server and not ref $self->config->debug_server eq 'ARRAY') {
-        $self->config->debug_server([ split /,/, $self->config->debug_server ]);
-    }
-    if ($self->config->servers and not ref $self->config->servers eq 'ARRAY') {
-        $self->config->servers([ split /,/, $self->config->servers ]);
-    }
 
-    croak ("Need config") if not defined $self->config;
+   if ($self->config->reporters and not ref $self->config->reporters eq 'ARRAY') {
+      $self->config->reporters([ split /,/, $self->config->reporters ]);
+   }
+   if ($self->config->validators and not ref $self->config->validators eq 'ARRAY') {
+      $self->config->validators([ split /,/, $self->config->validators ]);
+   }
+   if ($self->config->transformers and not ref $self->config->transformers eq 'ARRAY') {
+      $self->config->transformers([ split /,/, $self->config->transformers ]);
+   }
+   if ($self->config->redefine and not ref $self->config->redefine eq 'ARRAY') {
+      $self->config->redefine([ split /,/, $self->config->redefine ]);
+   }
+   if ($self->config->engine and not ref $self->config->engine eq 'ARRAY') {
+      $self->config->engine([ split /,/, $self->config->engine ]);
+   }
+   if ($self->config->dsn and not ref $self->config->dsn eq 'ARRAY') {
+      $self->config->dsn([ split /,/, $self->config->dsn ]);
+   }
+   if ($self->config->vcols and not ref $self->config->vcols eq 'ARRAY') {
+      $self->config->vcols([ split /,/, $self->config->vcols ]);
+   }
+   if ($self->config->views and not ref $self->config->views eq 'ARRAY') {
+      $self->config->views([ split /,/, $self->config->views ]);
+   }
+   if ($self->config->debug_server and not ref $self->config->debug_server eq 'ARRAY') {
+      $self->config->debug_server([ split /,/, $self->config->debug_server ]);
+   }
+   if ($self->config->servers and not ref $self->config->servers eq 'ARRAY') {
+      $self->config->servers([ split /,/, $self->config->servers ]);
+   }
 
-    return $self;
+   croak ("Need config") if not defined $self->config;
+
+   return $self;
 }
 
 sub config {
-    return $_[0]->[GT_CONFIG];
+   return $_[0]->[GT_CONFIG];
 }
 
 sub grammar {
-    return $_[0]->[GT_GRAMMAR];
+   return $_[0]->[GT_GRAMMAR];
 }
 
 sub generator {
-    return $_[0]->[GT_GENERATOR];
+   return $_[0]->[GT_GENERATOR];
 }
 
 sub XMLTest {
-    return $_[0]->[GT_XML_TEST];
+   return $_[0]->[GT_XML_TEST];
 }
 
 sub XMLReport {
-    return $_[0]->[GT_XML_REPORT];
+   return $_[0]->[GT_XML_REPORT];
 }
 
 sub channel {
-    return $_[0]->[GT_CHANNEL];
+   return $_[0]->[GT_CHANNEL];
 }
 
 sub reporterManager {
-    return $_[0]->[GT_REPORTER_MANAGER];
+   return $_[0]->[GT_REPORTER_MANAGER];
 }
 
 sub queryFilters {
-    return $_[0]->[GT_QUERY_FILTERS];
+   return $_[0]->[GT_QUERY_FILTERS];
 }
 
 sub logFilesToReport {
-    return @{$_[0]->[GT_LOG_FILES_TO_REPORT]};
+   return @{$_[0]->[GT_LOG_FILES_TO_REPORT]};
 }
 
 sub run {
-    my $self = shift;
+   my $self = shift;
 
-    $SIG{TERM} = sub { exit(0) };
-    $SIG{CHLD} = "IGNORE" if osWindows();
-    $SIG{INT} = "IGNORE";
-    
-    if (defined $ENV{RQG_HOME}) {
-        $ENV{RQG_HOME} = osWindows() ? $ENV{RQG_HOME}.'\\' : $ENV{RQG_HOME}.'/';
-    }
-    
-    $ENV{RQG_DEBUG} = 1 if $self->config->debug;
+   $SIG{TERM} = sub { exit(0) };
+   $SIG{CHLD} = "IGNORE" if osWindows();
+   $SIG{INT} = "IGNORE";
 
-    $self->initSeed();
+   if (defined $ENV{RQG_HOME}) {
+      $ENV{RQG_HOME} = osWindows() ? $ENV{RQG_HOME}.'\\' : $ENV{RQG_HOME}.'/';
+   }
 
-    my $queries = $self->config->queries;
-    $queries =~ s{K}{000}so;
-    $queries =~ s{M}{000000}so;
-    $self->config->property('queries', $queries);
+   $ENV{RQG_DEBUG} = 1 if $self->config->debug;
 
-    say("-------------------------------\nConfiguration");
-    $self->config->printProps;
+   $self->initSeed();
 
-    my $gendata_result = $self->doGenData();
-    return $gendata_result if $gendata_result != STATUS_OK;
+   my $queries = $self->config->queries;
+   $queries =~ s{K}{000}so;
+   $queries =~ s{M}{000000}so;
+   $self->config->property('queries', $queries);
 
-    $self->[GT_TEST_START] = time();
-    say("INFO: GenTest: Start of running queries : " . $self->[GT_TEST_START]);
-    $self->[GT_TEST_END] = $self->[GT_TEST_START] + $self->config->duration;
+   say("-------------------------------\nConfiguration");
+   $self->config->printProps;
 
-    $self->[GT_CHANNEL] = GenTest::IPC::Channel->new();
+   my $gendata_result = $self->doGenData();
+   return $gendata_result if $gendata_result != STATUS_OK;
 
-    my $init_generator_result = $self->initGenerator();
-    return $init_generator_result if $init_generator_result != STATUS_OK;
+   $self->[GT_TEST_START] = time();
+   say("INFO: GenTest: Start of running queries : " . $self->[GT_TEST_START]);
+   $self->[GT_TEST_END] = $self->[GT_TEST_START] + $self->config->duration;
 
-    my $init_reporters_result = $self->initReporters();
-    return $init_reporters_result if $init_reporters_result != STATUS_OK;
+   $self->[GT_CHANNEL] = GenTest::IPC::Channel->new();
 
-    my $init_validators_result = $self->initValidators();
-    return $init_validators_result if $init_validators_result != STATUS_OK;
+   # Some crash here ends like the case below except that finally STATUS_ALARM(110) gets reported.
 
-    # Cache metadata and other info that may be needed later
-    my @log_files_to_report;
-    foreach my $i (0..2) {
-        last if $self->config->property('upgrade-test') and $i > 0;
-        next unless $self->config->dsn->[$i];
-        if ($self->config->property('ps-protocol') and $self->config->dsn->[$i] !~ /mysql_server_prepare/) {
+   my $init_generator_result = $self->initGenerator();
+   return $init_generator_result if $init_generator_result != STATUS_OK;
+
+   # Some crash here ends in
+   # ... Reporters: Deadlock, Backtrace, ErrorLog
+   # DBI connect ... failed: Lost connection ... at lib/GenTest/Reporter.pm ...
+   # [ERROR] Reporter 'GenTest::Reporter::Deadlock' could not be added. Status will be set to ENVIRONMENT_FAILURE
+   # GenTest exited with exit status STATUS_ENVIRONMENT_FAILURE (110)
+   # Stopping server(s)...
+   # Stopping server on port 11100
+   # Stale connection to 11100. Reconnecting
+   # [ERROR] (Re)connect to 11100 failed due to 2003: Can't connect to MySQL server on '127.0.0.1' (111)
+   # Server has been stopped
+   # runall-new.pl will exit with exit status STATUS_ENVIRONMENT_FAILURE(110)
+
+   my $init_reporters_result = $self->initReporters();
+   return $init_reporters_result if $init_reporters_result != STATUS_OK;
+
+   my $init_validators_result = $self->initValidators();
+   return $init_validators_result if $init_validators_result != STATUS_OK;
+
+   # Some crash here ends in
+   # ERROR: connect() to dsn dbi:... failed: Lost connection ...
+   # ERROR: Will return STATUS_ENVIRONMENT_FAILURE
+   # ERROR: GenTest::Executor::MySQL::init : Getting a connection for MetaDataCacher failed with 110. Will return that status.
+   # GenTest exited with exit status STATUS_ENVIRONMENT_FAILURE (110)
+   # Stopping server(s)...
+   # Stopping server on port 11100
+   # Stale connection to 11100. Reconnecting
+   # ERROR] (Re)connect to 11100 failed due to 2003: Can't connect to MySQL server on '127.0.0.1' (111)
+   # Server has been stopped
+   # runall-new.pl will exit with exit status STATUS_ENVIRONMENT_FAILURE(110)
+
+   # Cache metadata and other info that may be needed later
+   my @log_files_to_report;
+   foreach my $i (0..2) {
+      last if $self->config->property('upgrade-test') and $i > 0;
+      next unless $self->config->dsn->[$i];
+      if ($self->config->property('ps-protocol') and $self->config->dsn->[$i] !~ /mysql_server_prepare/) {
           $self->config->dsn->[$i] .= ';mysql_server_prepare=1';
-        }
-        next if $self->config->dsn->[$i] !~ m{mysql}sio;
-        my $metadata_executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
-        $metadata_executor->init();
-        $metadata_executor->cacheMetaData() if defined $metadata_executor->dbh();
-        
-        # Cache log file names needed for result reporting at end-of-test
-        
-        # We do not copy the general log, as it may grow very large for some tests.
-        #my $logfile_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'general_log_file'");
-        #push(@log_files_to_report, $logfile_result->data()->[0]->[1]);
-        
-        # Guessing the error log file name relative to datadir (lacking safer methods).
-        my $datadir_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'datadir'");
-        croak("FATAL ERROR: Failed to retrieve datadir") unless $datadir_result;
+      }
+      next if $self->config->dsn->[$i] !~ m{mysql}sio;
+      my $metadata_executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
+      $metadata_executor->setRole("MetaDataCacher");
+      my $init_executor_result = $metadata_executor->init();
+      return $init_executor_result if $init_executor_result != STATUS_OK;
 
-        my $errorlog;
-        foreach my $errorlog_path (
+      # FIXME: Are there really cases where this dbh does not exist?
+      $metadata_executor->cacheMetaData() if defined $metadata_executor->dbh();
+
+      # Some crash after here end with fine backtrace
+# MLML
+# system ("killall -6 mysqld");
+# MLML
+
+      # Cache log file names needed for result reporting at end-of-test
+
+      # We do not copy the general log, as it may grow very large for some tests.
+      #my $logfile_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'general_log_file'");
+      #push(@log_files_to_report, $logfile_result->data()->[0]->[1]);
+
+      # Guessing the error log file name relative to datadir (lacking safer methods).
+      my $datadir_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'datadir'");
+      croak("FATAL ERROR: Failed to retrieve datadir") unless $datadir_result;
+
+      my $errorlog;
+      foreach my $errorlog_path (
             "../log/master.err",  # MTRv1 regular layout
             "../log/mysqld1.err", # MTRv2 regular layout
             "../mysql.err"        # DBServer::MySQL layout
-        ) {
-            my $possible_path = File::Spec->catfile($datadir_result->data()->[0]->[1], $errorlog_path);
-            if (-e $possible_path) {
-                $errorlog = $possible_path;
-                last;
-            }
-        }
-        push(@log_files_to_report, $errorlog) if defined $errorlog;
-        
-        $metadata_executor->disconnect();
-        undef $metadata_executor;
-    }
+      ) {
+         my $possible_path = File::Spec->catfile($datadir_result->data()->[0]->[1], $errorlog_path);
+         if (-e $possible_path) {
+             $errorlog = $possible_path;
+             last;
+         }
+      }
+      push(@log_files_to_report, $errorlog) if defined $errorlog;
 
-    $self->[GT_LOG_FILES_TO_REPORT] = \@log_files_to_report;
+      $metadata_executor->disconnect();
+      undef $metadata_executor;
+   }
 
-    if (defined $self->config->filter) {
-       $self->[GT_QUERY_FILTERS] = [ GenTest::Filter::Regexp->new(
+   $self->[GT_LOG_FILES_TO_REPORT] = \@log_files_to_report;
+
+   if (defined $self->config->filter) {
+      $self->[GT_QUERY_FILTERS] = [ GenTest::Filter::Regexp->new(
            file => $self->config->filter
-       ) ];
-    }
-    
-    say("Starting ".$self->config->threads." processes, ".
-        $self->config->queries." queries each, duration ".
-        $self->config->duration." seconds.");
+      ) ];
+   }
 
-    $self->initXMLReport();
-    
-    ### Start central reporting thread ####
-    
-    my $errorfilter = GenTest::ErrorFilter->new(channel => $self->channel());
-    my $errorfilter_p = GenTest::IPC::Process->new(object => $errorfilter);
-    if (!osWindows()) {
-        $errorfilter_p->start($self->config->property('upgrade-test') ? [$self->config->servers->[0]] : $self->config->servers);
-    }
+   say("Starting " . $self->config->threads . " processes, " .
+       $self->config->queries . " queries each, duration " .
+       $self->config->duration . " seconds.");
 
-    my $reporter_pid = $self->reportingProcess();
-    
-    ### Start worker children ###
+   $self->initXMLReport();
 
-    my %worker_pids;
+   ### Start central reporting thread ####
 
-    if ($self->config->threads > 0) {
-        foreach my $worker_id (1..$self->config->threads) {
-            my $worker_pid = $self->workerProcess($worker_id);
-            $worker_pids{$worker_pid} = 1;
-            Time::HiRes::sleep(0.1); # fork slowly for more predictability
-        }
-    }
+   my $errorfilter = GenTest::ErrorFilter->new(channel => $self->channel());
+   my $errorfilter_p = GenTest::IPC::Process->new(object => $errorfilter);
+   if (!osWindows()) {
+      $errorfilter_p->start($self->config->property('upgrade-test') ? [$self->config->servers->[0]] : $self->config->servers);
+   }
 
-    ### Main process
-        
-    if (osWindows()) {
-        ## Important that this is done here in the parent after the last
-        ## fork since on windows Process.pm uses threads
-        $errorfilter_p->start();
-    }
+   my $reporter_pid = $self->reportingProcess();
 
-    # We are the parent process, wait for for all spawned processes to terminate
-    my $total_status = STATUS_OK;
-    my $reporter_died = 0;
-        
-    ## Parent thread does not use channel
-    $self->channel()->close;
+   ### Start worker children ###
 
-    # Worker & Reporter processes that were spawned.
-    my @spawned_pids = (keys %worker_pids, $reporter_pid);
-    
-    OUTER: while (1) {
-        # Wait for processes to complete, i.e only processes spawned by workers & reporters. 
-        foreach my $spawned_pid (@spawned_pids) {
-            my $child_pid = waitpid($spawned_pid, WNOHANG);
-            next if $child_pid == 0;
-            my $child_exit_status = $? > 0 ? ($? >> 8) : 0;
+   my %worker_pids;   # OS pid -- Task of that process inside RQG
 
-            $total_status = $child_exit_status if $child_exit_status > $total_status;
-            say("Process with pid $child_pid ended with status ".status2text($child_exit_status));
-            
-            if ($child_pid == $reporter_pid) {
-                $reporter_died = 1;
-                last OUTER;
-            } else {
-                delete $worker_pids{$child_pid};
-            }
-            
-            last OUTER if $child_exit_status >= STATUS_CRITICAL_FAILURE;
-            last OUTER if keys %worker_pids == 0;
-            last OUTER if $child_pid == -1;
-        }
-        sleep 5;
-    }
+   if ($self->config->threads > 0) {
+      foreach my $worker_id (1..$self->config->threads) {
+         my $worker_pid = $self->workerProcess($worker_id);
+         $worker_pids{$worker_pid} = "Thread" . $worker_id;
+         Time::HiRes::sleep(0.1); # fork slowly for more predictability
+      }
+   }
 
-    foreach my $worker_pid (keys %worker_pids) {
-        say("Killing remaining worker process with pid $worker_pid...");
-        kill(15, $worker_pid);
-    }
-        
-    if ($reporter_died == 0) {
-        # Wait for periodic process to return the status of its last execution
-        Time::HiRes::sleep(1);
-        say("Killing periodic reporting process with pid $reporter_pid...");
-        kill(15, $reporter_pid);
-            
-        if (osWindows()) {
-            # We use sleep() + non-blocking waitpid() due to a bug in ActiveState Perl
-            Time::HiRes::sleep(1);
-            waitpid($reporter_pid, &POSIX::WNOHANG() );
-        } else {
-            waitpid($reporter_pid, 0);
-        }
-            
-        if ($? > -1 ) {
-            my $reporter_status = $? > 0 ? $? >> 8 : 0;
-            say("For pid $reporter_pid reporter status " . status2text($reporter_status));
-            $total_status = $reporter_status if $reporter_status > $total_status;
-        }
-    }
-        
-    $errorfilter_p->kill();
+   ### Main process
 
-    return $self->reportResults($total_status);
+   if (osWindows()) {
+      ## Important that this is done here in the parent after the last
+      ## fork since on windows Process.pm uses threads
+      $errorfilter_p->start();
+   }
+
+   # We are the parent process, wait for for all spawned processes to terminate
+   my $total_status = STATUS_OK;
+   my $reporter_died = 0;
+
+   ## Parent thread does not use channel
+   $self->channel()->close;
+
+   # Worker & Reporter processes that were spawned.
+   my @spawned_pids = (keys %worker_pids, $reporter_pid);
+
+   OUTER: while (1) {
+      # Wait for processes to complete, i.e only processes spawned by workers & reporters.
+      foreach my $spawned_pid (@spawned_pids) {
+         my $child_pid = waitpid($spawned_pid, WNOHANG);
+         next if $child_pid == 0;
+         my $child_exit_status = $? > 0 ? ($? >> 8) : 0;
+
+         $total_status = $child_exit_status if $child_exit_status > $total_status;
+
+         my $message_begin = "Process with pid $child_pid for ";
+         my $message_end   = " ended with status " . status2text($child_exit_status);
+         if ($child_pid == $reporter_pid ) {
+            say($message_begin . "Reporter"                 . $message_end);
+            # There was only one reporter process. So we leave the loop.
+            $reporter_died = 1;
+            last OUTER;
+         } else {
+            say($message_begin . $worker_pids{$spawned_pid} . $message_end);
+            delete $worker_pids{$child_pid};
+         }
+
+         last OUTER if $child_exit_status >= STATUS_CRITICAL_FAILURE;
+         last OUTER if keys %worker_pids == 0;
+         last OUTER if $child_pid == -1;
+      }
+      sleep 5;
+   }
+
+   # FIXME:
+   # What follows might be not sufficient.
+   # 1. What if a "Worker" does not react on SIGTERM?
+   # 2. What if a "Worker" has to report some bad status > current $total_status?
+   #    Warning:
+   #    There is a significant chance that this bad status is a sideeffect of the failure causing
+   #    a current bad $total_status.
+   #    And than this bad status is frequent
+   #    - less accurate/detailed than a current bad $total_status
+   #    - higher than a current bad $total_status
+   #    So in case we just take the maximum like usual than we destroy detail up to report a false
+   #    status.
+   foreach my $worker_pid (keys %worker_pids) {
+      say("Killing remaining worker process with pid $worker_pid...");
+      kill(15, $worker_pid);
+   }
+
+   if ($reporter_died == 0) {
+      # Wait for periodic process to return the status of its last execution
+      # FIXME:
+      # 1. I have doubts if a sleep of 1 second is all time sufficient for catching a last status
+      #    of some already ongoing execution. But otherwise: He had his chances before.
+      # 2. Like for the threads: What if a "Reporter" does not react on SIGTERM etc.?
+      Time::HiRes::sleep(1);
+      say("Killing periodic reporting process with pid $reporter_pid...");
+      kill(15, $reporter_pid);
+
+      if (osWindows()) {
+         # We use sleep() + non-blocking waitpid() due to a bug in ActiveState Perl
+         Time::HiRes::sleep(1);
+         waitpid($reporter_pid, &POSIX::WNOHANG() );
+      } else {
+         waitpid($reporter_pid, 0);
+      }
+
+      if ($? > -1 ) {
+         my $reporter_status = $? > 0 ? $? >> 8 : 0;
+         say("For pid $reporter_pid reporter status " . status2text($reporter_status));
+         $total_status = $reporter_status if $reporter_status > $total_status;
+      }
+   }
+
+   $errorfilter_p->kill();
+
+   return $self->reportResults($total_status);
 
 }
 
 sub reportResults {
     my ($self, $total_status) = @_;
-      
+
     my $reporter_manager = $self->reporterManager();
     my @report_results;
-        
+
     # New report type REPORTER_TYPE_END, used with reporter's that processes information at the end of a test.
     if ($total_status == STATUS_OK) {
         @report_results = $reporter_manager->report(REPORTER_TYPE_SUCCESS | REPORTER_TYPE_ALWAYS | REPORTER_TYPE_END);
@@ -369,21 +424,31 @@ sub reportResults {
         @report_results = $reporter_manager->report(REPORTER_TYPE_DEADLOCK | REPORTER_TYPE_ALWAYS | REPORTER_TYPE_END);
     } elsif ($total_status == STATUS_SERVER_KILLED) {
         @report_results = $reporter_manager->report(REPORTER_TYPE_SERVER_KILLED | REPORTER_TYPE_ALWAYS | REPORTER_TYPE_END);
+    # FIXME:
+    # A server real crash could come so early that the first connect attempt
+    # of some RQG Worker (Thread<n>) or some reporter fails. And than we would
+    # harvest STATUS_ENVIRONMENT_FAILURE which is unfortunate because the
+    # value is higher than the better STATUS_SERVER_CRASHED some other routine
+    # might report.
+    } elsif ($total_status == STATUS_ENVIRONMENT_FAILURE) {
+        say("Environment failure reported, but often the reason is a crash. So trying post-crash analysis...");
+        @report_results = $reporter_manager->report(REPORTER_TYPE_CRASH | REPORTER_TYPE_ALWAYS | REPORTER_TYPE_END);
     } else {
         @report_results = $reporter_manager->report(REPORTER_TYPE_ALWAYS | REPORTER_TYPE_END);
     }
-        
+
     my $report_status = shift @report_results;
     $total_status = $report_status if $report_status > $total_status;
     $total_status = STATUS_OK if $total_status == STATUS_SERVER_KILLED;
 
     $self->reportXMLIncidents($total_status, \@report_results);
-        
+
     if ($total_status == STATUS_OK) {
         say("Test completed successfully.");
         return STATUS_OK;
     } else {
-        say("Test completed with failure status ".status2text($total_status)." ($total_status)");
+        say("Test completed with failure status " .
+            status2text($total_status) . " ($total_status)");
         return $total_status;
     }
 }
@@ -430,14 +495,15 @@ sub reportingProcess {
 }
 
 sub workerProcess {
-    my ($self, $worker_id) = @_;
+   my ($self, $worker_id) = @_;
 
-    my $worker_pid = fork();
-    $self->channel()->writer;
+   my $worker_pid = fork();
+   $self->channel()->writer;
 
     if ($worker_pid != 0) {
         return $worker_pid;
     }
+    my $worker_role = "Thread" . $worker_id;
 
     $| = 1;
     my $ctrl_c = 0;
@@ -453,6 +519,7 @@ sub workerProcess {
         my $executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
         $executor->sqltrace($self->config->sqltrace);
         $executor->setId($i+1);
+        $executor->setRole($worker_role);
         push @executors, $executor;
     }
 
@@ -463,47 +530,51 @@ sub workerProcess {
         properties =>  $self->config,
         filters => $self->queryFilters(),
         end_time => $self->[GT_TEST_END],
-        restart_timeout => $self->config->property('restart-timeout')
+        restart_timeout => $self->config->property('restart-timeout'),
+        role => $worker_role
     );
 
-    if (not defined $mixer) {
-        sayError("GenTest failed to create a Mixer, status will be set to ENVIRONMENT_FAILURE");
-        $self->stopChild(STATUS_ENVIRONMENT_FAILURE);
-    }
-        
-    my $worker_result = 0;
+   if (not defined $mixer) {
+      sayError("GenTest failed to create a Mixer for $worker_role. Status will be set to ENVIRONMENT_FAILURE");
+      $self->stopChild(STATUS_ENVIRONMENT_FAILURE);
+   }
 
-    foreach my $i (1..$self->config->queries) {
-        my $query_result = $mixer->next();
-        $worker_result = $query_result if $query_result > $worker_result && $query_result > STATUS_TEST_FAILURE;
+   my $worker_result = 0;
 
-        if ($query_result > STATUS_CRITICAL_FAILURE) {
-				say("GenTest: Server crash or critical failure (". status2text($query_result) . ") reported, the child will be stopped");
-            undef $mixer;	# so that destructors are called
-            $self->stopChild($query_result);
-        }
+   foreach my $i (1..$self->config->queries) {
+      my $query_result = $mixer->next();
+      $worker_result = $query_result if $query_result > $worker_result && $query_result > STATUS_TEST_FAILURE;
 
-        last if $query_result == STATUS_EOF;
-        last if $ctrl_c == 1;
-        last if time() > $self->[GT_TEST_END];
-    }
-        
-    foreach my $executor (@executors) {
-        $executor->disconnect;
-        undef $executor;
-    }
+      if ($query_result > STATUS_CRITICAL_FAILURE) {
+         say("GenTest: Server crash or critical failure (" . status2text($query_result) .
+             ") was reported.\n" .
+             "         The child process for $worker_role will be stopped.");
+         undef $mixer;   # so that destructors are called
+         $self->stopChild($query_result);
+      }
 
-    # Forcefully deallocate the Mixer so that Validator destructors are called
-    undef $mixer;
-    undef $self->[GT_QUERY_FILTERS];
-        
-    if ($worker_result > 0) {
-        say("GenTest: Child worker process completed with error code $worker_result.");
-        $self->stopChild($worker_result);
-    } else {
-        say("GenTest: Child worker process completed successfully.");
-        $self->stopChild(STATUS_OK);
-    }
+      last if $query_result == STATUS_EOF;
+      last if $ctrl_c == 1;
+      last if time() > $self->[GT_TEST_END];
+   }
+
+   foreach my $executor (@executors) {
+      $executor->disconnect;
+      undef $executor;
+   }
+
+   # Forcefully deallocate the Mixer so that Validator destructors are called
+   undef $mixer;
+   undef $self->[GT_QUERY_FILTERS];
+
+   my $message_part= "INFO: GenTest: Child process for $worker_role completed";
+   if ($worker_result > 0) {
+      say("$message_part with status " . status2text($worker_result) . "($worker_result).");
+      $self->stopChild($worker_result);
+   } else {
+      say("$message_part successfully.");
+      $self->stopChild(STATUS_OK);
+   }
 }
 
 sub doGenData {
@@ -511,7 +582,8 @@ sub doGenData {
 
     return STATUS_OK if defined $self->config->property('start-dirty');
 
-    my $i = -1;
+    my $i = 0;
+    # my $i = -1; The server numbers reported should be 1 2 3 ...
     foreach my $dsn (@{$self->config->dsn}) {
         $i++;
         last if $self->config->property('upgrade-test') and $i>0;
@@ -524,6 +596,7 @@ sub doGenData {
                views => (defined $self->config->views ? ${$self->config->views}[$i] : undef),
                engine => (defined $self->config->engine ? ${$self->config->engine}[$i] : undef),
                sqltrace=> $self->config->sqltrace,
+               server_id   => $i,
                notnull => $self->config->notnull,
                rows => $self->config->rows,
                varchar_length => $self->config->property('varchar-length')
@@ -539,6 +612,7 @@ sub doGenData {
                views => (defined $self->config->views ? ${$self->config->views}[$i] : undef),
                engine => (defined $self->config->engine ? ${$self->config->engine}[$i] : undef),
                sqltrace=> $self->config->sqltrace,
+               server_id   => $i,
                notnull => $self->config->notnull,
                rows => $self->config->rows,
                varchar_length => $self->config->property('varchar-length')
@@ -554,48 +628,49 @@ sub doGenData {
                views => (defined $self->config->views ? ${$self->config->views}[$i] : undef),
                varchar_length => $self->config->property('varchar-length'),
                sqltrace => $self->config->sqltrace,
+               server_id   => $i,
                short_column_names => $self->config->short_column_names,
                strict_fields => $self->config->strict_fields,
                notnull => $self->config->notnull
             )->run();
         }
-            
         return $gendata_result if $gendata_result > STATUS_OK;
 
-      # $self->config->gendata_sql might be just a string containing a file name.
-      # Transform it to an array with one element.
-      if ( $self->config->gendata_sql and not ref $self->config->gendata_sql eq 'ARRAY' ) {
-         my $gendata_sql = [ split /,/, $self->config->gendata_sql ];
-         $self->config->gendata_sql($gendata_sql);
-      }
-      foreach my $file ( @{$self->config->gendata_sql} )
-      {
-         if ( not -e $file ) {
-            # In case of missing file rather abort before
-            # - running any script processing at all (Scenario: The previous files exist.)
-            # - creating an Executor etc. (Scenario: The current file does not exist.)
-            say("ERROR: lib::GenTest::App::GenTest::doGenData : The SQL file '$file' " .
-                "does not exist.");
-            say("ERROR: Will return status STATUS_ENVIRONMENT_FAILURE");
-            return STATUS_ENVIRONMENT_FAILURE;
-         }
-      }
-      foreach my $file ( @{$self->config->gendata_sql} )
-      {
-         say("INFO: Start processing the SQL file '$file'.");
-         $gendata_result = GenTest::App::GendataSQL->new(
-               sql_file    => $file,
-               debug       => $self->config->debug,
-               dsn         => $dsn,
-               server_id   => $i, # 'server_id'   => GDS_SERVER_ID,
-               sqltrace    => $self->config->sqltrace,
-         )->run();
-      }
+        if ( $self->config->gendata_sql ) {
+           # $self->config->gendata_sql might be just a string containing a file name.
+           # Transform it to an array with one element.
+           if ( not ref $self->config->gendata_sql eq 'ARRAY' ) {
+              my $gendata_sql = [ split /,/, $self->config->gendata_sql ];
+              $self->config->gendata_sql($gendata_sql);
+           }
+           # In case of missing file rather abort before
+           # - running any script processing at all (Scenario: The previous files exist.)
+           # - creating an Executor etc. (Scenario: The current file does not exist.)
+           foreach my $file ( @{$self->config->gendata_sql} )
+           {
+              if ( not -e $file ) {
+                 say("ERROR: lib::GenTest::App::GenTest::doGenData : The SQL file '$file' " .
+                     "does not exist.");
+                 say("ERROR: Will return status STATUS_ENVIRONMENT_FAILURE");
+                 return STATUS_ENVIRONMENT_FAILURE;
+              }
+           }
+           foreach my $file ( @{$self->config->gendata_sql} )
+           {
+              say("INFO: Start processing the SQL file '$file'.");
+              $gendata_result = GenTest::App::GendataSQL->new(
+                    sql_file    => $file,
+                    debug       => $self->config->debug,
+                    dsn         => $dsn,
+                    server_id   => $i, # 'server_id'   => GDS_SERVER_ID,
+                  sqltrace    => $self->config->sqltrace,
+              )->run();
+              return $gendata_result if $gendata_result > STATUS_OK;
+           }
+        }
 
-      return $gendata_result if $gendata_result > STATUS_OK;
-
-      # For multi-master setup, e.g. Galera, we only need to do generation once
-      return STATUS_OK if $self->config->property('multi-master');
+        # For multi-master setup, e.g. Galera, we only need to do generation once
+        return STATUS_OK if $self->config->property('multi-master');
    }
 
    return STATUS_OK;
@@ -604,7 +679,7 @@ sub doGenData {
 
 sub initSeed {
     my $self = shift;
- 
+
     return if not defined $self->config->seed();
 
     my $orig_seed = $self->config->seed();
@@ -712,7 +787,7 @@ sub initReporters {
             $self->config->reporters(['ErrorLog', 'Backtrace']) unless scalar(@{$self->config->reporters});
             push @{$self->config->reporters}, 'ValgrindXMLErrors' if (defined $self->config->property('valgrind-xml'));
             push @{$self->config->reporters}, 'ReplicationConsistency' if $self->config->rpl_mode ne '' and $self->config->rpl_mode !~ /nosync/;
-            push @{$self->config->reporters}, 'ReplicationSlaveStatus' 
+            push @{$self->config->reporters}, 'ReplicationSlaveStatus'
                 if $self->config->rpl_mode ne '' && $self->isMySQLCompatible();
         }
       if ($self->config->property('upgrade-test') and $self->config->property('upgrade-test') =~ /undo/) {
@@ -732,9 +807,9 @@ sub initReporters {
     }
 
     say("Reporters: ".($#{$self->config->reporters} > -1 ? join(', ', @{$self->config->reporters}) : "(none)"));
-    
+
     my $reporter_manager = GenTest::ReporterManager->new();
-    
+
     # pass option debug server to the reporter, for detecting the binary type.
     foreach my $i (0..2) {
         last if $self->config->property('upgrade-test') and $i>0;
@@ -772,16 +847,16 @@ sub initValidators {
             } elsif ($self->config->dsn->[1] ne '') {
                 push @{$self->config->validators}, 'ResultsetComparator';
             }
-        }        
-        push @{$self->config->validators}, 'MarkErrorLog' 
+        }
+        push @{$self->config->validators}, 'MarkErrorLog'
             if (defined $self->config->valgrind) && $self->isMySQLCompatible();
-        
-        push @{$self->config->validators}, 'QueryProperties' 
+
+        push @{$self->config->validators}, 'QueryProperties'
             if defined $self->grammar() && $self->grammar()->hasProperties() && $self->isMySQLCompatible();
     } else {
         ## Remove the "None" validator
         foreach my $i (0..$#{$self->config->validators}) {
-            delete $self->config->validators->[$i] 
+            delete $self->config->validators->[$i]
                 if $self->config->validators->[$i] eq "None"
                 or $self->config->validators->[$i] eq '';
         }
@@ -790,8 +865,8 @@ sub initValidators {
     ## Add the transformer validator if --transformers is specified
     ## and transformer validator not allready specified.
 
-    if (defined $self->config->transformers and 
-        $#{$self->config->transformers} >= 0) 
+    if (defined $self->config->transformers and
+        $#{$self->config->transformers} >= 0)
     {
         my $hasTransformer = 0;
         foreach my $t (@{$self->config->validators}) {
@@ -804,8 +879,8 @@ sub initValidators {
     }
 
     say("Validators: ".(defined $self->config->validators and $#{$self->config->validators} > -1 ? join(', ', @{$self->config->validators}) : "(none)"));
-    
-    say("Transformers: ".join(', ', @{$self->config->transformers})) 
+
+    say("Transformers: ".join(', ', @{$self->config->transformers}))
         if defined $self->config->transformers and $#{$self->config->transformers} > -1;
 
     return STATUS_OK;
@@ -842,8 +917,8 @@ sub initXMLReport {
             dsns => $self->config->dsn
         );
     }
-    
-    # XML: 
+
+    # XML:
     #  Define test suite name for reporting purposes.
     #  Until we support test suites and/or reports with multiple suites/tests,
     #  we use the test name as test suite name, from config option "testname".
@@ -877,7 +952,7 @@ sub initXMLReport {
             'varchar-length' => $self->config->property('varchar-length')
         }
     );
-    
+
     $self->[GT_XML_REPORT] = GenTest::XML::Report->new(
         buildinfo => $buildinfo,
         name => $test_suite_name,  # NOTE: name here refers to the name of the test suite or "test".
@@ -887,11 +962,11 @@ sub initXMLReport {
 
 sub reportXMLIncidents {
     my ($self, $total_status, $incidents) = @_;
- 
+
     foreach my $incident (@$incidents) {
         $self->XMLTest()->addIncident($incident);
     }
-        
+
     # If no Reporters reported an incident, and we have a test failure,
     # create an incident report and add it to the test report.
     if ((scalar(@$incidents) < 1) && ($total_status != STATUS_OK)) {
@@ -903,9 +978,9 @@ sub reportXMLIncidents {
         # Add the incident to the test report
         $self->XMLTest()->addIncident($unreported_incident);
     }
-        
+
     $self->XMLTest()->end($total_status == STATUS_OK ? "pass" : "fail");
-       
+
     if (defined $self->config->property('xml-output')) {
         open (XML , '>'.$self->config->property('xml-output')) or carp("Unable to open ".$self->config->property('xml-output').": $!");
         print XML $self->XMLReport()->xml();
@@ -925,7 +1000,7 @@ sub reportXMLIncidents {
         if (not defined $self->config->property('xml-output')) {
             carp("ERROR: --xml-output=<filename> must be set when using --report-xml-tt");
         }
- 
+
         my $xml_send_result = $xml_transporter->sendXML(
             $self->config->property('xml-output'),
             $self->config->property('report-xml-tt-dest')
@@ -935,7 +1010,7 @@ sub reportXMLIncidents {
             croak("Error from XML Transporter: $xml_send_result");
         }
 
-        if (defined $self->config->logfile && defined 
+        if (defined $self->config->logfile && defined
             $self->config->property('report-tt-logdir')) {
             $self->copyLogFiles($self->XMLTest->logdir(), $self->config->dsn);
         }

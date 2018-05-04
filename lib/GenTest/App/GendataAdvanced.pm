@@ -39,6 +39,7 @@ use constant GDS_NOTNULL => 4;
 use constant GDS_ROWS => 5;
 use constant GDS_VARCHAR_LENGTH => 6;
 use constant GDS_VCOLS => 7;
+use constant GDS_SERVER_ID => 8;
 
 use constant GDS_DEFAULT_ROWS => [0, 1, 20, 100, 1000, 0, 1, 20, 100];
 use constant GDS_DEFAULT_NAMES => ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9'];
@@ -53,6 +54,7 @@ sub new {
         'engine' => GDS_ENGINE,
         'views' => GDS_VIEWS,
         'sqltrace' => GDS_SQLTRACE,
+        'server_id' => GDS_SERVER_ID,
         'notnull' => GDS_NOTNULL,
         'rows' => GDS_ROWS,
         'varchar_length' => GDS_VARCHAR_LENGTH,
@@ -86,6 +88,10 @@ sub views {
     return $_[0]->[GDS_VIEWS];
 }
 
+sub server_id {
+    return $_[0]->[GDS_SERVER_ID];
+}
+
 sub sqltrace {
     return $_[0]->[GDS_SQLTRACE];
 }
@@ -101,12 +107,15 @@ sub varcharLength {
 sub run {
     my ($self) = @_;
     
+    say("INFO: Starting GenTest::App::GendataAdvanced");
+
     $prng = GenTest::Random->new( seed => 0 );
 
     my $executor = GenTest::Executor->newFromDSN($self->dsn());
     if ($executor->type != DB_MYSQL) {
         die "Only MySQL executor type is supported\n";
     }
+    $executor->sqltrace($self->server_id);
     $executor->sqltrace($self->sqltrace);
     $executor->init();
 

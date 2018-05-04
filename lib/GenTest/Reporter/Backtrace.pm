@@ -1,4 +1,5 @@
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018 MariaDB Corporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -36,44 +37,79 @@ sub report {
 }
 
 sub nativeReport {
-	my $reporter = shift;
+   my $reporter = shift;
 
-	my $datadir = $reporter->serverVariable('datadir');
-	say("datadir is $datadir");
+   say("INFO: Reporter 'Backtrace' ------------------------------ Begin");
 
-	my $binary = $reporter->serverInfo('binary');
-	say("binary is $binary");
-	
-	my $bindir = $reporter->serverInfo('bindir');
-	say("bindir is $bindir");
+   my $datadir = $reporter->serverVariable('datadir');
+   say("datadir is $datadir");
 
-	my $pid = $reporter->serverInfo('pid');
-	my $core = <$datadir/core*>;
-	$core = </cores/core.$pid> if $^O eq 'darwin';
-	$core = <$datadir/vgcore*> if defined $reporter->properties->valgrind;
-	$core = File::Spec->rel2abs($core);
-	(-f $core) ? say("core is $core") : say("WARNING: Core file not found!");
+   my $binary = $reporter->serverInfo('binary');
+   say("binary is $binary");
 
-	my @commands;
+   my $bindir = $reporter->serverInfo('bindir');
+   say("bindir is $bindir");
 
-	if (osWindows()) {
-		$bindir =~ s{/}{\\}sgio;
-		my $cdb_cmd = "!sym prompts off; !analyze -v; .ecxr; !for_each_frame dv /t;~*k;q";		
-		push @commands, 'cdb -i "'.$bindir.'" -y "'.$bindir.';srv*C:\\cdb_symbols*http://msdl.microsoft.com/download/symbols" -z "'.$datadir.'\mysqld.dmp" -lines -c "'.$cdb_cmd.'"';
-    } elsif (osSolaris()) {
-        ## We don't want to run gdb on solaris since it may core-dump
-        ## if the executable was generated with SunStudio.
+   my $pid = $reporter->serverInfo('pid');
+   my $core = <$datadir/core*>;
+   if (defined $core) {
+      say("INFO: The core file name computed is '$core'");
+   } else {
+      $core = </cores/core.$pid> if $^O eq 'darwin';
+      if (defined $core) {
+         say("INFO: The core file name computed is '$core'");
+      } else {
+         $core = <$datadir/vgcore*> if defined $reporter->properties->valgrind;
+         if (defined $core) {
+            say("INFO: The core file name computed is '$core'");
+         } else {
+            say("DEBUG: The core file name is not defined.");
+         }
+      }
+   }
+   if (not defined $core) {
+      say("DEBUG: The core file name is not defined.");
+      say("Will return STATUS_OK,undef");
+      say("INFO: Reporter 'Backtrace' ------------------------------ End");
+      return STATUS_OK, undef;
+   }
+   say("INFO: The core file name computed is '$core'");
+   $core = File::Spec->rel2abs($core);
+   if (-f $core) {
+      say("INFO: Core file '$core' found.")
+   } else {
+      say("WARNING: Core file not found!");
+      # AFAIR:
+      # Starting GDB for some not existing core file could waste serious runtime and
+      # especially CPU time too.
+      say("Will return STATUS_OK,undef");
+      say("INFO: Reporter 'Backtrace' ------------------------------ End");
+      return STATUS_OK, undef;
+   }
 
-        ## 1) First try to do it with dbx. dbx should work for both
-        ## Sunstudio and GNU CC. This is a bit complicated since we
-        ## need to first ask dbx which threads we have, and then dump
-        ## the stack for each thread.
+   my @commands;
 
-        ## The code below is "inspired by MTR
-        `echo | dbx - $core 2>&1` =~ m/Corefile specified executable: "([^"]+)"/;
-        if ($1) {
+   if (osWindows()) {
+      $bindir =~ s{/}{\\}sgio;
+      my $cdb_cmd = "!sym prompts off; !analyze -v; .ecxr; !for_each_frame dv /t;~*k;q";
+      push @commands,
+           'cdb -i "' . $bindir . '" -y "' . $bindir .
+           ';srv*C:\\cdb_symbols*http://msdl.microsoft.com/download/symbols" -z "' . $datadir .
+           '\mysqld.dmp" -lines -c "'.$cdb_cmd.'"';
+   } elsif (osSolaris()) {
+      ## We don't want to run gdb on solaris since it may core-dump
+      ## if the executable was generated with SunStudio.
+
+      ## 1) First try to do it with dbx. dbx should work for both
+      ## Sunstudio and GNU CC. This is a bit complicated since we
+      ## need to first ask dbx which threads we have, and then dump
+      ## the stack for each thread.
+
+      ## The code below is "inspired by MTR
+      `echo | dbx - $core 2>&1` =~ m/Corefile specified executable: "([^"]+)"/;
+      if ($1) {
             ## We do apparently have a working dbx
-            
+
             # First, identify all threads
             my @threads = `echo threads | dbx $binary $core 2>&1` =~ m/t@\d+/g;
 
@@ -81,40 +117,53 @@ sub nativeReport {
             ## more efficient and get nicer output to have all
             ## commands in one dbx-batch, TODO!)
 
-            my $traces = join("; ",map{"where ".$_} @threads);
+            my $traces = join("; ", map{"where " . $_} @threads);
 
             push @commands, "echo \"$traces\" | dbx $binary $core";
-        } elsif ($core) {
+      } elsif ($core) {
             ## We'll attempt pstack and c++filt which should allways
             ## work and show all threads. c++filt from SunStudio
             ## should even be able to demangle GNU CC-compiled
-                ## executables.
+            ## executables.
             push @commands, "pstack $core | c++filt";
         } else {
             say ("No core available");
+            say("Will return STATUS_OK,undef");
+            say("INFO: Reporter 'Backtrace' ------------------------------ End");
+            return STATUS_OK, undef;
         }
-	} else {
-        ## Assume all other systems are gdb-"friendly" ;-)
-		push @commands, "gdb --batch --se=$binary --core=$core --command=backtrace.gdb";
-		push @commands, "gdb --batch --se=$binary --core=$core --command=backtrace-all.gdb";
-	}
-	
-	my @debugs;
+   } else {
+      ## Assume all other systems are gdb-"friendly" ;-)
+      # We should not expect that our RQG Runner has some current working directory
+      # containing the RQG to be used or some RQG at all.
+      my $rqg_homedir = "./";
+      if (defined $ENV{RQG_HOME}) {
+         $rqg_homedir = $ENV{RQG_HOME} . "/";
+      }
+      my $command_part = "gdb --batch --se=$binary --core=$core --command=$rqg_homedir";
+      push @commands, "$command_part" . "backtrace.gdb";
+      push @commands, "$command_part" . "backtrace-all.gdb";
+   }
 
-	foreach my $command (@commands) {
-		my $output = `$command`;
-		say("$output");
-		push @debugs, [$command, $output];
-	}
+   my @debugs;
+
+   foreach my $command (@commands) {
+      my $output = `$command`;
+      say("$output");
+      push @debugs, [$command, $output];
+   }
 
 
-    my $incident = GenTest::Incident->new(
+   my $incident = GenTest::Incident->new(
         result   => 'fail',
         corefile => $core,
         debugs   => \@debugs
-    );
+   );
 
-	return STATUS_OK, $incident;
+   # return STATUS_OK, $incident;
+   say("Will return STATUS_SERVER_CRASHED, ...");
+   say("INFO: Reporter 'Backtrace' ------------------------------ End");
+   return STATUS_SERVER_CRASHED, $incident;
 }
 
 sub callbackReport {
@@ -126,7 +175,7 @@ sub callbackReport {
 }
 
 sub type {
-	return REPORTER_TYPE_CRASH | REPORTER_TYPE_DEADLOCK;
+   return REPORTER_TYPE_CRASH | REPORTER_TYPE_DEADLOCK;
 }
 
 1;
