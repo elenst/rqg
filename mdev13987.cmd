@@ -1,0 +1,1 @@
+perl ./run-scenario.pl --duration=350 --threads=8 --grammar=mdev13987.yy  --seed=1525736601 --basedir=/data/bld/10.3 --scenario=Restart  --mysqld=--lock-wait-timeout=10 --mysqld=--innodb-lock-wait-timeout=5 --vardir=/dev/shm/vardir
