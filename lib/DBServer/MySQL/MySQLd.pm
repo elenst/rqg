@@ -711,7 +711,6 @@ sub term {
             if ($waits >= 100) {
                 say("Unable to terminate process ".$self->serverpid.". Trying SIGABRT");
                 kill ABRT => $self->serverpid;
-                $res= DBSTATUS_FAILURE;
                 $waits= 0;
                 while ($self->running && $waits < 20) {
                   Time::HiRes::sleep(0.2);
@@ -721,6 +720,7 @@ sub term {
                   say("SIGABRT didn't work for process ".$self->serverpid.". Trying KILL");
                   $self->kill;
                 }
+                $res= DBSTATUS_FAILURE;
             } else {
                 say("Terminated process ".$self->serverpid);
                 $res= DBSTATUS_OK;
@@ -920,7 +920,9 @@ sub stopServer {
         my $dbh = $self->dbh();
         # Need to check if $dbh is defined, in case the server has crashed
         if (defined $dbh) {
-            $res = $dbh->func('shutdown','127.0.0.1','root','admin');
+            say("Sending shutdown command");
+            $res = $dbh->do("shutdown");
+#            $res = $dbh->func('shutdown','127.0.0.1','root','admin');
             if (!$res) {
                 ## If shutdown fails, we want to know why:
                 say("Shutdown failed due to ".$dbh->err.":".$dbh->errstr);
