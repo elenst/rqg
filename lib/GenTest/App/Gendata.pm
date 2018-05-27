@@ -215,8 +215,10 @@ sub run {
     }
 
     $executor->execute("SET SQL_MODE= CONCAT(\@\@sql_mode,',NO_ENGINE_SUBSTITUTION')") if $executor->type == DB_MYSQL;
-    $executor->execute("SET DEFAULT_STORAGE_ENGINE='".$self->engine()."'") 
-        if $self->engine() ne '' and ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE);
+    if ((defined $self->engine() and $self->engine() ne '') and
+        ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE)) {
+       $executor->execute("SET DEFAULT_STORAGE_ENGINE= '" . $self->engine() . "'");
+    }
 
     if (defined $schemas) {
         push(@schema_perms, @$schemas);
@@ -246,6 +248,7 @@ sub run {
     if (not ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE or $executor->type==DB_DUMMY)) {
         my @datetimestuff = grep(/date|time/,@{$fields->{types}});
         if ($#datetimestuff > -1) {
+           # FIXME: Replace that damned croak
             croak "Dates and times are severly broken. Cannot be used for other than MySQL/Drizzle";
         }
     }
@@ -477,14 +480,20 @@ sub run {
         my @table_copy = @$table;
         my @fields_copy = @fields;
         
-        if (uc($table->[TABLE_ENGINE]) eq 'FALCON') {
+        if (defined $table->[TABLE_ENGINE] and uc($table->[TABLE_ENGINE]) eq 'FALCON') {
             @fields_copy =  grep {
                 !($_->[FIELD_TYPE] =~ m{blob|text}io && $_->[FIELD_INDEX] ne '')
             } @fields ;
         }
         
-        say("Creating ".$executor->getName().
-            " table: $schema.$table_copy[TABLE_NAME]; engine: $table_copy[TABLE_ENGINE]; rows: $table_copy[TABLE_ROW] .");
+        my $message = "Creating " . $executor->getName() . 
+                      " table: $schema.$table_copy[TABLE_NAME]; ";
+        if (defined $table->[TABLE_ENGINE]) {
+           $message = $message . " engine: $table_copy[TABLE_ENGINE]; ";
+        } else {
+           $message = $message . " engine: <not set>; ";
+        }
+        say("$message rows: $table_copy[TABLE_ROW] .");
         
         if ($table_copy[TABLE_PK] ne '') {
             my $pk_field;
@@ -509,7 +518,7 @@ sub run {
  
         my @index_fields;
         if ($executor->type() == DB_MYSQL || $executor->type() == DB_DRIZZLE) {
-            @index_fields = grep { $_->[FIELD_INDEX_SQL] ne '' } @fields_copy;
+            @index_fields = grep { defined $_->[FIELD_INDEX_SQL] and $_->[FIELD_INDEX_SQL] ne '' } @fields_copy;
         } else {
             ## Just keep the primary keys.....
             @index_fields = grep { $_->[FIELD_INDEX_SQL] =~ m/primary/ } @fields_copy;
@@ -525,8 +534,7 @@ sub run {
 
         $executor->execute("CREATE TABLE `$table->[TABLE_NAME]` (\n".join(",\n/*Indices*/\n", grep { defined $_ } (@field_sqls, $index_sqls) ).") ".$table->[TABLE_SQL]);
         
-        if (not ($executor->type() == DB_MYSQL || 
-                 $executor->type() == DB_DRIZZLE)) {
+        if (not ($executor->type() == DB_MYSQL or $executor->type() == DB_DRIZZLE)) {
             @index_fields = grep { $_->[FIELD_INDEX_SQL] ne '' } @fields_copy;
             foreach my $idx (@index_fields) {
                 my $key_sql = $idx->[FIELD_INDEX_SQL];

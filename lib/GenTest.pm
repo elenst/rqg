@@ -1,6 +1,7 @@
 # Copyright (c) 2008, 2011, Oracle and/or its affiliates. All rights
 # reserved.
 # Copyright (c) 2013, Monty Program Ab.
+# Copyright (c) 2018, MariaDB Corporation Program Ab.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,9 +20,9 @@
 package GenTest;
 use base 'Exporter';
 
-@EXPORT = ('say', 'sayError', 'sayFile', 'tmpdir', 'safe_exit', 
+@EXPORT = ('say', 'sayError', 'sayFile', 'tmpdir', 'settmpdir', 'safe_exit',
            'osWindows', 'osLinux', 'osSolaris', 'osMac',
-           'isoTimestamp', 'isoUTCTimestamp', 'isoUTCSimpleTimestamp', 
+           'isoTimestamp', 'isoUTCTimestamp', 'isoUTCSimpleTimestamp',
            'rqg_debug', 'unix2winPath',
            'setLoggingToFile','setLogConf','shorten_message');
 
@@ -76,7 +77,7 @@ sub BEGIN {
 	# persistent property file
 	if (! defined $ppFile) {
                 $ppFile=tmpnam();
-        }  
+        }
 	
 	return 1;
 }
@@ -107,7 +108,7 @@ sub new {
 sub say {
 	my $text = shift;
 
-	# Suppress warnings "Wide character in print". 
+	# Suppress warnings "Wide character in print".
 	# We already know that our UTFs in some grammars are ugly.
 	no warnings 'layer';
 
@@ -132,7 +133,7 @@ sub say {
 sub sayError {
 	my $text = shift;
 
-	# Suppress warnings "Wide character in print". 
+	# Suppress warnings "Wide character in print".
 	# We already know that our UTFs in some grammars are ugly.
 	no warnings 'layer';
 
@@ -157,8 +158,15 @@ sub sayError {
 sub sayFile {
     my ($file) = @_;
 
+    if (not -f $file) {
+       Carp::cluck("ERROR: The file '$file' does not exist or is no plain file.");
+       return ;
+    }
     say("--------- Contents of $file -------------");
-    open FILE,$file;
+    if (not open FILE, $file) {
+       Carp::cluck("ERROR: Unable to open the file '$file' : $!");
+       return ;
+    };
     while (<FILE>) {
 	say("| ".$_);
     }
@@ -168,6 +176,15 @@ sub sayFile {
 
 sub tmpdir {
 	return $tmpdir;
+}
+
+# Certain RQG tools or runner start, get than via sub BEGIN some tmpdir picked which
+# cannot fit to their use cases, calculate than some perfect tmpdir and need to
+# cause that this is used instead.
+sub settmpdir {
+    my($new_tmpdir) = @_;
+    $tmpdir = $new_tmpdir;
+    say("DEBUG: tmpdir set to '$tmpdir'");
 }
 
 sub safe_exit {
@@ -269,11 +286,11 @@ sub setLoggingToFile {
     my $logfile = shift;
     my $logconf = {
         'log4perl.logger.randgen' => 'INFO, STDOUT, FILE',
-        
+
         'log4perl.appender.STDOUT' => 'Log::Log4perl::Appender::Screen',
         'log4perl.appender.STDOUT.layout'=>'PatternLayout',
         'log4perl.appender.STDOUT.layout.ConversionPattern'=>"# %d{yyyy-MM-dd'T'HH:mm:ss} %m%n",
-        
+
         'log4perl.appender.FILE'=>'Log::Log4perl::Appender::File',
         'log4perl.appender.FILE.filename'=>$logfile,
         'log4perl.appender.FILE.mode'=>'append',
@@ -303,7 +320,7 @@ sub persistentProperty {
     # at the same time
     open(MYLOCK,'>'.$ppFile.'.lck');
     flock(MYLOCK,LOCK_EX);
-    # access persistent property    
+    # access persistent property
     tie(%h, 'GDBM_File', $ppFile, , &GDBM_WRCREAT, 0640);
     if (defined $_[1]) {
         $h{$_[0]}=$_[1];

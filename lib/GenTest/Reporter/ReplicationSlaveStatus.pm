@@ -1,5 +1,5 @@
 # Copyright (C) 2008-2009 Sun Microsystems, Inc. All rights reserved.
-# Copyright (C) 2016 MariaDB Corporation AB.
+# Copyright (C) 2016, 2018 MariaDB Corporation AB.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -58,6 +58,9 @@ sub status {
 	$first_reporter = $reporter if not defined $first_reporter;
 	return STATUS_OK if $reporter ne $first_reporter;
 
+    if (not defined $reporter->properties->servers->[1]) {
+       Carp::cluck("ERROR $reporter->properties->servers->[1] is not defined.");
+    }
     my $server = $reporter->properties->servers->[1];
     my $dbh = DBI->connect($server->dsn());
 
@@ -78,7 +81,10 @@ sub status {
 		}
 	} else {
 		say("ERROR: Lost connection to the slave");
-		return STATUS_REPLICATION_FAILURE;
+        # This is definitely not a replication failure.
+		# return STATUS_REPLICATION_FAILURE;
+        # Experimental but maybe sub optimal
+		return STATUS_SERVER_CRASHED;
 	}
 }
 

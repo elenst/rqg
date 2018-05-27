@@ -115,8 +115,9 @@ sub run {
     if ($executor->type != DB_MYSQL) {
         die "Only MySQL executor type is supported\n";
     }
-    $executor->sqltrace($self->server_id);
+    $executor->setId($self->server_id);
     $executor->sqltrace($self->sqltrace);
+    $executor->setRole("GendataAdvanced");
     $executor->init();
 
     my $names = GDS_DEFAULT_NAMES;

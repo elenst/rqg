@@ -93,7 +93,8 @@ require Exporter;
 use strict;
 
 use constant STATUS_OK                         => 0;    # Suitable for exit code
-use constant STATUS_INTERNAL_ERROR             => 1;    # Apparently seen with certain Perl coding errors; check RQG log carefully for exact error
+use constant STATUS_INTERNAL_ERROR             => 160;  # Apparently seen with certain Perl coding errors; check RQG log carefully for exact error
+                                                        # This was in history '1'. But its very critical failure and must serious attention.
 use constant STATUS_UNKNOWN_ERROR              => 2;
 
 use constant STATUS_ANY_ERROR                  => 3;    # Used in util/simplify* to not differentiate based on error code

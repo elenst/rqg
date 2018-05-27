@@ -106,7 +106,7 @@ sub new {
       }
    }
 
-   my @validators = (@prerequisites, @validators);
+   @validators = (@prerequisites, @validators);
    $mixer->setValidators(\@validators);
 
    foreach my $validator (@validators) {
@@ -371,8 +371,8 @@ sub next {
       }
    } # End of loop called "query"
 
-   say("DEBUG: Mixer for $mixer_role : Will return maxstatus : " .
-       status2text($max_status) . "($max_status).");
+#  say("DEBUG: Mixer for $mixer_role : Will return maxstatus : " .
+#      status2text($max_status) . "($max_status).");
 
    return $max_status;
 }
@@ -383,7 +383,7 @@ sub DESTROY {
 
    my @rule_failures;
 
-   foreach my $rule (keys %rule_status) {
+   foreach my $rule (sort keys %rule_status) {
       if ($rule_status{$rule} > STATUS_OK) {
          push @rule_failures, "$rule (" . status2text($rule_status{$rule}) . ")";
       }

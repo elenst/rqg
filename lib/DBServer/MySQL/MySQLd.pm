@@ -1,4 +1,4 @@
-# Copyright (c) 2010, 2012, Oracle and/or its affiliates. All rights reserved. 
+# Copyright (c) 2010, 2012, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, 2018, MariaDB Corporation Ab
 # Use is subject to license terms.
 #
@@ -34,54 +34,54 @@ use File::Basename qw(dirname);
 use File::Path qw(mkpath rmtree);
 use File::Copy qw(move);
 
-use constant MYSQLD_BASEDIR => 0;
-use constant MYSQLD_VARDIR => 1;
-use constant MYSQLD_DATADIR => 2;
-use constant MYSQLD_PORT => 3;
-use constant MYSQLD_MYSQLD => 4;
-use constant MYSQLD_LIBMYSQL => 5;
-use constant MYSQLD_BOOT_SQL => 6;
-use constant MYSQLD_STDOPTS => 7;
-use constant MYSQLD_MESSAGES => 8;
-use constant MYSQLD_CHARSETS => 9;
-use constant MYSQLD_SERVER_OPTIONS => 10;
-use constant MYSQLD_AUXPID => 11;
-use constant MYSQLD_SERVERPID => 12;
-use constant MYSQLD_WINDOWS_PROCESS => 13;
-use constant MYSQLD_DBH => 14;
-use constant MYSQLD_START_DIRTY => 15;
-use constant MYSQLD_VALGRIND => 16;
-use constant MYSQLD_VALGRIND_OPTIONS => 17;
-use constant MYSQLD_VERSION => 18;
-use constant MYSQLD_DUMPER => 19;
-use constant MYSQLD_SOURCEDIR => 20;
-use constant MYSQLD_GENERAL_LOG => 21;
-use constant MYSQLD_WINDOWS_PROCESS_EXITCODE => 22;
-use constant MYSQLD_DEBUG_SERVER => 22;
-use constant MYSQLD_SERVER_TYPE => 23;
-use constant MYSQLD_VALGRIND_SUPPRESSION_FILE => 24;
-use constant MYSQLD_TMPDIR => 25;
-use constant MYSQLD_CONFIG_CONTENTS => 26;
-use constant MYSQLD_CONFIG_FILE => 27;
-use constant MYSQLD_USER => 28;
-use constant MYSQLD_MAJOR_VERSION => 29;
-use constant MYSQLD_CLIENT_BINDIR => 30;
-use constant MYSQLD_SERVER_VARIABLES => 31;
-use constant MYSQLD_SQL_RUNNER => 32;
+use constant MYSQLD_BASEDIR                      => 0;
+use constant MYSQLD_VARDIR                       => 1;
+use constant MYSQLD_DATADIR                      => 2;
+use constant MYSQLD_PORT                         => 3;
+use constant MYSQLD_MYSQLD                       => 4;
+use constant MYSQLD_LIBMYSQL                     => 5;
+use constant MYSQLD_BOOT_SQL                     => 6;
+use constant MYSQLD_STDOPTS                      => 7;
+use constant MYSQLD_MESSAGES                     => 8;
+use constant MYSQLD_CHARSETS                     => 9;
+use constant MYSQLD_SERVER_OPTIONS               => 10;
+use constant MYSQLD_AUXPID                       => 11;
+use constant MYSQLD_SERVERPID                    => 12;
+use constant MYSQLD_WINDOWS_PROCESS              => 13;
+use constant MYSQLD_DBH                          => 14;
+use constant MYSQLD_START_DIRTY                  => 15;
+use constant MYSQLD_VALGRIND                     => 16;
+use constant MYSQLD_VALGRIND_OPTIONS             => 17;
+use constant MYSQLD_VERSION                      => 18;
+use constant MYSQLD_DUMPER                       => 19;
+use constant MYSQLD_SOURCEDIR                    => 20;
+use constant MYSQLD_GENERAL_LOG                  => 21;
+use constant MYSQLD_WINDOWS_PROCESS_EXITCODE     => 22;
+use constant MYSQLD_DEBUG_SERVER                 => 22;
+use constant MYSQLD_SERVER_TYPE                  => 23;
+use constant MYSQLD_VALGRIND_SUPPRESSION_FILE    => 24;
+use constant MYSQLD_TMPDIR                       => 25;
+use constant MYSQLD_CONFIG_CONTENTS              => 26;
+use constant MYSQLD_CONFIG_FILE                  => 27;
+use constant MYSQLD_USER                         => 28;
+use constant MYSQLD_MAJOR_VERSION                => 29;
+use constant MYSQLD_CLIENT_BINDIR                => 30;
+use constant MYSQLD_SERVER_VARIABLES             => 31;
+use constant MYSQLD_SQL_RUNNER                   => 32;
 
-use constant MYSQLD_PID_FILE => "mysql.pid";
-use constant MYSQLD_ERRORLOG_FILE => "mysql.err";
-use constant MYSQLD_BOOTSQL_FILE => "boot.sql";
-use constant MYSQLD_BOOTLOG_FILE => "boot.log";
-use constant MYSQLD_LOG_FILE => "mysql.log";
-use constant MYSQLD_DEFAULT_PORT =>  19300;
-use constant MYSQLD_DEFAULT_DATABASE => "test";
-use constant MYSQLD_WINDOWS_PROCESS_STILLALIVE => 259;
+use constant MYSQLD_PID_FILE                     => "mysql.pid";
+use constant MYSQLD_ERRORLOG_FILE                => "mysql.err";
+use constant MYSQLD_BOOTSQL_FILE                 => "boot.sql";
+use constant MYSQLD_BOOTLOG_FILE                 => "boot.log";
+use constant MYSQLD_LOG_FILE                     => "mysql.log";
+use constant MYSQLD_DEFAULT_PORT                 =>  19300;
+use constant MYSQLD_DEFAULT_DATABASE             => "test";
+use constant MYSQLD_WINDOWS_PROCESS_STILLALIVE   => 259;
 
 
 sub new {
     my $class = shift;
-    
+
     my $self = $class->SUPER::new({'basedir' => MYSQLD_BASEDIR,
                                    'sourcedir' => MYSQLD_SOURCEDIR,
                                    'vardir' => MYSQLD_VARDIR,
@@ -94,29 +94,29 @@ sub new {
                                    'valgrind_options' => MYSQLD_VALGRIND_OPTIONS,
                                    'config' => MYSQLD_CONFIG_CONTENTS,
                                    'user' => MYSQLD_USER},@_);
-    
+
     croak "No valgrind support on windows" if osWindows() and $self->[MYSQLD_VALGRIND];
-    
+
     if (not defined $self->[MYSQLD_VARDIR]) {
         $self->[MYSQLD_VARDIR] = "mysql-test/var";
     }
-    
+
     if (osWindows()) {
         ## Use unix-style path's since that's what Perl expects...
         $self->[MYSQLD_BASEDIR] =~ s/\\/\//g;
         $self->[MYSQLD_VARDIR] =~ s/\\/\//g;
         $self->[MYSQLD_DATADIR] =~ s/\\/\//g;
     }
-    
+
     if (not $self->_absPath($self->vardir)) {
         $self->[MYSQLD_VARDIR] = $self->basedir."/".$self->vardir;
     }
-    
+
     # Default tmpdir for server.
     $self->[MYSQLD_TMPDIR] = $self->vardir."/tmp";
 
     $self->[MYSQLD_DATADIR] = $self->[MYSQLD_VARDIR]."/data";
-    
+
     # Use mysqld-debug server if --debug-server option used.
     if ($self->[MYSQLD_DEBUG_SERVER]) {
         # Catch exception, dont exit continue search for other mysqld if debug.
@@ -125,13 +125,13 @@ sub new {
                                                   osWindows()?["sql/Debug","sql/RelWithDebInfo","sql/Release","bin"]:["sql","libexec","bin","sbin"],
                                                   osWindows()?"mysqld-debug.exe":"mysqld-debug");
         };
-        # If mysqld-debug server is not found, use mysqld server if built as debug.        
+        # If mysqld-debug server is not found, use mysqld server if built as debug.
         if (!$self->[MYSQLD_MYSQLD]) {
             $self->[MYSQLD_MYSQLD] = $self->_find([$self->basedir],
                                                   osWindows()?["sql/Debug","sql/RelWithDebInfo","sql/Release","bin"]:["sql","libexec","bin","sbin"],
-                                                  osWindows()?"mysqld.exe":"mysqld");     
+                                                  osWindows()?"mysqld.exe":"mysqld");
             if ($self->[MYSQLD_MYSQLD] && $self->serverType($self->[MYSQLD_MYSQLD]) !~ /Debug/) {
-                croak "--debug-server needs a mysqld debug server, the server found is $self->[MYSQLD_SERVER_TYPE]"; 
+                croak "--debug-server needs a mysqld debug server, the server found is $self->[MYSQLD_SERVER_TYPE]";
             }
         }
     } else {
@@ -147,7 +147,7 @@ sub new {
                                                   osWindows()?["sql/Debug","sql/RelWithDebInfo","sql/Release","bin"]:["sql","libexec","bin","sbin"],
                                                   osWindows()?"mysqld-debug.exe":"mysqld-debug");
         }
-        
+
         $self->serverType($self->[MYSQLD_MYSQLD]);
     }
 
@@ -173,14 +173,14 @@ sub new {
             }
         }
     }
-   
-    ## Use valgrind suppression file available in mysql-test path. 
+
+    ## Use valgrind suppression file available in mysql-test path.
     if ($self->[MYSQLD_VALGRIND]) {
         $self->[MYSQLD_VALGRIND_SUPPRESSION_FILE] = $self->_find(defined $self->sourcedir?[$self->basedir,$self->sourcedir]:[$self->basedir],
                                                              osWindows()?["share/mysql-test","mysql-test"]:["share/mysql-test","mysql-test"],
                                                              "valgrind.supp")
     };
-    
+
     foreach my $file ("mysql_system_tables.sql",
                       "mysql_performance_tables.sql",
                       "mysql_system_tables_data.sql",
@@ -191,25 +191,25 @@ sub new {
                           ["scripts","share/mysql","share"], $file) };
         push(@{$self->[MYSQLD_BOOT_SQL]},$script) if $script;
     }
-    
-    $self->[MYSQLD_MESSAGES] = 
-       $self->_findDir(defined $self->sourcedir?[$self->basedir,$self->sourcedir]:[$self->basedir], 
+
+    $self->[MYSQLD_MESSAGES] =
+       $self->_findDir(defined $self->sourcedir?[$self->basedir,$self->sourcedir]:[$self->basedir],
                        ["sql/share","share/mysql","share"], "english/errmsg.sys");
 
     $self->[MYSQLD_CHARSETS] =
         $self->_findDir(defined $self->sourcedir?[$self->basedir,$self->sourcedir]:[$self->basedir],
                         ["sql/share/charsets","share/mysql/charsets","share/charsets"], "Index.xml");
-                         
-    
+
+
     #$self->[MYSQLD_LIBMYSQL] =
     #   $self->_findDir([$self->basedir],
     #                   osWindows()?["libmysql/Debug","libmysql/RelWithDebInfo","libmysql/Release","lib","lib/debug","lib/opt","bin"]:["libmysql","libmysql/.libs","lib/mysql","lib"],
     #                   osWindows()?"libmysql.dll":osMac()?"libmysqlclient.dylib":"libmysqlclient.so");
-    
+
     $self->[MYSQLD_STDOPTS] = ["--basedir=".$self->basedir,
                                $self->_messages,
                                "--character-sets-dir=".$self->[MYSQLD_CHARSETS],
-                               "--tmpdir=".$self->tmpdir];    
+                               "--tmpdir=".$self->tmpdir];
 
     if ($self->[MYSQLD_START_DIRTY]) {
         say("Using existing data for MySQL " .$self->version ." at ".$self->datadir);
@@ -254,7 +254,7 @@ sub tmpdir {
 
 sub port {
     my ($self) = @_;
-    
+
     if (defined $self->[MYSQLD_PORT]) {
         return $self->[MYSQLD_PORT];
     } else {
@@ -283,7 +283,7 @@ sub socketfile {
     my ($self) = @_;
     my $socketFileName = $_[0]->vardir."/mysql.sock";
     if (length($socketFileName) >= 100) {
-	$socketFileName = "/tmp/RQGmysql.".$self->port.".sock";
+        $socketFileName = "/tmp/RQGmysql.".$self->port.".sock";
     }
     return $socketFileName;
 }
@@ -320,10 +320,10 @@ sub valgrind_suppressionfile {
 sub serverType {
     my ($self, $mysqld) = @_;
     $self->[MYSQLD_SERVER_TYPE] = "Release";
-    
+
     my $command="$mysqld --version";
     my $result=`$command 2>&1`;
-    
+
     $self->[MYSQLD_SERVER_TYPE] = "Debug" if ($result =~ /debug/sig);
     return $self->[MYSQLD_SERVER_TYPE];
 }
@@ -359,7 +359,7 @@ sub printServerOptions {
 
 sub createMysqlBase  {
     my ($self) = @_;
-    
+
     ## Clean old db if any
     if (-d $self->vardir) {
         rmtree($self->vardir);
@@ -459,58 +459,58 @@ sub _reportError {
 }
 
 sub startServer {
-    my ($self) = @_;
+   my ($self) = @_;
 
-	my @defaults = ($self->[MYSQLD_CONFIG_FILE] ? ("--defaults-group-suffix=.runtime", "--defaults-file=$self->[MYSQLD_CONFIG_FILE]") : ("--no-defaults"));
+   my @defaults = ($self->[MYSQLD_CONFIG_FILE] ? ("--defaults-group-suffix=.runtime", "--defaults-file=$self->[MYSQLD_CONFIG_FILE]") : ("--no-defaults"));
 
-    my ($v1,$v2,@rest) = $self->versionNumbers;
-    my $v = $v1*1000+$v2;
-    my $command = $self->generateCommand([@defaults],
+   my ($v1,$v2,@rest) = $self->versionNumbers;
+   my $v = $v1*1000+$v2;
+   my $command = $self->generateCommand([@defaults],
                                          $self->[MYSQLD_STDOPTS],
                                          ["--core-file",
                                           "--datadir=".$self->datadir,  # Could not add to STDOPTS, because datadir could have changed
-                                          "--max-allowed-packet=128Mb",	# Allow loading bigger blobs
+                                          "--max-allowed-packet=128Mb", # Allow loading bigger blobs
                                           "--port=".$self->port,
                                           "--socket=".$self->socketfile,
                                           "--pid-file=".$self->pidfile],
                                          $self->_logOptions);
-    if (defined $self->[MYSQLD_SERVER_OPTIONS]) {
+   if (defined $self->[MYSQLD_SERVER_OPTIONS]) {
         $command = $command." ".join(' ',@{$self->[MYSQLD_SERVER_OPTIONS]});
-    }
-    # If we don't remove the existing pidfile, 
-    # the server will be considered started too early, and further flow can fail
-    unlink($self->pidfile);
-    
-    my $errorlog = $self->vardir."/".MYSQLD_ERRORLOG_FILE;
-    
-    # In seconds, timeout for the server to start updating error log
-    # after the server startup command has been launched
-    my $start_wait_timeout= 30;
+   }
+   # If we don't remove the existing pidfile,
+   # the server will be considered started too early, and further flow can fail
+   unlink($self->pidfile);
 
-    # In seconds, timeout for the server to create pid file
-    # after it has started updating the error log
-    # (before the server is considered hanging)
-    my $startup_timeout= 600;
-    
-    if (osWindows) {
-        my $proc;
-        my $exe = $self->binary;
-        my $vardir = $self->[MYSQLD_VARDIR];
-        $exe =~ s/\//\\/g;
-        $vardir =~ s/\//\\/g;
-        $self->printInfo();
-        say("Starting MySQL ".$self->version.": $exe as $command on $vardir");
-        Win32::Process::Create($proc,
+   my $errorlog = $self->vardir."/".MYSQLD_ERRORLOG_FILE;
+
+   # In seconds, timeout for the server to start updating error log
+   # after the server startup command has been launched
+   my $start_wait_timeout= 30;
+
+   # In seconds, timeout for the server to create pid file
+   # after it has started updating the error log
+   # (before the server is considered hanging)
+   my $startup_timeout= 600;
+
+   if (osWindows) {
+      my $proc;
+      my $exe = $self->binary;
+      my $vardir = $self->[MYSQLD_VARDIR];
+      $exe =~ s/\//\\/g;
+      $vardir =~ s/\//\\/g;
+      $self->printInfo();
+      say("INFO: Starting MySQL " . $self->version . ": $exe as $command on $vardir");
+      Win32::Process::Create($proc,
                                $exe,
                                $command,
                                0,
                                NORMAL_PRIORITY_CLASS(),
                                ".") || croak _reportError();
-        $self->[MYSQLD_WINDOWS_PROCESS]=$proc;
-        $self->[MYSQLD_SERVERPID]=$proc->GetProcessID();
-        # Gather the exit code and check if server is running.
-        $proc->GetExitCode($self->[MYSQLD_WINDOWS_PROCESS_EXITCODE]);
-        if ($self->[MYSQLD_WINDOWS_PROCESS_EXITCODE] == MYSQLD_WINDOWS_PROCESS_STILLALIVE) {
+      $self->[MYSQLD_WINDOWS_PROCESS]=$proc;
+      $self->[MYSQLD_SERVERPID]=$proc->GetProcessID();
+      # Gather the exit code and check if server is running.
+      $proc->GetExitCode($self->[MYSQLD_WINDOWS_PROCESS_EXITCODE]);
+      if ($self->[MYSQLD_WINDOWS_PROCESS_EXITCODE] == MYSQLD_WINDOWS_PROCESS_STILLALIVE) {
             ## Wait for the pid file to have been created
             my $wait_time = 0.5;
             my $waits = 0;
@@ -522,94 +522,106 @@ sub startServer {
                 sayFile($errorlog);
                 croak("Could not start mysql server, waited ".($waits*$wait_time)." seconds for pid file");
             }
-        }
-    } else {
-        if ($self->[MYSQLD_VALGRIND]) {
-            my $val_opt ="";
-            $start_wait_timeout= 60;
-            $startup_timeout= 1200;
-            if (defined $self->[MYSQLD_VALGRIND_OPTIONS]) {
-                $val_opt = join(' ',@{$self->[MYSQLD_VALGRIND_OPTIONS]});
-            }
-            $command = "valgrind --time-stamp=yes --leak-check=yes --suppressions=".$self->valgrind_suppressionfile." ".$val_opt." ".$command;
-        }
-        $self->printInfo;
+      }
+   } else {
+      if ($self->[MYSQLD_VALGRIND]) {
+         my $val_opt         = "";
+         $start_wait_timeout = 60;   # Maximum wait time for an error log update or
+                                     # pid_file existence..
+         $startup_timeout    = 1200;
+         if (defined $self->[MYSQLD_VALGRIND_OPTIONS]) {
+            $val_opt = join(' ',@{$self->[MYSQLD_VALGRIND_OPTIONS]});
+         }
+         # FIXME: Do we check somewhere that the $self->valgrind_suppressionfile exists?
+         $command = "valgrind --time-stamp=yes --leak-check=yes --suppressions=" .
+                    $self->valgrind_suppressionfile . " " . $val_opt . " " . $command;
+      }
+      # This is too early. printInfo needs the pid which is currently unknown!
+      # $self->printInfo;
 
-        my $errlog_fh;
-        my $errlog_last_update_time= (stat($errorlog))[9] || 0;
-        if ($errlog_last_update_time) {
+      my $errlog_fh;
+      my $errlog_last_update_time= (stat($errorlog))[9] || 0;
+      if ($errlog_last_update_time) {
             open($errlog_fh,$errorlog) || ( sayError("Could not open the error log " . $errorlog . " for initial read: $!") && return DBSTATUS_FAILURE );
             while (!eof($errlog_fh)) { readline $errlog_fh };
             seek $errlog_fh, 0, 1;
-        }
+      }
 
-        say("Starting MySQL ".$self->version.": $command");
+      say("INFO: Starting MySQL " . $self->version . ": $command");
 
-        $self->[MYSQLD_AUXPID] = fork();
-        if ($self->[MYSQLD_AUXPID]) {
-            
-            sub get_pid_from_file {
-                my $fname= shift;
-                my $p = `cat \"$fname\"`;
-                $p =~ s/.*?([0-9]+).*/$1/;
-                return $p;
+      $self->[MYSQLD_AUXPID] = fork();
+      if ($self->[MYSQLD_AUXPID]) {
+         # This is the parent (usually GenTest?) observing his child.
+         #-----------------------------------------------------------
+
+         sub get_pid_from_file {
+            my $fname = shift;
+            my $p     = `cat \"$fname\"`;
+            $p        =~ s/.*?([0-9]+).*/$1/;
+            return $p;
+         }
+
+         ## Wait for the pid file to have been created
+         my $wait_time      = 0.2;
+         my $errlog_update  = 0;
+         my $pid;
+         my $wait_end       = time() + $start_wait_timeout;
+
+         # After we've launched server startup, we'll wait for max $start_wait_timeout seconds
+         # for the server to start updating the error log
+         while (not -f $self->pidfile and time() < $wait_end) {
+            Time::HiRes::sleep($wait_time);
+            $errlog_update = ((stat($errorlog))[9] > $errlog_last_update_time);
+            last if $errlog_update;
+         }
+         # What could have been?
+         # 1. An errlog_update has happened. Q: All time before pidfile creation?
+         # 2. The pidfile was created.
+         # 3. timeout exceeded in state no pidfile exists and no error log update.
+         #    Warning: The state might already have changed.
+
+         if (-f $self->pidfile) {
+            $pid = get_pid_from_file($self->pidfile);
+            say("INFO: Server created pid file with pid $pid");
+         } elsif (!$errlog_update) {
+            sayError("Server has not started updating the error log within $start_wait_timeout sec. timeout, and has not created pid file");
+            sayFile($errorlog);
+            sayError('Will return DBSTATUS_FAILURE');
+            return DBSTATUS_FAILURE;
+         }
+
+         if (!$pid)
+         {
+            # If we are here, server has started updating the error log.
+            # It can be doing some lengthy startup before creating the pid file,
+            # but we might be able to get the pid from the error log record
+            # [Note] <path>/mysqld (mysqld <version>) starting as process <pid> ...
+            # (if the server is new enough to produce it).
+            # We need the latest line of this kind
+
+            unless ($errlog_fh) {
+               unless (open($errlog_fh, $errorlog)) {
+                  sayError("Could not open the error log '" . $errorlog . "': $!");
+                  return DBSTATUS_FAILURE;
+               }
             }
-            
-            ## Wait for the pid file to have been created
-            my $wait_time = 0.2;
-            my $waits= 0;
-            my $errlog_update= 0;
-            my $pid;
-            my $wait_end= time() + $start_wait_timeout;
+            # In case the file is being slowly updated (e.g. with valgrind),
+            # and pid is not the first line which was printed (again, as with valgrind),
+            # we don't want to reach the EOF and exit too quickly.
+            # So, first we read the whole file till EOF, and if the last line was a valgrind-produced line
+            # (starts with '== ', we'll keep waiting for more updates, until we get the first normal line,
+            # which is supposed to be the PID. If it's not, there is nothing more to wait for.
+            # TODO:
+            # - if it's not the first start in this error log, so our protection against
+            #   quitting too quickly won't work -- we'll read a wrong (old) PID and will leave.
+            # And of course it won't work on Windows, but the new-style server start is generally
+            # not reliable there and needs to be fixed.
 
-            # After we've launched server startup, we'll wait for max $start_wait_timeout seconds
-            # for the server to start updating the error log
-            while (!-f $self->pidfile and time() < $wait_end ) {
-                Time::HiRes::sleep($wait_time);
-                $errlog_update= ( (stat($errorlog))[9] > $errlog_last_update_time);
-                last if $errlog_update;
-            }
-
-            if (-f $self->pidfile) {
-                $pid= get_pid_from_file($self->pidfile);
-                say("Server created pid file with pid $pid");
-            } elsif (!$errlog_update) {
-                sayError("Server has not started updating the error log withing $start_wait_timeout sec. timeout, and has not created pid file");
-                sayFile($errorlog);
-                return DBSTATUS_FAILURE;
-            }
-
-            if (!$pid)
-            {
-                # If we are here, server has started updating the error log. 
-                # It can be doing some lengthy startup before creating the pid file,
-                # but we might be able to get the pid from the error log record
-                # [Note] <path>/mysqld (mysqld <version>) starting as process <pid> ...
-                # (if the server is new enough to produce it).
-                # We need the latest line of this kind
-                
-                unless ($errlog_fh) {
-                    unless (open($errlog_fh, $errorlog)) {
-                        sayError("Could not open the error log  " . $errorlog . ": $!");
-                        return DBSTATUS_FAILURE;
-                    }
-                }
-                # In case the file is being slowly updated (e.g. with valgrind),
-                # and pid is not the first line which was printed (again, as with valgrind),
-                # we don't want to reach the EOF and exit too quickly.
-                # So, first we read the whole file till EOF, and if the last line was a valgrind-produced line
-                # (starts with '== ', we'll keep waiting for more updates, until we get the first normal line,
-                # which is supposed to be the PID. If it's not, there is nothing more to wait for.
-                # TODO: 
-                # - if it's not the first start in this error log, so our protection against
-                #   quitting too quickly won't work -- we'll read a wrong (old) PID and will leave.
-                # And of course it won't work on Windows, but the new-style server start is generally
-                # not reliable there and needs to be fixed.
-                
-                TAIL:
+            TAIL:
                 for (;;) {
                     do {
                         $_= readline $errlog_fh;
+                        # [Note] /work/Server/10.3//sql/mysqld (mysqld 10.3.7-MariaDB-debug-log) starting as process 14533 ...
                         if (/\[Note\]\s+\S+?\/mysqld\s+\(mysqld.*?\)\s+starting as process (\d+)\s+\.\./) {
                             $pid= $1;
                             last TAIL;
@@ -621,144 +633,180 @@ sub startServer {
                     sleep 1;
                     seek ERRLOG, 0, 1;    # this clears the EOF flag
                 }
+         }
+         close($errlog_fh) if $errlog_fh;
+
+         unless (defined $pid) {
+            say("WARNING: could not find the pid in the error log, might be an old version");
+         }
+
+         # Now we know the pid and can monitor it along with the pid file,
+         # to avoid unnecessary waiting if the server goes down
+         $wait_end= time() + $startup_timeout;
+
+         while (!-f $self->pidfile and time() < $wait_end) {
+            Time::HiRes::sleep($wait_time);
+            last if $pid and not kill(0, $pid);
+         }
+
+         if (!-f $self->pidfile) {
+            sayFile($errorlog);
+            if ($pid and not kill(0, $pid)) {
+               sayError("Server disappeared after having started with pid $pid");
+            } elsif ($pid) {
+               sayError("Timeout $startup_timeout has passed and the server still has not created the pid file, assuming it has hung, sending final SIGABRT to pid $pid...");
+               kill 'ABRT', $pid;
+            } else {
+               sayError("Timeout $startup_timeout has passed and the server still has not created the pid file, assuming it has hung, but cannot kill because we don't know the pid");
             }
-            close($errlog_fh) if $errlog_fh;
+            return DBSTATUS_FAILURE;
+         }
 
-            unless (defined $pid) {
-                say("WARNING: could not find the pid in the error log, might be an old version");
-            }
+         # We should only get here if the pid file was created
+         my $pidfile = $self->pidfile;
+         my $pid_from_file = `cat \"$pidfile\"`;
 
-            # Now we know the pid and can monitor it along with the pid file,
-            # to avoid unnecessary waiting if the server goes down
-            $wait_end= time() + $startup_timeout;
-
-            while (!-f $self->pidfile and time() < $wait_end) {
-                Time::HiRes::sleep($wait_time);
-                last if $pid and not kill(0, $pid);
-            }
-
-            if (!-f $self->pidfile) {
-                sayFile($errorlog);
-                if ($pid and not kill(0, $pid)) {
-                    sayError("Server disappeared after having started with pid $pid");
-                } elsif ($pid) {
-                    sayError("Timeout $startup_timeout has passed and the server still has not created the pid file, assuming it has hung, sending final SIGABRT to pid $pid...");
-                    kill 'ABRT', $pid;
-                } else {
-                    sayError("Timeout $startup_timeout has passed and the server still has not created the pid file, assuming it has hung, but cannot kill because we don't know the pid");
-                }
-                return DBSTATUS_FAILURE;
-            }
-
-            # We should only get here if the pid file was created
-            my $pidfile = $self->pidfile;
-            my $pid_from_file = `cat \"$pidfile\"`;
-
-            $pid_from_file =~ s/.*?([0-9]+).*/$1/;
-            if ($pid and $pid != $pid_from_file) {
-                say("WARNING: pid extracted from the error log ($pid) is different from the pid in the pidfile ($pid_from_file). Assuming the latter is correct");
-            }
-            $self->[MYSQLD_SERVERPID] = int($pid_from_file);
-        } else {
-            exec("$command >> \"$errorlog\"  2>&1") || croak("Could not start mysql server");
-        }
-    }
-    return ($self->waitForServerToStart && $self->dbh) ? DBSTATUS_OK : DBSTATUS_FAILURE;
+         $pid_from_file =~ s/.*?([0-9]+).*/$1/;
+         if ($pid and $pid != $pid_from_file) {
+            say("WARNING: pid extracted from the error log ($pid) is different from the pid in the pidfile ($pid_from_file). Assuming the latter is correct");
+         }
+         $self->[MYSQLD_SERVERPID] = int($pid_from_file);
+         $self->printInfo;
+         # FIXME:
+         # Will the current architecture
+         # - remove zombies fast
+         # - allow some very precise detection if some server is dead (process disappeared or zombie)
+      } else {
+         # Here is the child process who tries to become a running server
+         # FIXME: Replace Carp::cluck by returning something appropriate.
+         exec("$command >> \"$errorlog\"  2>&1") || Carp::cluck("ERROR: Could not start mysql server");
+      }
+   }
+   my $return = $self->waitForServerToStart;
+   if ($return != DBSTATUS_OK) {
+      say("ERROR: The server start failed. Will return DBSTATUS_FAILURE");
+      return DBSTATUS_FAILURE;
+   } else {
+      if (not defined $self->dbh) {
+         say("ERROR: We did not get a connection to the just started server. Will return DBSTATUS_FAILURE");
+         return DBSTATUS_FAILURE;
+      } else {
+         return DBSTATUS_OK;
+      }
+   }
 }
 
 sub kill {
-    my ($self) = @_;
+   my ($self) = @_;
 
-    if (osWindows()) {
-        if (defined $self->[MYSQLD_WINDOWS_PROCESS]) {
-            $self->[MYSQLD_WINDOWS_PROCESS]->Kill(0);
-            say("Killed process ".$self->[MYSQLD_WINDOWS_PROCESS]->GetProcessID());
-        }
-    } else {
-        my $pidfile= $self->pidfile;
+   if (osWindows()) {
+      if (defined $self->[MYSQLD_WINDOWS_PROCESS]) {
+         $self->[MYSQLD_WINDOWS_PROCESS]->Kill(0);
+         say("Killed process ".$self->[MYSQLD_WINDOWS_PROCESS]->GetProcessID());
+      }
+   } else {
+      my $pidfile= $self->pidfile;
 
-        if (not defined $self->serverpid and -f $pidfile) {
-            $self->[MYSQLD_SERVERPID] = `cat \"$pidfile\"`;
-        }
+      # FIXME: Is RQG really unable to memorize the server pid somehow else?
+      if (not defined $self->serverpid and -f $pidfile) {
+         $self->[MYSQLD_SERVERPID] = `cat \"$pidfile\"`;
+      }
 
-        if (defined $self->serverpid and $self->serverpid =~ /^\d+$/) {
-            kill KILL => $self->serverpid;
-            my $waits = 0;
-            while ($self->running && $waits < 100) {
-                Time::HiRes::sleep(0.2);
-                $waits++;
-            }
-            if ($waits >= 100) {
-                croak("Unable to kill process ".$self->serverpid);
-            } else {
-                say("Killed process ".$self->serverpid);
-            }
-        }
-    }
+      if (defined $self->serverpid and $self->serverpid =~ /^\d+$/) {
+         kill KILL => $self->serverpid;
+         # There is no guarantee that the OS has already killed the process when
+         # kill KILL returns. This is especially valid for boxes with currently
+         # extreme CPU load.
+         my $wait_end  = Time::HiRes::time() + 30;
+         my $wait_unit = 0.2;
+         while ($self->running && Time::HiRes::time() < $wait_end) {
+                Time::HiRes::sleep($wait_unit);
+         }
+         if (not Time::HiRes::time() < $wait_end) {
+            # FIXME: Replace the croak
+            croak("ERROR: Unable to kill the server process " . $self->serverpid);
+         } else {
+            say("INFO: Killed the server process " . $self->serverpid);
+         }
+      }
+   }
+   # FIXME: We must return something and bring the test to some clean end if failure.
 
-    # clean up when the server is not alive.
-    unlink $self->socketfile if -e $self->socketfile;
-    unlink $self->pidfile if -e $self->pidfile;
-    return ($self->running ? DBSTATUS_FAILURE : DBSTATUS_OK);
+   # clean up when the server is not alive.
+   unlink $self->socketfile if -e $self->socketfile;
+   unlink $self->pidfile if -e $self->pidfile;
+   return ($self->running ? DBSTATUS_FAILURE : DBSTATUS_OK);
 }
 
 sub term {
-    my ($self) = @_;
+   my ($self) = @_;
 
-    my $res;
-    if (osWindows()) {
-        ### Not for windows
-        say("Don't know how to do SIGTERM on Windows");
-        $self->kill;
-        $res= DBSTATUS_OK;
-    } else {
-        if (defined $self->serverpid) {
-            kill TERM => $self->serverpid;
-            my $waits = 0;
-            while ($self->running && $waits < 100) {
-                Time::HiRes::sleep(0.2);
-                $waits++;
-            }
-            if ($waits >= 100) {
-                say("Unable to terminate process ".$self->serverpid." Trying kill");
-                $self->kill;
-                $res= DBSTATUS_FAILURE;
-            } else {
-                say("Terminated process ".$self->serverpid);
-                $res= DBSTATUS_OK;
-            }
-        }
-    }
-    if (-e $self->socketfile) {
-        unlink $self->socketfile;
-    }
-    return $res;
+   my $res;
+   if (osWindows()) {
+      ### Not for windows
+      say("Don't know how to do SIGTERM on Windows");
+      $self->kill;
+      $res= DBSTATUS_OK;
+   } else {
+      if (defined $self->serverpid) {
+         kill TERM => $self->serverpid;
+
+         my $wait_end  = Time::HiRes::time() + 60;
+         my $wait_unit = 0.2;
+         while ($self->running && Time::HiRes::time() < $wait_end) {
+            Time::HiRes::sleep($wait_unit);
+         }
+         if (not Time::HiRes::time() < $wait_end) {
+            say("WARNING: Unable to terminate the server process " . $self->serverpid .
+                " Trying kill");
+            $self->kill;
+            $res= DBSTATUS_FAILURE;
+         } else {
+            say("INFO: Terminated the server process " . $self->serverpid);
+            $res= DBSTATUS_OK;
+         }
+      }
+   }
+   if (-e $self->socketfile) {
+      unlink $self->socketfile;
+   }
+   return $res;
 }
 
 sub crash {
-    my ($self) = @_;
-    
-    if (osWindows()) {
-        ## How do i do this?????
-        $self->kill; ## Temporary
-    } else {
-        if (defined $self->serverpid) {
-            kill SEGV => $self->serverpid;
-            say("Crashed process ".$self->serverpid);
-        }
-    }
+   my ($self) = @_;
 
-    # clean up when the server is not alive.
-    unlink $self->socketfile if -e $self->socketfile;
-    unlink $self->pidfile if -e $self->pidfile;
- 
+   if (osWindows()) {
+      ## How do i do this?????
+      $self->kill; ## Temporary
+   } else {
+      if (defined $self->serverpid) {
+         kill SEGV => $self->serverpid;
+         say("INFO: Crashed the server process " . $self->serverpid . " with SEGV.");
+      } else {
+         Carp:cluck("ERROR: Crashing the server process impossible because server pid is not defined.");
+      }
+   }
+   # FIXME: We must return something and bring the test to some clean end if failure.
+
+   # clean up when the server is not alive.
+   unlink $self->socketfile if -e $self->socketfile;
+   unlink $self->pidfile if -e $self->pidfile;
+
 }
 
 sub corefile {
-    my ($self) = @_;
+   my ($self) = @_;
 
-    ## Unix variant
-    return $self->datadir."/core.".$self->serverpid;
+   ## Unix variant
+   # FIXME: This is weak. There are boxes where we get 'core' without pid only.
+   if (not defined $self->datadir) {
+      Carp::cluck("ERROR: self->datadir is not defined.");
+   }
+   if (not defined $self->serverpid) {
+      Carp::cluck("ERROR: self->serverpid is not defined.");
+   }
+   return $self->datadir."/core.".$self->serverpid;
 }
 
 sub upgradeDb {
@@ -892,7 +940,7 @@ sub nonSystemDatabases {
 
 sub collectAutoincrements {
   my $self= shift;
-	my $autoinc_tables= $self->dbh->selectall_arrayref(
+    my $autoinc_tables= $self->dbh->selectall_arrayref(
       "SELECT CONCAT(ist.TABLE_SCHEMA,'.',ist.TABLE_NAME), ist.AUTO_INCREMENT, isc.COLUMN_NAME, '' ".
       "FROM INFORMATION_SCHEMA.TABLES ist JOIN INFORMATION_SCHEMA.COLUMNS isc ON (ist.TABLE_SCHEMA = isc.TABLE_SCHEMA AND ist.TABLE_NAME = isc.TABLE_NAME) ".
       "WHERE ist.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') ".
@@ -925,18 +973,21 @@ sub stopServer {
             $res = $dbh->func('shutdown','127.0.0.1','root','admin');
             if (!$res) {
                 ## If shutdown fails, we want to know why:
-                say("Shutdown failed due to ".$dbh->err.":".$dbh->errstr);
+                say("Shutdown failed due to " . $dbh->err . ":" . $dbh->errstr);
                 $res= DBSTATUS_FAILURE;
             }
+        } else {
+            # Lets stick to a warning because the state met might be intentional.
+            say("WARN: In stopServer : dbh is not defined.");
         }
-        if (!$self->waitForServerToStop($shutdown_timeout)) {
+        if ($self->waitForServerToStop($shutdown_timeout) != DBSTATUS_OK) {
             # Terminate process
             say("Server would not shut down properly. Terminate it");
             $res= $self->term;
         } else {
             # clean up when server is not alive.
             unlink $self->socketfile if -e $self->socketfile;
-            unlink $self->pidfile if -e $self->pidfile;
+            unlink $self->pidfile    if -e $self->pidfile;
             $res= DBSTATUS_OK;
             say("Server has been stopped");
         }
@@ -988,45 +1039,65 @@ sub checkDatabaseIntegrity {
 }
 
 sub addErrorLogMarker {
-  my $self= shift;
-  my $marker= shift;
+   my $self   = shift;
+   my $marker = shift;
 
-    say("Adding marker $marker to the error log ".$self->errorlog);
-  if (open(ERRLOG,">>".$self->errorlog)) {
-    print ERRLOG "$marker\n";
-    close (ERRLOG);
-  } else {
-    say("Could not add marker $marker to the error log ".$self->errorlog);
-  }
+   # FIXME:
+   # 1. Handle that adding the marker fails (file does not exist, write fails).
+   # 2. Could the impact of that operation get lost because of concurrent server write?
+   # 3. Return something showing success/fail + What should the caller do?
+   say("Adding marker '$marker' to the error log " . $self->errorlog);
+   if (open(ERRLOG, ">>" . $self->errorlog)) {
+      print ERRLOG "$marker\n";
+      close (ERRLOG);
+   } else {
+      say("WARNING: Could not add marker $marker to the error log " . $self->errorlog);
+   }
 }
 
 sub waitForServerToStop {
-  my $self= shift;
-  my $timeout= shift;
-  $timeout = (defined $timeout ? $timeout*2 : 120);
-  my $waits= 0;
-  while ($self->running && $waits < $timeout) {
-    Time::HiRes::sleep(0.5);
-    $waits++;
-  }
-  return !$self->running;
+# We return either DBSTATUS_OK(0) or DBSTATUS_FAILURE(1);
+   my $self      = shift;
+   my $timeout   = shift;
+   # 180s Looks like a lot but slow binaries and heavy loaded testing boxes are not rare.
+   $timeout      = (defined $timeout ? $timeout*2 : 180);
+   my $wait_end  = Time::HiRes::time() + $timeout;
+   my $wait_unit = 0.5;
+   while ($self->running && Time::HiRes::time() < $wait_end) {
+      Time::HiRes::sleep($wait_unit);
+   }
+   if ($self->running) {
+      say("ERROR: The server process has not disappeared after " . $timeout . "s waiting.\n" .
+          "       Will return DBSTATUS_FAILURE.");
+      return DBSTATUS_FAILURE;
+   } else {
+      return DBSTATUS_OK;
+   }
 }
 
 sub waitForServerToStart {
-  my $self= shift;
-  my $waits= 0;
-  while (!$self->running && $waits < 120) {
-    Time::HiRes::sleep(0.5);
-    $waits++;
-  }
-  return $self->running;
+# We return either DBSTATUS_OK(0) or DBSTATUS_FAILURE(1);
+   my $self      = shift;
+   my $timeout   = 180;
+   my $wait_end  = Time::HiRes::time() + $timeout;
+   my $wait_unit = 0.5;
+   while (!$self->running && Time::HiRes::time() < $wait_end) {
+      Time::HiRes::sleep($wait_unit);
+   }
+   if (not $self->running) {
+      say("ERROR: The server process has not come up after " . $timeout . "s waiting.\n" .
+          "       Will return DBSTATUS_FAILURE.");
+      return DBSTATUS_FAILURE;
+   } else {
+      return DBSTATUS_OK;
+   }
 }
 
 
 sub backupDatadir {
   my $self= shift;
   my $backup_name= shift;
-  
+
   say("Copying datadir... (interrupting the copy operation may cause investigation problems later)");
   if (osWindows()) {
       system('xcopy "'.$self->datadir.'" "'.$backup_name.' /E /I /Q');
@@ -1054,7 +1125,7 @@ sub checkErrorLogForErrors {
   {
     next unless !$marker or $found_marker or /^$marker$/;
     $found_marker= 1;
-		$_ =~ s{[\r\n]}{}siog;
+    $_ =~ s{[\r\n]}{}siog;
 
     # Ignore certain errors
     next if
@@ -1096,106 +1167,107 @@ sub checkErrorLogForErrors {
 sub serverVariables {
     my $self = shift;
     if (not keys %{$self->[MYSQLD_SERVER_VARIABLES]}) {
-        my $dbh = $self->dbh;
-        return undef if not defined $dbh;
-        my $sth = $dbh->prepare("SHOW VARIABLES");
-        $sth->execute();
-        my %vars = ();
-        while (my $array_ref = $sth->fetchrow_arrayref()) {
-            $vars{$array_ref->[0]} = $array_ref->[1];
-        }
-        $sth->finish();
-        $self->[MYSQLD_SERVER_VARIABLES] = \%vars;
+       my $dbh = $self->dbh;
+       return undef if not defined $dbh;
+       my $sth = $dbh->prepare("SHOW VARIABLES");
+       $sth->execute();
+       my %vars = ();
+       while (my $array_ref = $sth->fetchrow_arrayref()) {
+          $vars{$array_ref->[0]} = $array_ref->[1];
+       }
+       $sth->finish();
+       $self->[MYSQLD_SERVER_VARIABLES] = \%vars;
     }
     return $self->[MYSQLD_SERVER_VARIABLES];
 }
 
 sub serverVariable {
-    my ($self, $var) = @_;
-    return $self->serverVariables()->{$var};
+   my ($self, $var) = @_;
+   return $self->serverVariables()->{$var};
 }
 
 sub running {
-    my($self) = @_;
-    if (osWindows()) {
-        ## Need better solution fir windows. This is actually the old
-        ## non-working solution for unix....
-        return -f $self->pidfile;
-    } elsif ($self->serverpid and $self->serverpid =~ /^\d+$/) {
-        ## Check if the child process is active.
-        return kill(0,$self->serverpid);
-    } elsif (-f $self->pidfile) {
-        my $pid= get_pid_from_file($self->pidfile);
-        if ($pid and $pid =~ /^\d+$/) {
-          return kill(0,$pid);
-        }
-    } else {
-        return 0;
-    }
+   my($self) = @_;
+   if (osWindows()) {
+      ## Need better solution fir windows. This is actually the old
+      ## non-working solution for unix....
+      return -f $self->pidfile;
+   } elsif ($self->serverpid and $self->serverpid =~ /^\d+$/) {
+      ## Check if the child process is active.
+      return kill(0, $self->serverpid);
+   } elsif (-f $self->pidfile) {
+      my $pid = get_pid_from_file($self->pidfile);
+      if ($pid and $pid =~ /^\d+$/) {
+         return kill(0, $pid);
+      }
+   } else {
+      return 0;
+   }
 }
 
 sub _find {
-    my($self, $bases, $subdir, @names) = @_;
-    
-    foreach my $base (@$bases) {
-        foreach my $s (@$subdir) {
-        	foreach my $n (@names) {
-                my $path  = $base."/".$s."/".$n;
-                return $path if -f $path;
-        	}
-        }
-    }
-    my $paths = "";
-    foreach my $base (@$bases) {
-        $paths .= join(",",map {"'".$base."/".$_."'"} @$subdir).",";
-    }
-    my $names = join(" or ", @names );
-    croak "Cannot find '$names' in $paths"; 
+   my($self, $bases, $subdir, @names) = @_;
+
+   foreach my $base (@$bases) {
+      foreach my $s (@$subdir) {
+         foreach my $n (@names) {
+            my $path  = $base . "/" . $s . "/" . $n;
+            return $path if -f $path;
+         }
+      }
+   }
+   my $paths = "";
+   foreach my $base (@$bases) {
+      $paths .= join(",", map {"'" . $base . "/" . $_ ."'"} @$subdir) . ",";
+   }
+   my $names = join(" or ", @names );
+   # FIXME: Replace the confess by returning something better.
+   Carp::confess("ERROR: Cannot find '$names' in $paths");
 }
 
 sub dsn {
-    my ($self,$database) = @_;
-    $database = "test" if not defined MYSQLD_DEFAULT_DATABASE;
-    return "dbi:mysql:host=127.0.0.1:port=".
-        $self->[MYSQLD_PORT].
-        ":user=".
-        $self->[MYSQLD_USER].
-        ":database=".$database.
-        ":mysql_local_infile=1";
+   my ($self,$database) = @_;
+   $database = MYSQLD_DEFAULT_DATABASE if not defined $database;
+    
+   return "dbi:mysql:host=127.0.0.1:port=" . $self->[MYSQLD_PORT] .
+          ":user=" . $self->[MYSQLD_USER]                         .
+          ":database=" . $database                                .
+          ":mysql_local_infile=1";
 }
 
 sub dbh {
-    my ($self) = @_;
-    if (defined $self->[MYSQLD_DBH]) {
-        if (!$self->[MYSQLD_DBH]->ping) {
-            say("Stale connection to ".$self->[MYSQLD_PORT].". Reconnecting");
-            $self->[MYSQLD_DBH] = DBI->connect($self->dsn("mysql"),
-                                               undef,
-                                               undef,
-                                               {PrintError => 0,
-                                                RaiseError => 0,
-                                                AutoCommit => 1,
-                                                mysql_auto_reconnect => 1});
-        }
-    } else {
-        say("Connecting to ".$self->[MYSQLD_PORT]);
-        $self->[MYSQLD_DBH] = DBI->connect($self->dsn("mysql"),
-                                           undef,
-                                           undef,
-                                           {PrintError => 0,
-                                            RaiseError => 0,
-                                            AutoCommit => 1,
-                                            mysql_auto_reconnect => 1});
-    }
-    if(!defined $self->[MYSQLD_DBH]) {
-        sayError("(Re)connect to ".$self->[MYSQLD_PORT]." failed due to ".$DBI::err.": ".$DBI::errstr);
-    }
-    return $self->[MYSQLD_DBH];
+   my ($self) = @_;
+   if (defined $self->[MYSQLD_DBH]) {
+      if (!$self->[MYSQLD_DBH]->ping) {
+         say("Stale connection to " . $self->[MYSQLD_PORT] . ". Reconnecting");
+         $self->[MYSQLD_DBH] = DBI->connect($self->dsn("mysql"),
+                                            undef,
+                                            undef,
+                                            {PrintError => 0,
+                                             RaiseError => 0,
+                                             AutoCommit => 1,
+                                             mysql_auto_reconnect => 1});
+      }
+   } else {
+      say("Connecting to " . $self->[MYSQLD_PORT]);
+      $self->[MYSQLD_DBH] = DBI->connect($self->dsn("mysql"),
+                                         undef,
+                                         undef,
+                                         {PrintError => 0,
+                                          RaiseError => 0,
+                                          AutoCommit => 1,
+                                          mysql_auto_reconnect => 1});
+   }
+   if(!defined $self->[MYSQLD_DBH]) {
+      sayError("(Re)connect to " . $self->[MYSQLD_PORT] . " failed due to " .
+               $DBI::err . ": " . $DBI::errstr);
+   }
+   return $self->[MYSQLD_DBH];
 }
 
 sub _findDir {
     my($self, $bases, $subdir, $name) = @_;
-    
+
     foreach my $base (@$bases) {
         foreach my $s (@$subdir) {
             my $path  = $base."/".$s."/".$name;
@@ -1211,7 +1283,7 @@ sub _findDir {
 
 sub _absPath {
     my ($self, $path) = @_;
-    
+
     if (osWindows()) {
         return
             $path =~ m/^[A-Z]:[\/\\]/i;
@@ -1224,10 +1296,10 @@ sub version {
     my($self) = @_;
 
     if (not defined $self->[MYSQLD_VERSION]) {
-        my $conf = $self->_find([$self->basedir], 
+        my $conf = $self->_find([$self->basedir],
                                 ['scripts',
                                  'bin',
-                                 'sbin'], 
+                                 'sbin'],
                                 'mysql_config.pl', 'mysql_config');
         ## This will not work if there is no perl installation,
         ## but without perl, RQG won't work either :-)
@@ -1309,7 +1381,7 @@ sub _logOptions {
 
 sub _olderThan {
     my ($self,$b1,$b2,$b3) = @_;
-    
+
     my ($v1, $v2, $v3) = $self->versionNumbers;
 
     if    ($v1 == 10 and $b1 == 5 and ($v2 == 0 or $v2 == 1 or $v2 == 2)) { $v1 = 5; $v2 = 6 }

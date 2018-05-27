@@ -1,5 +1,5 @@
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2016, MariaDB Corporation
+# Copyright (c) 2016,2018 MariaDB Corporation
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -63,12 +63,14 @@ sub new {
 
 		if (defined $grammar->files()) {
 			my $parse_result = $grammar->extractFromFiles($grammar->files());
-			return undef if $parse_result > STATUS_OK;
+			return undef if not defined $parse_result;
+            # If not undef than $grammar->[GRAMMAR_STRING] is now filled.
 		}
 
 		if (defined $grammar->string()) {
 			my $parse_result = $grammar->parseFromString($grammar->string());
 			return undef if $parse_result > STATUS_OK;
+            # If not undef than $grammar->[GRAMMAR_RULES] is now filled.
 		}
 	}
 
@@ -92,20 +94,37 @@ sub toString {
 
 
 sub extractFromFiles {
-	my ($grammar, $grammar_files) = @_;
+# Return
+# - Some string even if empty ('')
+# - undef if hitting an error
 
-    $grammar->[GRAMMAR_STRING] = '';
-    foreach my $grammar_file (@$grammar_files) {
-        open (GF, $grammar_file) or die "Unable to open() grammar $grammar_file: $!";
-        say "Reading grammar from file $grammar_file";
-        read (GF, my $grammar_string, -s $grammar_file) or die "Unable to read() $grammar_file: $!";
-        close (GF);
-        $grammar->[GRAMMAR_STRING] .= $grammar_string;
-    }
-    
-    return $grammar->[GRAMMAR_STRING];
+   my ($grammar, $grammar_files) = @_;
 
-#	return $grammar->parseFromString($grammar_string);
+   $grammar->[GRAMMAR_STRING] = '';
+   foreach my $grammar_file (@$grammar_files) {
+      # For experimenting.
+      # $grammar_file = '/otto';
+      if (not open (GF, $grammar_file)) {
+         say("ERROR: Unable to open() grammar file '$grammar_file': $!.  Will return undef.");
+         return undef;
+      }
+      say "Reading grammar from file $grammar_file";
+      my $grammar_string;
+      my $result = read (GF, $grammar_string, -s $grammar_file);
+      if (not defined $result) {
+         say("ERROR: Unable to read() '$grammar_file': $!. Will return undef.");
+         return undef;
+      } else {
+         say("DEBUG: $result bytes from grammar file '$grammar_file' read.");
+      }
+      if (0 == $result) {
+         say("WARN: The grammar file '$grammar_file' is empty.");
+      }
+      $grammar->[GRAMMAR_STRING] .= $grammar_string;
+   }
+
+   return $grammar->[GRAMMAR_STRING];
+
 }
 
 sub parseFromString {
@@ -196,10 +215,23 @@ sub parseFromString {
     my %thread_init_adds = ();
 
 	foreach my $rule_string (@rule_strings) {
+        say("DEBUG: rule_string : ->" . $rule_string . "<-");
 		my ($rule_name, $components_string) = $rule_string =~ m{^(.*?)\s*:(.*)$}sio;
 
+        if (not defined $rule_name) {
+            say("DEBUG: Step1 rule_name not detected.");
+            next;
+        }
 		$rule_name =~ s{[\r\n]}{}gsio;
+        if (not defined $rule_name) {
+            say("DEBUG: Step2 rule_name not detected.");
+            next;
+        }
 		$rule_name =~ s{^\s*}{}gsio;
+        if (not defined $rule_name) {
+            say("DEBUG: Step3 rule_name not detected.");
+            next;
+        }
 
 		next if $rule_name eq '';
 
@@ -250,6 +282,12 @@ sub parseFromString {
         );
     }
 
+    if (0 == scalar keys %rules) {
+        say("WARN/ERROR: GenTest::Grammar::parseFromString : There are no rules in the grammar. " .
+            "Will return STATUS_ENVIRONMENT_FAILURE."); 
+        return STATUS_ENVIRONMENT_FAILURE;
+    }
+
     # Now we have all the rules extracted from grammar files, time to parse
 
 	foreach my $rule_name (keys %rules) {
@@ -283,18 +321,20 @@ sub parseFromString {
 
 			if (
 				(exists $components{$component_string}) &&
-				($grammar->[GRAMMAR_FLAGS] & GRAMMAR_FLAG_COMPACT_RULES)
+				(defined $grammar->[GRAMMAR_FLAGS] & GRAMMAR_FLAG_COMPACT_RULES)
 			) {
 				next;
 			} else {
 				$components{$component_string}++;
 			}
 
+            # Split at the '|' added above.
 			my @component_parts = split (m{\|}, $component_string);
+            # say("DEBUG: component_string ->" . $component_string . "<-");
 
 			if (
 				(grep { $_ eq $rule_name } @component_parts) &&
-				($grammar->[GRAMMAR_FLAGS] & GRAMMAR_FLAG_SKIP_RECURSIVE_RULES)
+				(defined $grammar->[GRAMMAR_FLAGS] & GRAMMAR_FLAG_SKIP_RECURSIVE_RULES)
 			) {
 				say("Skipping recursive production in rule '$rule_name'.") if rqg_debug();
 				next;
@@ -328,8 +368,10 @@ sub parseFromString {
 						$code_start = undef;
 					}
 				}
-				last if $pos > $#component_parts;
 				$pos++;
+                # The incremented pos/index might be higher than the highest index existing.
+                # So use "last" in order to not fiddle with a not defined $component_parts[$pos].
+				last if $pos > $#component_parts;
 			}
 
 			push @components, \@component_parts;
@@ -344,7 +386,8 @@ sub parseFromString {
 
 	$grammar->[GRAMMAR_RULES] = \%rules;
 	return STATUS_OK;
-}
+
+} # End of sub parseFromString
 
 sub rule {
 	return $_[0]->[GRAMMAR_RULES]->{$_[1]};

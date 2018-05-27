@@ -109,10 +109,11 @@ sub run {
    my $prng = GenTest::Random->new( seed => 0 );
 
    my $executor = GenTest::Executor->newFromDSN($self->dsn());
-   $executor->sqltrace($self->sqltrace);
    # Set the number to which server we will connect.
    # This number is used for messages only.
    $executor->setId($self->server_id);
+   $executor->sqltrace($self->sqltrace);
+   $executor->setRole("GendataSimple");
    $executor->init();
 
    my $names = GDS_DEFAULT_NAMES;

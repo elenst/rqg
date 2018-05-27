@@ -181,7 +181,19 @@ sub run {
    my $gendata_result = $self->doGenData();
    return $gendata_result if $gendata_result != STATUS_OK;
 
-   $self->[GT_TEST_START] = time();
+   # Give 1.0 seconds delay per worker/thread configured.
+   # Impact:
+   # 1. The reporting process has connected and finished a first round.
+   #    All workers have connected + got their Mixer.
+   #    Except: The setup or server is "ill" and than STATUS_ENVIRONMENT_FAILURE would be right.
+   # 2. Hereby we hopefully mostly avoid the often seen wrong status code STATUS_ENVIRONMENT_FAILURE
+   #    Some threads connect, get their mixer, start to run DDL/DML and crash hereby the server.
+   #    They all report STATUS_SERVER_CRASHED which is right.
+   #    The reporting process or some other threads are slower (box is heavy loaded), try to
+   #    connect first time after the crash, get no connection and report than
+   #    STATUS_ENVIRONMENT_FAILURE because its their first connect attempt.
+   $self->[GT_TEST_START] = time() + 1.0 * $self->config->threads;
+   # FIXME: This message comes too early
    say("INFO: GenTest: Start of running queries : " . $self->[GT_TEST_START]);
    $self->[GT_TEST_END] = $self->[GT_TEST_START] + $self->config->duration;
 
@@ -225,6 +237,14 @@ sub run {
    # Cache metadata and other info that may be needed later
    my @log_files_to_report;
    foreach my $i (0..2) {
+      # FIXME:
+      # IMHO MetaDataCaching for different servers is questionable.
+      # 1. What will be the impact on the SQL executed on the different servers
+      #    if the Metadata between these servers differ?
+      # 2. When using MySQL/MariaDB builtin replication than omitting to cache Metadata on
+      #    slave servers makes sense. But should that get triggered by some undef dsn?
+      # Wouldn't be Metadata chaching only on the first server better.
+      # But we have also the view[0] ... view[3] etc
       last if $self->config->property('upgrade-test') and $i > 0;
       next unless $self->config->dsn->[$i];
       if ($self->config->property('ps-protocol') and $self->config->dsn->[$i] !~ /mysql_server_prepare/) {
@@ -233,6 +253,7 @@ sub run {
       next if $self->config->dsn->[$i] !~ m{mysql}sio;
       my $metadata_executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
       $metadata_executor->setRole("MetaDataCacher");
+      $metadata_executor->setId($i + 1);
       my $init_executor_result = $metadata_executor->init();
       return $init_executor_result if $init_executor_result != STATUS_OK;
 
@@ -252,6 +273,7 @@ sub run {
 
       # Guessing the error log file name relative to datadir (lacking safer methods).
       my $datadir_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'datadir'");
+      # FIXME: Replace that damned croak
       croak("FATAL ERROR: Failed to retrieve datadir") unless $datadir_result;
 
       my $errorlog;
@@ -281,14 +303,14 @@ sub run {
    }
 
    say("Starting " . $self->config->threads . " processes, " .
-       $self->config->queries . " queries each, duration " .
+       $self->config->queries  . " queries each, duration " .
        $self->config->duration . " seconds.");
 
    $self->initXMLReport();
 
    ### Start central reporting thread ####
 
-   my $errorfilter = GenTest::ErrorFilter->new(channel => $self->channel());
+   my $errorfilter   = GenTest::ErrorFilter->new(channel => $self->channel());
    my $errorfilter_p = GenTest::IPC::Process->new(object => $errorfilter);
    if (!osWindows()) {
       $errorfilter_p->start($self->config->property('upgrade-test') ? [$self->config->servers->[0]] : $self->config->servers);
@@ -317,7 +339,7 @@ sub run {
    }
 
    # We are the parent process, wait for for all spawned processes to terminate
-   my $total_status = STATUS_OK;
+   my $total_status  = STATUS_OK;
    my $reporter_died = 0;
 
    ## Parent thread does not use channel
@@ -392,7 +414,15 @@ sub run {
       if ($? > -1 ) {
          my $reporter_status = $? > 0 ? $? >> 8 : 0;
          say("For pid $reporter_pid reporter status " . status2text($reporter_status));
-         $total_status = $reporter_status if $reporter_status > $total_status;
+         # FIXME: Experimental
+         # In case the reporter Backtrace reports STATUS_SERVER_CRASHED than this is valid
+         # and not some STATUS_ENVIRONMENT_ERROR thrown by some worker thread before.
+         if ($reporter_status == STATUS_SERVER_CRASHED) {
+            say("INFO: Assigning STATUS_SERVER_CRASHED got by the reporter to total_status.");
+            $total_status = STATUS_SERVER_CRASHED;
+         } else {
+            $total_status = $reporter_status if $reporter_status > $total_status;
+         }
       }
    }
 
@@ -472,6 +502,7 @@ sub reportingProcess {
     my $reporter_pid = fork();
 
     if ($reporter_pid != 0) {
+       # We are the parent.
         return $reporter_pid;
     }
 
@@ -495,7 +526,7 @@ sub reportingProcess {
 }
 
 sub workerProcess {
-   my ($self, $worker_id) = @_;
+   my ($self, $worker_id, $start_run_time) = @_;
 
    my $worker_pid = fork();
    $self->channel()->writer;
@@ -537,6 +568,10 @@ sub workerProcess {
    if (not defined $mixer) {
       sayError("GenTest failed to create a Mixer for $worker_role. Status will be set to ENVIRONMENT_FAILURE");
       $self->stopChild(STATUS_ENVIRONMENT_FAILURE);
+   }
+
+   while (time() < $self->[GT_TEST_START]) {
+      sleep 1;
    }
 
    my $worker_result = 0;
@@ -663,7 +698,7 @@ sub doGenData {
                     debug       => $self->config->debug,
                     dsn         => $dsn,
                     server_id   => $i, # 'server_id'   => GDS_SERVER_ID,
-                  sqltrace    => $self->config->sqltrace,
+                    sqltrace    => $self->config->sqltrace,
               )->run();
               return $gendata_result if $gendata_result > STATUS_OK;
            }
@@ -751,15 +786,15 @@ sub initGenerator {
 }
 
 sub isMySQLCompatible {
-    my $self = shift;
+   my $self = shift;
 
-    my $is_mysql_compatible = 1;
+   my $is_mysql_compatible = 1;
 
-    foreach my $i (0..2) {
-        next if $self->config->dsn->[$i] eq '';
-        $is_mysql_compatible = 0 if ($self->config->dsn->[$i] !~ m{mysql|drizzle}sio);
-    }
-    return $is_mysql_compatible;
+   foreach my $i (0..2) {
+      next if (not defined $self->config->dsn->[$i] or $self->config->dsn->[$i] eq '');
+      $is_mysql_compatible = 0 if ($self->config->dsn->[$i] !~ m{mysql|drizzle}sio);
+   }
+   return $is_mysql_compatible;
 }
 
 sub initReporters {
@@ -770,66 +805,82 @@ sub initReporters {
       $self->config->reporters([]);
     }
 
-    # If reporters were set to None or empty string explicitly,
-    # remove the "None" reporter and don't add any reporters automatically
-    my $no_reporters= 0;
-    foreach my $i (0..$#{$self->config->reporters}) {
-        if ($self->config->reporters->[$i] eq "None"
-            or $self->config->reporters->[$i] eq '')
-        {
-          delete $self->config->reporters->[$i];
-          $no_reporters= 1;
-        }
-    }
+   # If reporters were set to None or empty string explicitly,
+   # remove the "None" reporter and don't add any reporters automatically
+   my $no_reporters= 0;
+   foreach my $i (0..$#{$self->config->reporters}) {
+      if ($self->config->reporters->[$i] eq "None"
+          or $self->config->reporters->[$i] eq '')
+      {
+         delete $self->config->reporters->[$i];
+         $no_reporters= 1;
+      }
+   }
 
-    if (not $no_reporters) {
-        if ($self->isMySQLCompatible()) {
-            $self->config->reporters(['ErrorLog', 'Backtrace']) unless scalar(@{$self->config->reporters});
-            push @{$self->config->reporters}, 'ValgrindXMLErrors' if (defined $self->config->property('valgrind-xml'));
-            push @{$self->config->reporters}, 'ReplicationConsistency' if $self->config->rpl_mode ne '' and $self->config->rpl_mode !~ /nosync/;
-            push @{$self->config->reporters}, 'ReplicationSlaveStatus'
-                if $self->config->rpl_mode ne '' && $self->isMySQLCompatible();
-        }
+   if (not $no_reporters) {
+      if ($self->isMySQLCompatible()) {
+         $self->config->reporters(['ErrorLog', 'Backtrace'])
+                   unless scalar(@{$self->config->reporters});
+         push @{$self->config->reporters}, 'ValgrindXMLErrors'
+                   if (defined $self->config->property('valgrind-xml'));
+         my $rpl_mode = $self->config->rpl_mode;
+         if (($rpl_mode eq Auxiliary::RQG_RPL_STATEMENT)        or
+             ($rpl_mode eq Auxiliary::RQG_RPL_STATEMENT_NOSYNC) or
+             ($rpl_mode eq Auxiliary::RQG_RPL_MIXED)            or
+             ($rpl_mode eq Auxiliary::RQG_RPL_MIXED_NOSYNC)     or
+             ($rpl_mode eq Auxiliary::RQG_RPL_ROW)              or
+             ($rpl_mode eq Auxiliary::RQG_RPL_ROW_NOSYNC)         ) {
+            # We run MariaDB/MySQL replication.
+
+            if (($rpl_mode eq Auxiliary::RQG_RPL_STATEMENT)        or
+                ($rpl_mode eq Auxiliary::RQG_RPL_MIXED)            or
+                ($rpl_mode eq Auxiliary::RQG_RPL_ROW)                ) {
+               # Its synchronous replication.
+               push @{$self->config->reporters}, 'ReplicationConsistency';
+               say("INFO: 'ReplicationConsistency' added to the list of reporters.");
+            }
+            push @{$self->config->reporters}, 'ReplicationSlaveStatus';
+            say("INFO: 'ReplicationSlaveStatus' added to the list of reporters.");
+         }
+      }
       if ($self->config->property('upgrade-test') and $self->config->property('upgrade-test') =~ /undo/) {
-          push @{$self->config->reporters}, 'UpgradeUndoLogs';
+         push @{$self->config->reporters}, 'UpgradeUndoLogs';
+      } elsif ($self->config->property('upgrade-test')) {
+         push @{$self->config->reporters}, 'Upgrade';
+      } else {
+         foreach (@{$self->config->reporters}) {
+            if ($_ eq 'Upgrade') {
+               say("WARNING: Upgrade reporter is requested, but --upgrade-test option is not set, the behavior is undefined");
+               last;
+            }
+         }
+       }
+   }
+
+   say("Reporters: ".($#{$self->config->reporters} > -1 ? join(', ', @{$self->config->reporters}) : "(none)"));
+
+   my $reporter_manager = GenTest::ReporterManager->new();
+
+   # pass option debug server to the reporter, for detecting the binary type.
+   foreach my $i (0..2) {
+      last if $self->config->property('upgrade-test') and $i>0;
+      next unless $self->config->dsn->[$i];
+      foreach my $reporter (@{$self->config->reporters}) {
+         my $add_result = $reporter_manager->addReporter($reporter, {
+               dsn             => $self->config->dsn->[$i],
+               test_start      => $self->[GT_TEST_START],
+               test_end        => $self->[GT_TEST_END],
+               test_duration   => $self->config->duration,
+               debug_server    => (defined $self->config->debug_server ? ${$self->config->debug_server}[$i] : undef),
+               properties      => $self->config
+         });
+
+         return $add_result if $add_result > STATUS_OK;
       }
-      elsif ($self->config->property('upgrade-test')) {
-          push @{$self->config->reporters}, 'Upgrade';
-      }
-      else {
-          foreach (@{$self->config->reporters}) {
-              if ($_ eq 'Upgrade') {
-                   say("WARNING: Upgrade reporter is requested, but --upgrade-test option is not set, the behavior is undefined");
-                   last;
-              }
-          }
-      }
-    }
+   }
 
-    say("Reporters: ".($#{$self->config->reporters} > -1 ? join(', ', @{$self->config->reporters}) : "(none)"));
-
-    my $reporter_manager = GenTest::ReporterManager->new();
-
-    # pass option debug server to the reporter, for detecting the binary type.
-    foreach my $i (0..2) {
-        last if $self->config->property('upgrade-test') and $i>0;
-        next unless $self->config->dsn->[$i];
-        foreach my $reporter (@{$self->config->reporters}) {
-            my $add_result = $reporter_manager->addReporter($reporter, {
-                dsn => $self->config->dsn->[$i],
-                test_start => $self->[GT_TEST_START],
-                test_end => $self->[GT_TEST_END],
-                test_duration => $self->config->duration,
-                debug_server => (defined $self->config->debug_server ? ${$self->config->debug_server}[$i] : undef),
-                properties => $self->config
-            });
-
-            return $add_result if $add_result > STATUS_OK;
-        }
-    }
-
-    $self->[GT_REPORTER_MANAGER] = $reporter_manager;
-    return STATUS_OK;
+   $self->[GT_REPORTER_MANAGER] = $reporter_manager;
+   return STATUS_OK;
 }
 
 sub initValidators {
@@ -938,18 +989,18 @@ sub initXMLReport {
         name => $test_suite_name,  # NOTE: Consider changing to test (or test case) name when suites are supported.
         logdir => $self->config->property('report-tt-logdir').'/'.$test_suite_name.isoUTCSimpleTimestamp,
         attributes => {
-            engine => $self->config->engine,
-            gendata => $self->config->gendata,
-            grammar => $self->config->grammar,
-            threads => $self->config->threads,
-            queries => $self->config->queries,
-            validators => ($self->config->validators ? join (',', @{$self->config->validators}) : ''),
-            reporters => ($self->config->reporters ? join (',', @{$self->config->reporters}) : ''),
-            seed => $self->config->seed,
-            mask => $self->config->mask,
-            mask_level => $self->config->property('mask-level'),
-            rows => $self->config->rows,
-            'varchar-length' => $self->config->property('varchar-length')
+        engine => $self->config->engine,
+        gendata => $self->config->gendata,
+        grammar => $self->config->grammar,
+        threads => $self->config->threads,
+        queries => $self->config->queries,
+        validators => ($self->config->validators ? join (',', @{$self->config->validators}) : ''),
+        reporters => ($self->config->reporters ? join (',', @{$self->config->reporters}) : ''),
+        seed => $self->config->seed,
+        mask => $self->config->mask,
+        mask_level => $self->config->property('mask-level'),
+        rows => $self->config->rows,
+        'varchar-length' => $self->config->property('varchar-length')
         }
     );
 

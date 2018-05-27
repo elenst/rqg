@@ -684,15 +684,17 @@ sub get_connection {
    } );
 
    if (not defined $dbh) {
-      say("ERROR: connect() to dsn " . $executor->dsn() . " failed: " . $DBI::errstr);
+      my $message_part = "ERROR: " . $executor->role . " connect() to dsn " . $executor->dsn() .
+                         " failed: " . $DBI::errstr ;
       if ($first_connect == 1) {
-         say("ERROR: Will return STATUS_ENVIRONMENT_FAILURE");
+         say("$message_part. Will return STATUS_ENVIRONMENT_FAILURE");
          return STATUS_ENVIRONMENT_FAILURE;
       } else {
-         say("ERROR: Will return STATUS_SERVER_CRASHED");
+         say("$message_part. Will return STATUS_SERVER_CRASHED");
          return STATUS_SERVER_CRASHED;
       }
    }
+   $first_connect = 0;
 
    $executor->setDbh($dbh);
 
@@ -706,7 +708,7 @@ sub get_connection {
    }
 
    #
-   # Hack around bug 35676, optimizer_switch must be set sesson-wide in order to have effect
+   # Hack around bug 35676, optimizer_switch must be set session-wide in order to have effect
    # So we read it from the GLOBAL_VARIABLE table and set it locally to the session
    # Please leave this statement on a single line, which allows easier correct parsing from general log.
    #
@@ -732,7 +734,21 @@ sub get_connection {
    $executor->setConnectionId($dbh->selectrow_arrayref("SELECT CONNECTION_ID()")->[0]);
    $executor->setCurrentUser($dbh->selectrow_arrayref("SELECT CURRENT_USER()")->[0]);
 
-   say("WARN: Executor Role is undef") if not defined $executor->role;
+   if (not defined $executor->role) {
+      Carp::cluck("WARN: Executor Role is undef");
+   }
+   if (not defined $executor->id) {
+      Carp::cluck("WARN: Executor id is undef");
+   }
+   if (not defined $executor->defaultSchema()) {
+      Carp::cluck("WARN: Executor defaultSchema is undef");
+   }
+   if (not defined $executor->connectionId()) {
+      Carp::cluck("WARN: Executor connectionId is undef");
+   }
+   if (not defined rqg_debug()) {
+      Carp::cluck("WARN: Executor rqg_debug is undef");
+   }
    say("Executor initialized. Role: " . $executor->role . "; id: ".$executor->id() .
        "; default schema: " . $executor->defaultSchema() . "; connection ID: " .
        $executor->connectionId()) if rqg_debug();
@@ -1180,7 +1196,7 @@ sub explain {
 
       push @explain_fragments, "partitions: " . $explain_row->{table} . ":" . $explain_row->{partitions} if defined $explain_row->{partitions};
 
-      push @explain_fragments, "ref: " . $explain_row->{ref};
+      push @explain_fragments, "ref: " . ($explain_row->{ref} || '(empty)');
 
       foreach my $extra_item (split('; ', ($explain_row->{Extra} || '(empty)')) ) {
          $extra_item =~ s{0x.*?\)}{%d\)}sgio;
@@ -1228,22 +1244,42 @@ sub DESTROY {
    my $executor = shift;
    $executor->disconnect();
 
-   if ( (rqg_debug()) &&
-        (defined $executor->[EXECUTOR_STATUS_COUNTS])) {
-      say("Statistics for Executor ".$executor->dsn());
+   if ((rqg_debug()) && (defined $executor->[EXECUTOR_STATUS_COUNTS])) {
+      # FIXME: Are there "roles" where the statistics makes no sense? Gendata*?
+      my $executor_role;
+      # FIXME:
+      # For not defined $executor->role
+      #    Carp::cluck on first use + set to 'Unknown'
+      if (not defined $executor->role) {
+         say("WARN: No executor role defined. Set it to 'Unknown'.");
+         $executor_role = 'Unknown';
+      } else {
+         $executor_role = $executor->role;
+      }
+      # Diff to older code:
+      # Collect everything in some huge string with line breaks and print so all at once.
+      # This reduces the risk that other stuff gets written by other threads etc. between.
+      my $statistics_part =  "Statistics of Executor for $executor_role (" . $executor->dsn() . ")";
+      my $statistics =       $statistics_part . " ------- Begin\n";
       use Data::Dumper;
       $Data::Dumper::Sortkeys = 1;
-      say("Rows returned:");
-      print Dumper $executor->[EXECUTOR_RETURNED_ROW_COUNTS];
-      say("Rows affected:");
-      print Dumper $executor->[EXECUTOR_AFFECTED_ROW_COUNTS];
-      say("Explain items:");
-      print Dumper $executor->[EXECUTOR_EXPLAIN_COUNTS];
-      say("Errors:");
-      print Dumper $executor->[EXECUTOR_ERROR_COUNTS];
+      $statistics = $statistics . "Rows returned:\n";
+      $statistics = $statistics . Dumper($executor->[EXECUTOR_RETURNED_ROW_COUNTS]) . "\n";
+      $statistics = $statistics . "Rows affected:\n";
+      $statistics = $statistics . Dumper($executor->[EXECUTOR_AFFECTED_ROW_COUNTS]) . "\n";
+      $statistics = $statistics . "Explain items:\n";
+      $statistics = $statistics . Dumper($executor->[EXECUTOR_EXPLAIN_COUNTS])      . "\n";
+      $statistics = $statistics . "Errors:\n";
+      $statistics = $statistics . Dumper($executor->[EXECUTOR_ERROR_COUNTS])        . "\n";
 #     say("Rare EXPLAIN items:");
 #     print Dumper $executor->[EXECUTOR_EXPLAIN_QUERIES];
-      say("Statuses: " . join(', ', map { status2text($_) . ": " . $executor->[EXECUTOR_STATUS_COUNTS]->{$_} . " queries" } keys %{$executor->[EXECUTOR_STATUS_COUNTS]}));
+      # Diff to older code:
+      # Sort the keys in order to get better comparable message lines.
+      $statistics = $statistics . "Statuses: " . join(', ',
+                    map { status2text($_) . ": " . $executor->[EXECUTOR_STATUS_COUNTS]->{$_} .
+                          " queries" } sort keys %{$executor->[EXECUTOR_STATUS_COUNTS]}) . "\n";
+      $statistics =  $statistics . $statistics_part . " ------- End\n";
+      say($statistics);
    }
 }
 

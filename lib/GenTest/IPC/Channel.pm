@@ -1,4 +1,5 @@
 # Copyright (C) 2010 Sun Microsystems, Inc. All rights reserved.
+# Copyright (C) 2018 MariaDB Corporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -93,14 +94,14 @@ sub recv {
         my $line = readline $self->[CHANNEL_IN];
 
         ## Decode eol
-        $line =~ s/&NEWLINE;/\n/g;
+        $line =~ s/&NEWLINE;/\n/g if defined $line;
 
         ## Turn off strict vars since received message uses variables
         ## without "my"
         no strict "vars";
 
         ## Evaluate object
-        $obj = eval $line;
+        $obj = eval $line if defined $line;
         use strict "vars";
         $self->[CHANNEL_EOF] = eof $self->[CHANNEL_IN];
     };

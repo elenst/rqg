@@ -50,7 +50,47 @@ sub nativeReport {
    my $bindir = $reporter->serverInfo('bindir');
    say("bindir is $bindir");
 
+   my $error_log = $reporter->serverInfo('errorlog');
+   say("error_log is $error_log");
+
+   my $pid_file = $reporter->serverVariable('pid_file');
+   say("pid_file is $pid_file");
+
    my $pid = $reporter->serverInfo('pid');
+
+   system ("sync");
+
+   # Do not look for a core file in case the server pid exists.
+   my $server_running = 1;
+   my $aborted_found  = 0;
+   my $wait_timeout   = 180;
+   my $end_time       = Time::HiRes::time() + $wait_timeout;
+   while (($server_running or not $aborted_found) and (Time::HiRes::time() < $end_time)) {
+      sleep 1;
+      $server_running = kill (0, $pid);
+      say("DEBUG: server pid : $pid , server_running : $server_running");
+
+      if ($aborted_found == 0) {
+         open(LOGFILE, "$error_log") or Carp::cluck("Error on open Server error file $error_log");
+         while(<LOGFILE>) {
+            $aborted_found = 1 if(/Aborted .core dumped./);
+            if(/Aborted .core dumped./) {
+               say("DEBUG: Aborted + core dumped found in server error log.");
+            }
+         }
+         close LOGFILE;
+      }
+   }
+   if ( $server_running ) {
+      say("ALARM: Reporter::Backtrace $wait_timeout" . "s waited but the server process has not disappeared.");
+   }
+   if ( not $aborted_found ) {
+      say("ALARM: Reporter::Backtrace $wait_timeout" . "s waited but server error_log remains without 'Aborted (core dumped)'.");
+   }
+   if ( -e $pid_file ) {
+      say("INFO: Reporter::Backtrace The pid_file '$pid_file' did not disappear.");
+   }
+
    my $core = <$datadir/core*>;
    if (defined $core) {
       say("INFO: The core file name computed is '$core'");

@@ -142,7 +142,8 @@ sub run {
       }
    }
 
-   if ($self->engine() ne '' and ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE)) {
+   if ((defined $self->engine() and $self->engine() ne '') and
+       ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE)) {
       my $sql_cmd = "SET DEFAULT_STORAGE_ENGINE='" . $self->engine() . "'";
       my $status = run_sql_cmd($sql_cmd);
       if ($status) {
@@ -173,6 +174,11 @@ sub run {
    if ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE) {
       $executor->execute("COMMIT");
    }
+
+   # FIXME:
+   # This gave weird output in history. Check again
+   $executor->disconnect();
+   undef $executor;
 
    # $executor->currentSchema(@schema_perms[0]);
    return STATUS_OK;

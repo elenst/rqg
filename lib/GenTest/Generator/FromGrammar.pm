@@ -346,9 +346,11 @@ sub next {
 
    my $starting_rule;
 
-     say("DEBUG: In FromGrammar for " . $executors->[0]->role() .
-         " GENERATOR_SEQ_ID : " . $generator->[GENERATOR_SEQ_ID] .
-         " GENERATOR_RECONNECT : " . $generator->[GENERATOR_RECONNECT]);
+   if(0) {
+      say("DEBUG: In FromGrammar for " . $executors->[0]->role() .
+          " GENERATOR_SEQ_ID : " . $generator->[GENERATOR_SEQ_ID] .
+          " GENERATOR_RECONNECT : " . $generator->[GENERATOR_RECONNECT]);
+   }
 
    # Design
    # ======
