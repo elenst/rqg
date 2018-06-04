@@ -38,29 +38,36 @@ sub report {
 
 sub nativeReport {
 
-	my $reporter = shift;
+   my $reporter = shift;
 
-	# master.err-old is created when logs are rotated due to SIGHUP
+   # master.err-old is created when logs are rotated due to SIGHUP
 
-	my $main_log = $reporter->serverVariable('log_error');
-    if ($main_log eq '') {
-        foreach my $errlog ('../log/master.err', '../mysql.err') {
-            if (-f $reporter->serverVariable('datadir').'/'.$errlog) {
-                $main_log = $reporter->serverVariable('datadir').'/'.$errlog;
-                last;
-            }
-        }
-    }
+   my $main_log = $reporter->serverVariable('log_error');
+   if ($main_log eq '') {
+      foreach my $errlog ('../log/master.err', '../mysql.err') {
+         if (-f $reporter->serverVariable('datadir').'/'.$errlog) {
+            $main_log = $reporter->serverVariable('datadir').'/'.$errlog;
+            last;
+         }
+      }
+   }
 
-	foreach my $log ( $main_log, $main_log.'-old' ) {
-		if ((-e $log) && (-s $log > 0)) {
-			say("The last 2000 lines from $log ------------------------------ Begin");
-			system("tail -2000 $log | cut -c 1-4096");
-			say("$log                          ------------------------------ End");
-		}
-	}
+   # ML 2018-06-04 Observation
+   # RQG runner --logfile=otto --> The output of the "system" calls is short visible
+   # on screen but not in otto. RQG runner ... > otto 2>&1 works well.
+   # This seems to be a result of the rather wild output redirecting.
+   # Obviously the say* routines do not have that trouble.
+   # So is stick to the provisoric fix to use sayFile.
+   foreach my $log ($main_log, $main_log . '-old') {
+      if ((-e $log) && (-s $log > 0)) {
+      #  say("The last 2000 lines from $log ------------------------------ Begin");
+         sayFile($log);
+      #  system("tail -2000 $log | cut -c 1-4096");
+      #  say("$log                          ------------------------------ End");
+      }
+   }
 	
-	return STATUS_OK;
+   return STATUS_OK;
 }
 
 sub callbackReport {
