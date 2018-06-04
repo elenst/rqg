@@ -81,7 +81,7 @@ sub new {
       my $validator = $v[$i];
       if (ref($validator) eq '') {
          $validator = "GenTest::Validator::".$validator;
-         say("INFO: Mixer for " . $mixer->role() . " Loading Validator $validator.");
+         say("INFO: " . $mixer->role() . " in Mixer : Loading Validator $validator.");
          eval "use $validator" or print $@;
          push @validators, $validator->new();
 
@@ -100,7 +100,8 @@ sub new {
       foreach my $prerequisite (@$prerequisites) {
          next if exists $validators{$prerequisite};
          $prerequisite = "GenTest::Validator::" . $prerequisite;
-#        say("DEBUG: Mixer for " . $mixer->role() . " : Loading Prerequisite $prerequisite, required by $validator.");
+#        say("DEBUG: " . $mixer->role() . " n Mixer : Loading Prerequisite $prerequisite, " .
+#            "required by $validator.");
          eval "use $prerequisite" or print $@;
          push @prerequisites, $prerequisite->new();
       }
@@ -113,7 +114,7 @@ sub new {
       return undef if not defined $validator->init($mixer->executors());
    }
 
-   say("INFO: Mixer for " . $mixer->role() . " created.");
+   say("INFO: " . $mixer->role() . " : Mixer created.");
    return $mixer;
 }
 
@@ -150,8 +151,8 @@ sub next {
    # For experimenting
    # $queries = undef;
    if (not defined $queries) {
-      say("ERROR: Mixer for $mixer_role : Internal grammar problem(\$queries is not defined).\n" .
-          "ERROR:        Will return STATUS_ENVIRONMENT_FAILURE");
+      say("ERROR: $mixer_role in Mixer : Internal grammar problem(\$queries is not defined).\n" .
+          "ERROR:                        Will return STATUS_ENVIRONMENT_FAILURE");
       return STATUS_ENVIRONMENT_FAILURE;
    } elsif ($queries->[0] eq '') {
 #     Disabled because tests are sometimes forced to generate empty queries
@@ -167,7 +168,7 @@ sub next {
       next if $query =~ m{^\s*$}o;
 
       if ($mixer->end_time() && (time() > $mixer->end_time())) {
-         say("INFO: Mixer for $mixer_role : We have already exceeded time specified by " .
+         say("INFO: $mixer_role in Mixer : We have already exceeded time specified by " .
              "--duration=x; exiting now.");
          last;
       }
@@ -193,7 +194,7 @@ sub next {
          if ((   $execution_result->status() == STATUS_SERVER_CRASHED
               or $execution_result->status() == STATUS_SERVER_KILLED
               or $execution_result->status() == STATUS_REPLICATION_FAILURE) and $restart_timeout) {
-            say("INFO: Mixer for $mixer_role : Server has gone away, waiting up till " .
+            say("INFO: $mixer_role in Mixer : Server has gone away, waiting up till " .
                 "\$restart_timeout(" . $restart_timeout . ") seconds to see if it gets back.")
                   if $restart_timeout == $mixer->restart_timeout() or $restart_timeout == 1;
             while ($restart_timeout) {
@@ -218,7 +219,7 @@ sub next {
                #    queries (solution like for STATUS 99 got).
                # 4. Report if the server did not come up.
                if ($executor->execute("SELECT 'Heartbeat'", EXECUTOR_FLAG_SILENT)->status() == STATUS_OK) {
-                  say("INFO: Mixer for $mixer_role : Server is back, repeating the last query");
+                  say("INFO: $mixer_role in Mixer : Server is back, repeating the last query");
                   redo EXECUTE_QUERY;
                }
             }
@@ -287,7 +288,7 @@ sub next {
             #   Omit all remaining queries from QUERY. This will than force to ask the Generator
             #   for the next QUERY and than we will get "*_connect" etc.
             #
-            say("INFO: Mixer for $mixer_role : STATUS_SKIP_RELOOP got.");
+            say("INFO: $mixer_role in Mixer : STATUS_SKIP_RELOOP got.");
             # Disconnect all executors (one per server).
             # The next $executor->execute will than do a reconnect.
             foreach my $executor (@{$mixer->executors()}) {
@@ -305,11 +306,10 @@ sub next {
             #   "*_connect" if that exists
             last query;
 
-
             # By what follows we can figure out which generator we use.
             # But is not needed here.
             # if (ref($mixer->generator()) eq 'GenTest::Generator::FromGrammar') {
-            #    say("MLML: Mixer Generator is FromGrammar");
+            #    say("DEBUG: Mixer Generator is FromGrammar");
             # }
 
          }
@@ -337,7 +337,7 @@ sub next {
          # - It is unlikely that some rare "omit the execution of a small and rather arbitrary group
          #   of remaing queries" has some significant impact on funtional coverage.
          if ($execution_result->status() > STATUS_CRITICAL_FAILURE) {
-            say("Mixer for $mixer_role : Critical failure " .
+            say("$mixer_role in Mixer : Critical failure " .
                 status2text($execution_result->status()) . " (" . $execution_result->err() . ") " .
                 "reported at dsn " . $executor->dsn());
             last query;
@@ -369,7 +369,7 @@ sub next {
             $rule_status{$participating_rule} = $max_status
          }
       }
-   } # End of loop called "query"
+   }
 
 #  say("DEBUG: Mixer for $mixer_role : Will return maxstatus : " .
 #      status2text($max_status) . "($max_status).");
@@ -390,7 +390,7 @@ sub DESTROY {
    }
 
    if ($#rule_failures > -1) {
-      say("Mixer for " . $mixer->role() . " : The following rules produced no STATUS_OK queries: " .
+      say($mixer->role() . " : The following rules produced no STATUS_OK queries: " .
           join(', ', @rule_failures));
    }
 }

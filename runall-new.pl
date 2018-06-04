@@ -96,7 +96,13 @@ my $duration = my $default_duration = 3600;
 
 my @ARGV_saved = @ARGV;
 
-my $opt_result = GetOptions(
+# Take the options assigned in command line and
+# - fill them into the of variables allowed in command line
+# - abort in case of meeting some not supported options
+my $opt_result = {};
+
+if (not GetOptions(
+    $opt_result,
     'mysqld=s@' => \$mysqld_options[0],
     'mysqld1=s@' => \$mysqld_options[1],
     'mysqld2=s@' => \$mysqld_options[2],
@@ -187,7 +193,10 @@ my $opt_result = GetOptions(
     'ps-protocol' => \$ps_protocol,
     'ps_protocol' => \$ps_protocol,
     'store-binaries|store_binaries' => \$store_binaries
-);
+    )) {
+   print STDERR "\nERROR: Error occured while reading options\n\n";
+   help();
+};
 
 if (defined $scenario) {
    system("perl $ENV{RQG_HOME}/run-scenario.pl @ARGV_saved");
@@ -206,6 +215,7 @@ if ($help) {
    help();
    exit 0;
 }
+
 if ($basedirs[0] eq '' and $basedirs[1] eq '') {
    print STDERR "\nERROR: Basedir is not defined\n\n";
    help();
@@ -213,11 +223,6 @@ if ($basedirs[0] eq '' and $basedirs[1] eq '') {
 }
 if (not defined $grammar_file) {
    print STDERR "\nERROR: Grammar file is not defined\n\n";
-   help();
-   exit 1;
-}
-if (!$opt_result) {
-   print STDERR "\nERROR: Error occured while reading options\n\n";
    help();
    exit 1;
 }
@@ -843,23 +848,35 @@ if (($gentest_result == STATUS_OK) && !$upgrade_test && ( ($rpl_mode && $rpl_mod
 }
 
 sub stopServers {
-    my $status = shift;
-    if ($skip_shutdown) {
-        say("Server shutdown is skipped upon request");
-        return;
-    }
-    say("Stopping server(s)...");
-    if ($rpl_mode ne '') {
-        $rplsrv->stopServer($status);
-    } elsif (defined $upgrade_test) {
-        $server[1]->stopServer;
-    } else {
-        foreach my $srv (@server) {
-            if ($srv) {
-                $srv->stopServer;
+   my $status = shift;
+   if (not defined $status) {
+      Carp::cluck("stopServers was called without status");
+   }
+   if ($skip_shutdown) {
+      say("INFO: Server shutdown is skipped upon request");
+      return;
+   }
+   say("INFO: Stopping server(s)...");
+   if ($rpl_mode ne '') {
+      my $stop_status = $rplsrv->stopServer($status);
+      if ($stop_status) {
+         say("ERROR: The attempt to stop the server gave the status $stop_status.");
+      }
+   } elsif (defined $upgrade_test) {
+      my $stop_status = $server[1]->stopServer;
+      if ($stop_status) {
+         say("ERROR: The attempt to stop the server 1 gave the status $stop_status.");
+      }
+   } else {
+      foreach my $srv (@server) {
+         if ($srv) {
+            my $stop_status = $srv->stopServer;
+            if ($stop_status) {
+               say("ERROR: The attempt to stop the server 1 gave the status $stop_status.");
             }
-        }
-    }
+         }
+      }
+   }
 }
 
 
@@ -949,7 +966,7 @@ $0 - Run a complete random query generation test, including server start with re
 EOF
     ;
     print "$0 arguments were: ".join(' ', @ARGV_saved)."\n";
-    exit_test(STATUS_UNKNOWN_ERROR);
+    safe_exit(STATUS_UNKNOWN_ERROR);
 }
 
 sub exit_test {

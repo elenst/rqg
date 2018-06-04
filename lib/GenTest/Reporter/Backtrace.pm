@@ -58,14 +58,17 @@ sub nativeReport {
 
    my $pid = $reporter->serverInfo('pid');
 
-   system ("sync");
+   # Whereas the "sync" looks reasonable it might have some unexpected impact on total runtime.
+   # Some dd into some USB Flash drive performed by root caused a delay of several minutes.
+   # system ("sync");
 
    # Do not look for a core file in case the server pid exists.
    my $server_running = 1;
    my $aborted_found  = 0;
    my $wait_timeout   = 180;
-   my $end_time       = Time::HiRes::time() + $wait_timeout;
-   while (($server_running or not $aborted_found) and (Time::HiRes::time() < $end_time)) {
+   my $start_time     = Time::HiRes::time();
+   my $max_end_time   = $start_time + $wait_timeout;
+   while ($server_running and not $aborted_found and (Time::HiRes::time() < $max_end_time)) {
       sleep 1;
       $server_running = kill (0, $pid);
       say("DEBUG: server pid : $pid , server_running : $server_running");
@@ -81,11 +84,13 @@ sub nativeReport {
          close LOGFILE;
       }
    }
+   my $wait_time = Time::HiRes::time() - $start_time;
+   my $message_begin = "ALARM: Reporter::Backtrace $wait_time" . "s waited but the server";
    if ( $server_running ) {
-      say("ALARM: Reporter::Backtrace $wait_timeout" . "s waited but the server process has not disappeared.");
+      say("$message_begin process has not disappeared.");
    }
    if ( not $aborted_found ) {
-      say("ALARM: Reporter::Backtrace $wait_timeout" . "s waited but server error_log remains without 'Aborted (core dumped)'.");
+      say("$message_begin error_log remains without 'Aborted (core dumped)'.");
    }
    if ( -e $pid_file ) {
       say("INFO: Reporter::Backtrace The pid_file '$pid_file' did not disappear.");

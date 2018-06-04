@@ -1228,7 +1228,7 @@ sub _find {
 sub dsn {
    my ($self,$database) = @_;
    $database = MYSQLD_DEFAULT_DATABASE if not defined $database;
-    
+
    return "dbi:mysql:host=127.0.0.1:port=" . $self->[MYSQLD_PORT] .
           ":user=" . $self->[MYSQLD_USER]                         .
           ":database=" . $database                                .

@@ -34,29 +34,29 @@ use Cwd;
 use List::Util qw(shuffle); # For some grammars
 use Time::HiRes qw(time);
 
-use constant GENERATOR_MAX_OCCURRENCES	=> 3500;
-use constant GENERATOR_MAX_LENGTH	=> 10000;
+use constant GENERATOR_MAX_OCCURRENCES  => 3500;
+use constant GENERATOR_MAX_LENGTH       => 10000;
 
 my $field_pos;
 my $cwd = cwd();
 
 sub new {
-   my $class = shift;
+   my $class     = shift;
    my $generator = $class->SUPER::new(@_);
 
    if (not defined $generator->grammar()) {
-   #  say("DEBUG: Loading grammar file '".$generator->grammarFile()."' ...");
+   #  say("DEBUG: Loading grammar file '" . $generator->grammarFile() . "' ...");
       $generator->[GENERATOR_GRAMMAR] = GenTest::Grammar->new(
-			grammar_file	=> $generator->grammarFile(),
-			grammar_string	=> $generator->grammarString()
+            grammar_file    => $generator->grammarFile(),
+            grammar_string	=> $generator->grammarString()
       );
       return undef if not defined $generator->[GENERATOR_GRAMMAR];
    }
 
    if (not defined $generator->prng()) {
       $generator->[GENERATOR_PRNG] = GenTest::Random->new(
-			seed => $generator->[GENERATOR_SEED] || 0,
-			varchar_length => $generator->[GENERATOR_VARCHAR_LENGTH]
+            seed           => $generator->[GENERATOR_SEED] || 0,
+            varchar_length => $generator->[GENERATOR_VARCHAR_LENGTH]
       );
    }
 
@@ -64,15 +64,15 @@ sub new {
       $generator->[GENERATOR_MASK_LEVEL] = 1;
    }
 
-   $generator->[GENERATOR_SEQ_ID] = 0;
+   $generator->[GENERATOR_SEQ_ID]    = 0;
    $generator->[GENERATOR_RECONNECT] = 1;
 
-   if ($generator->mask() > 0) {
+   if (defined $generator->mask() and $generator->mask() > 0) {
       my $grammar = $generator->grammar();
-      my $top = $grammar->topGrammar($generator->maskLevel(),
-                                       "thread".$generator->threadId(),
-                                       "query");
-      my $maskedTop = $top->mask($generator->mask());
+      my $top     = $grammar->topGrammar($generator->maskLevel(),
+                                         "thread" . $generator->threadId(),
+                                         "query");
+      my $maskedTop                          = $top->mask($generator->mask());
       $generator->[GENERATOR_MASKED_GRAMMAR] = $grammar->patch($maskedTop);
    }
 
@@ -539,7 +539,7 @@ sub next {
 		return \@sentences;
 	} else {
 		return [ $sentence ];
-	}
+    }
 }
 
 1;

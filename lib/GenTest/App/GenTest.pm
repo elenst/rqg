@@ -31,6 +31,8 @@ use File::Path 'mkpath';
 use File::Copy;
 use File::Spec;
 
+use Auxiliary;
+
 use GenTest;
 use GenTest::Properties;
 use GenTest::Constants;
@@ -114,9 +116,13 @@ sub new {
       $self->config->servers([ split /,/, $self->config->servers ]);
    }
 
-   croak ("Need config") if not defined $self->config;
-
-   return $self;
+   # croak ("Need config") if not defined $self->config;
+   if (not defined $self->config) {
+      Carp::cluck("ERROR: $self->config is not defined but we need it. Will return undef.");
+      return undef;
+   } else {
+      return $self;
+   }
 }
 
 sub config {
@@ -155,31 +161,71 @@ sub logFilesToReport {
    return @{$_[0]->[GT_LOG_FILES_TO_REPORT]};
 }
 
+sub do_init {
+   my $self = shift;
+
+   our $initialized = 0 if not defined $initialized;
+
+   if (not $initialized ) {
+
+      $SIG{TERM} = sub { exit(0) };
+      $SIG{CHLD} = "IGNORE" if osWindows();
+      $SIG{INT} = "IGNORE";
+
+      if (defined $ENV{RQG_HOME}) {
+         $ENV{RQG_HOME} = osWindows() ? $ENV{RQG_HOME}.'\\' : $ENV{RQG_HOME}.'/';
+      }
+
+      $ENV{RQG_DEBUG} = 1 if $self->config->debug;
+
+      $self->initSeed();
+
+      my $queries = $self->config->queries;
+      $queries =~ s{K}{000}so;
+      $queries =~ s{M}{000000}so;
+      $self->config->property('queries', $queries);
+
+      say("-------------------------------\nConfiguration");
+      $self->config->printProps;
+      $initialized = 1;
+      say("DEBUG: GenTest::App::GenTest::do_init : Have initialized.");
+   } else {
+      say("DEBUG: GenTest::App::GenTest::do_init : Additional initialization omitted.");
+   }
+}
+
 sub run {
    my $self = shift;
 
-   $SIG{TERM} = sub { exit(0) };
-   $SIG{CHLD} = "IGNORE" if osWindows();
-   $SIG{INT} = "IGNORE";
+#  $SIG{TERM} = sub { exit(0) };
+#  $SIG{CHLD} = "IGNORE" if osWindows();
+#  $SIG{INT} = "IGNORE";
 
-   if (defined $ENV{RQG_HOME}) {
-      $ENV{RQG_HOME} = osWindows() ? $ENV{RQG_HOME}.'\\' : $ENV{RQG_HOME}.'/';
-   }
+#  if (defined $ENV{RQG_HOME}) {
+#     $ENV{RQG_HOME} = osWindows() ? $ENV{RQG_HOME}.'\\' : $ENV{RQG_HOME}.'/';
+#  }
 
-   $ENV{RQG_DEBUG} = 1 if $self->config->debug;
+#  $ENV{RQG_DEBUG} = 1 if $self->config->debug;
 
-   $self->initSeed();
+#  $self->initSeed();
 
-   my $queries = $self->config->queries;
-   $queries =~ s{K}{000}so;
-   $queries =~ s{M}{000000}so;
-   $self->config->property('queries', $queries);
+#  my $queries = $self->config->queries;
+#  $queries =~ s{K}{000}so;
+#  $queries =~ s{M}{000000}so;
+#  $self->config->property('queries', $queries);
 
-   say("-------------------------------\nConfiguration");
-   $self->config->printProps;
+#  say("-------------------------------\nConfiguration");
+#  $self->config->printProps;
+
+   $self->do_init();
 
    my $gendata_result = $self->doGenData();
    return $gendata_result if $gendata_result != STATUS_OK;
+
+   my $gendata_result = $self->doGenTest();
+   return $gendata_result;
+
+if(0) {
 
    # Give 1.0 seconds delay per worker/thread configured.
    # Impact:
@@ -261,9 +307,268 @@ sub run {
       $metadata_executor->cacheMetaData() if defined $metadata_executor->dbh();
 
       # Some crash after here end with fine backtrace
-# MLML
+# For experimenting:
 # system ("killall -6 mysqld");
-# MLML
+
+      # Cache log file names needed for result reporting at end-of-test
+
+      # We do not copy the general log, as it may grow very large for some tests.
+      #my $logfile_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'general_log_file'");
+      #push(@log_files_to_report, $logfile_result->data()->[0]->[1]);
+
+      # Guessing the error log file name relative to datadir (lacking safer methods).
+      my $datadir_result = $metadata_executor->execute("SHOW VARIABLES LIKE 'datadir'");
+      # FIXME: Replace that damned croak
+      croak("FATAL ERROR: Failed to retrieve datadir") unless $datadir_result;
+
+      my $errorlog;
+      foreach my $errorlog_path (
+            "../log/master.err",  # MTRv1 regular layout
+            "../log/mysqld1.err", # MTRv2 regular layout
+            "../mysql.err"        # DBServer::MySQL layout
+      ) {
+         my $possible_path = File::Spec->catfile($datadir_result->data()->[0]->[1], $errorlog_path);
+         if (-e $possible_path) {
+             $errorlog = $possible_path;
+             last;
+         }
+      }
+      push(@log_files_to_report, $errorlog) if defined $errorlog;
+
+      $metadata_executor->disconnect();
+      undef $metadata_executor;
+   }
+
+   $self->[GT_LOG_FILES_TO_REPORT] = \@log_files_to_report;
+
+   if (defined $self->config->filter) {
+      $self->[GT_QUERY_FILTERS] = [ GenTest::Filter::Regexp->new(
+           file => $self->config->filter
+      ) ];
+   }
+
+   say("Starting " . $self->config->threads . " processes, " .
+       $self->config->queries  . " queries each, duration " .
+       $self->config->duration . " seconds.");
+
+   $self->initXMLReport();
+
+   ### Start central reporting thread ####
+
+   my $errorfilter   = GenTest::ErrorFilter->new(channel => $self->channel());
+   my $errorfilter_p = GenTest::IPC::Process->new(object => $errorfilter);
+   if (!osWindows()) {
+      $errorfilter_p->start($self->config->property('upgrade-test') ? [$self->config->servers->[0]] : $self->config->servers);
+   }
+
+   my $reporter_pid = $self->reportingProcess();
+
+   ### Start worker children ###
+
+   my %worker_pids;   # OS pid -- Task of that process inside RQG
+
+   if ($self->config->threads > 0) {
+      foreach my $worker_id (1..$self->config->threads) {
+         my $worker_pid = $self->workerProcess($worker_id);
+         $worker_pids{$worker_pid} = "Thread" . $worker_id;
+         Time::HiRes::sleep(0.1); # fork slowly for more predictability
+      }
+   }
+
+   ### Main process
+
+   if (osWindows()) {
+      ## Important that this is done here in the parent after the last
+      ## fork since on windows Process.pm uses threads
+      $errorfilter_p->start();
+   }
+
+   # We are the parent process, wait for for all spawned processes to terminate
+   my $total_status  = STATUS_OK;
+   my $reporter_died = 0;
+
+   ## Parent thread does not use channel
+   $self->channel()->close;
+
+   # Worker & Reporter processes that were spawned.
+   my @spawned_pids = (keys %worker_pids, $reporter_pid);
+
+   OUTER: while (1) {
+      # Wait for processes to complete, i.e only processes spawned by workers & reporters.
+      foreach my $spawned_pid (@spawned_pids) {
+         my $child_pid = waitpid($spawned_pid, WNOHANG);
+         next if $child_pid == 0;
+         my $child_exit_status = $? > 0 ? ($? >> 8) : 0;
+
+         $total_status = $child_exit_status if $child_exit_status > $total_status;
+
+         my $message_begin = "Process with pid $child_pid for ";
+         my $message_end   = " ended with status " . status2text($child_exit_status);
+         if ($child_pid == $reporter_pid ) {
+            say($message_begin . "Reporter"                 . $message_end);
+            # There was only one reporter process. So we leave the loop.
+            $reporter_died = 1;
+            last OUTER;
+         } else {
+            say($message_begin . $worker_pids{$spawned_pid} . $message_end);
+            delete $worker_pids{$child_pid};
+         }
+
+         last OUTER if $child_exit_status >= STATUS_CRITICAL_FAILURE;
+         last OUTER if keys %worker_pids == 0;
+         last OUTER if $child_pid == -1;
+      }
+      sleep 5;
+   }
+
+   # FIXME:
+   # What follows might be not sufficient.
+   # 1. What if a "Worker" does not react on SIGTERM?
+   # 2. What if a "Worker" has to report some bad status > current $total_status?
+   #    Warning:
+   #    There is a significant chance that this bad status is a sideeffect of the failure causing
+   #    a current bad $total_status.
+   #    And than this bad status is frequent
+   #    - less accurate/detailed than a current bad $total_status
+   #    - higher than a current bad $total_status
+   #    So in case we just take the maximum like usual than we destroy detail up to report a false
+   #    status.
+   foreach my $worker_pid (keys %worker_pids) {
+      say("Killing remaining worker process with pid $worker_pid...");
+      kill(15, $worker_pid);
+   }
+
+   if ($reporter_died == 0) {
+      # Wait for periodic process to return the status of its last execution
+      # FIXME:
+      # 1. I have doubts if a sleep of 1 second is all time sufficient for catching a last status
+      #    of some already ongoing execution. But otherwise: He had his chances before.
+      # 2. Like for the threads: What if a "Reporter" does not react on SIGTERM etc.?
+      Time::HiRes::sleep(1);
+      say("Killing periodic reporting process with pid $reporter_pid...");
+      kill(15, $reporter_pid);
+
+      if (osWindows()) {
+         # We use sleep() + non-blocking waitpid() due to a bug in ActiveState Perl
+         Time::HiRes::sleep(1);
+         waitpid($reporter_pid, &POSIX::WNOHANG() );
+      } else {
+         waitpid($reporter_pid, 0);
+      }
+
+      if ($? > -1 ) {
+         my $reporter_status = $? > 0 ? $? >> 8 : 0;
+         say("For pid $reporter_pid reporter status " . status2text($reporter_status));
+         # FIXME: Experimental
+         # In case the reporter Backtrace reports STATUS_SERVER_CRASHED than this is valid
+         # and not some STATUS_ENVIRONMENT_ERROR thrown by some worker thread before.
+         if ($reporter_status == STATUS_SERVER_CRASHED) {
+            say("INFO: Assigning STATUS_SERVER_CRASHED got by the reporter to total_status.");
+            $total_status = STATUS_SERVER_CRASHED;
+         } else {
+            $total_status = $reporter_status if $reporter_status > $total_status;
+         }
+      }
+   }
+
+   $errorfilter_p->kill();
+
+   return $self->reportResults($total_status);
+}
+
+}
+
+################################
+
+sub doGenTest {
+
+   my $self = shift;
+
+   $self->do_init();
+
+   # Give 1.0 seconds delay per worker/thread configured.
+   # Impact:
+   # 1. The reporting process has connected and finished a first round.
+   #    All workers have connected + got their Mixer.
+   #    Except: The setup or server is "ill" and than STATUS_ENVIRONMENT_FAILURE would be right.
+   # 2. Hereby we hopefully mostly avoid the often seen wrong status code STATUS_ENVIRONMENT_FAILURE
+   #    Some threads connect, get their mixer, start to run DDL/DML and crash hereby the server.
+   #    They all report STATUS_SERVER_CRASHED which is right.
+   #    The reporting process or some other threads are slower (box is heavy loaded), try to
+   #    connect first time after the crash, get no connection and report than
+   #    STATUS_ENVIRONMENT_FAILURE because its their first connect attempt.
+
+   $self->[GT_TEST_START] = time() + 1.0 * $self->config->threads;
+   # FIXME: This message comes too early
+   say("INFO: GenTest: Start of running queries : " . $self->[GT_TEST_START]);
+   $self->[GT_TEST_END] = $self->[GT_TEST_START] + $self->config->duration;
+
+   $self->[GT_CHANNEL] = GenTest::IPC::Channel->new();
+
+   # Some crash here ends like the case below except that finally STATUS_ALARM(110) gets reported.
+
+   my $init_generator_result = $self->initGenerator();
+   return $init_generator_result if $init_generator_result != STATUS_OK;
+
+   # Some crash here ends in
+   # ... Reporters: Deadlock, Backtrace, ErrorLog
+   # DBI connect ... failed: Lost connection ... at lib/GenTest/Reporter.pm ...
+   # [ERROR] Reporter 'GenTest::Reporter::Deadlock' could not be added. Status will be set to ENVIRONMENT_FAILURE
+   # GenTest exited with exit status STATUS_ENVIRONMENT_FAILURE (110)
+   # Stopping server(s)...
+   # Stopping server on port 11100
+   # Stale connection to 11100. Reconnecting
+   # [ERROR] (Re)connect to 11100 failed due to 2003: Can't connect to MySQL server on '127.0.0.1' (111)
+   # Server has been stopped
+   # runall-new.pl will exit with exit status STATUS_ENVIRONMENT_FAILURE(110)
+
+   my $init_reporters_result = $self->initReporters();
+   return $init_reporters_result if $init_reporters_result != STATUS_OK;
+
+   my $init_validators_result = $self->initValidators();
+   return $init_validators_result if $init_validators_result != STATUS_OK;
+
+   # Some crash here ends in
+   # ERROR: connect() to dsn dbi:... failed: Lost connection ...
+   # ERROR: Will return STATUS_ENVIRONMENT_FAILURE
+   # ERROR: GenTest::Executor::MySQL::init : Getting a connection for MetaDataCacher failed with 110. Will return that status.
+   # GenTest exited with exit status STATUS_ENVIRONMENT_FAILURE (110)
+   # Stopping server(s)...
+   # Stopping server on port 11100
+   # Stale connection to 11100. Reconnecting
+   # ERROR] (Re)connect to 11100 failed due to 2003: Can't connect to MySQL server on '127.0.0.1' (111)
+   # Server has been stopped
+   # runall-new.pl will exit with exit status STATUS_ENVIRONMENT_FAILURE(110)
+
+   # Cache metadata and other info that may be needed later
+   my @log_files_to_report;
+   foreach my $i (0..2) {
+      # FIXME:
+      # IMHO MetaDataCaching for different servers is questionable.
+      # 1. What will be the impact on the SQL executed on the different servers
+      #    if the Metadata between these servers differ?
+      # 2. When using MySQL/MariaDB builtin replication than omitting to cache Metadata on
+      #    slave servers makes sense. But should that get triggered by some undef dsn?
+      # Wouldn't be Metadata chaching only on the first server better.
+      # But we have also the view[0] ... view[3] etc
+      last if $self->config->property('upgrade-test') and $i > 0;
+      next unless $self->config->dsn->[$i];
+      if ($self->config->property('ps-protocol') and $self->config->dsn->[$i] !~ /mysql_server_prepare/) {
+          $self->config->dsn->[$i] .= ';mysql_server_prepare=1';
+      }
+      next if $self->config->dsn->[$i] !~ m{mysql}sio;
+      my $metadata_executor = GenTest::Executor->newFromDSN($self->config->dsn->[$i], osWindows() ? undef : $self->channel());
+      $metadata_executor->setRole("MetaDataCacher");
+      $metadata_executor->setId($i + 1);
+      my $init_executor_result = $metadata_executor->init();
+      return $init_executor_result if $init_executor_result != STATUS_OK;
+
+      # FIXME: Are there really cases where this dbh does not exist?
+      $metadata_executor->cacheMetaData() if defined $metadata_executor->dbh();
+
+      # Some crash after here end with fine backtrace
+# For experimenting:
+# system ("killall -6 mysqld");
 
       # Cache log file names needed for result reporting at end-of-test
 
@@ -430,7 +735,9 @@ sub run {
 
    return $self->reportResults($total_status);
 
-}
+} # End of sub doGenTest
+
+################################
 
 sub reportResults {
     my ($self, $total_status) = @_;
@@ -614,6 +921,8 @@ sub workerProcess {
 
 sub doGenData {
     my $self = shift;
+
+    $self->do_init();
 
     return STATUS_OK if defined $self->config->property('start-dirty');
 

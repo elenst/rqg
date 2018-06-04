@@ -184,7 +184,7 @@ sub parseFromString {
     # In the resulting grammar we will have:
     #   query:
     #     rule1 | rule2 | rule3;
-    # 
+    #
     # Additions to '*_init' rules will be added as a part of a multiple-statement, e.g.
     #
     # In grammar files we have:
@@ -207,7 +207,7 @@ sub parseFromString {
     # 1: query_init; query_init_add
     # 2: query_init; query_init_add; thread2_init_add
     # 3: thread3_init
-    
+
 
     my @query_adds = ();
     my %thread_adds = ();
@@ -264,7 +264,7 @@ sub parseFromString {
         my $adds = join ' | ', @{$thread_adds{$tid}};
         $rules{'thread'.$tid} = ( defined $rules{'thread'.$tid} ? $rules{'thread'.$tid} . ' | ' . $adds : $adds );
     }
-    
+
     if (@query_init_adds) {
         my $adds = join '; ', @query_init_adds;
         $rules{'query_init'} = ( defined $rules{'query_init'} ? $rules{'query_init'} . '; ' . $adds : $adds );
@@ -284,7 +284,7 @@ sub parseFromString {
 
     if (0 == scalar keys %rules) {
         say("WARN/ERROR: GenTest::Grammar::parseFromString : There are no rules in the grammar. " .
-            "Will return STATUS_ENVIRONMENT_FAILURE."); 
+            "Will return STATUS_ENVIRONMENT_FAILURE.");
         return STATUS_ENVIRONMENT_FAILURE;
     }
 
@@ -293,7 +293,7 @@ sub parseFromString {
 	foreach my $rule_name (keys %rules) {
 
         my $components_string = $rules{$rule_name};
-        
+
 		my @component_strings = split (m{\|}, $components_string);
 		my @components;
 		my %components;
