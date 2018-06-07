@@ -34,6 +34,9 @@ use Cwd;
 # use constant STATUS_OK       => 0;
 use constant STATUS_FAILURE    => 1; # Just the opposite of STATUS_OK
 
+use constant MATCHING_START    => 'MATCHING: Region start =====================';
+use constant MATCHING_END      => 'MATCHING: Region end   =====================';
+
 
 sub check_value_supported {
 #
@@ -533,8 +536,6 @@ sub check_normalize_set_black_white_lists {
 # Check, normalize (make lists) and set the variables which might be later used for checking if
 # certain content matches (black and white) list (statuses and patterns).
 # Input variables:
-# $cut_start              -- Some text pattern defining the point after which any content should
-#                            be ignored.
 # $status_prefix          -- Some text pattern defining what a line informing about an status needs
 #                            to contain.
 # $blacklist_statuses_ref -- reference to the list (*) with blacklist statuses
@@ -545,6 +546,12 @@ sub check_normalize_set_black_white_lists {
 # Example: <TS_PID> == Timestamp and Pid like '2018-05-31T22:17:52 [13946]'
 #
 # We process the log of some RQG run which already included result analysis with bw list matching.
+# <TS_PID> INFO: Final command line:
+# <TS_PID> perl ./rqg.pl ... --whitelist_statuses=... --whitelist_patterns=...
+#                        # So the b/w list statuses and patterns used are printed here.
+# <TS_PID> ...
+# <TS_PID> MATCHING: Region start   =====================
+#                       --> $cut_start = Auxiliary::MATCHING_START;
 # <TS_PID> ...
 # <TS_PID> Progress: loaded 10000 out of 10000 rows
 # <TS_PID> GenData returned status STATUS_OK (0)
@@ -563,45 +570,41 @@ sub check_normalize_set_black_white_lists {
 #                       aggregates all GenData, Gentest, Check + Compare activities performed.
 # ...
 # <TS_PID> Stopping server(s)...
-# ...
-# <TS_PID> PHASE: finished
-#                       --> $cut_start = ' PHASE: ' . Auxiliary::RQG_PHASE_FINISHED;
+# <TS_PID> MATCHING: Region end   =====================
+#                       --> $cut_start = Auxiliary::MATCHING_END;
 # ...
 # <TS_PID> PHASE: analyze
 #                       Here starts the bw list matching.
 # ...
 # <TS_PID> Blacklist statuses, element 'The RQG run ended with status STATUS_OK' : match
+#                        # So the b/w list statuses and patterns used are printed here.
 #
 # 1. $status_prefix needs to have a value which ensures that the matching focuses on the right
 #    status. ==> $status_prefix = ' The RQG run ended with status ';
-# 2. Lets assume we run the black/white list matching on this log maybe again.
-#    Than the matching could be fooled by entries written by the previous maching like the
-#    Blacklist statuses, element 'The RQG run ended with status STATUS_OK' : match.
-#    In order to prevent that we shorten the area to the range before that first matching.
-#    ==> $cut_start = ' PHASE: ' . Auxiliary::RQG_PHASE_FINISHED;
-#    In theory the end of the line RESULT: The RQG run ended with status STATUS_OK (0) could
-#    be used for that purpose too but there might be events of interest between this line and
-#    the line with " PHASE: 'finished'".
-#    Thinkable example: Stopping the servers failed.
+# 2. We need to avoid to match on the b/w list statuses and patterns reported
+#    - in the final RQG command
+#    - in the analysis section. Just assume there was a run with analysis at end.
+#      And now we run that matching again on that log.
+#    Therefore only the region between the MATCHING start and end gets considered.
 #
 # Return values:
 # - STATUS_OK      success
 # - STATUS_FAILURE no success
 #
 
-   ($cut_start, $status_prefix,
+   ($status_prefix,
        my $blacklist_statuses_ref, my $blacklist_patterns_ref,
        my $whitelist_statuses_ref, my $whitelist_patterns_ref) = @_;
 
        # The $<black|white>list_<statuses|patterns> need to be references to the corresponding lists.
 
-   if (6 != scalar @_) {
+   if (5 != scalar @_) {
       Carp::confess("INTERNAL ERROR: Auxiliary::check_normalize_set_black_white_lists : five parameters " .
                     "are required.");
       # This accident could roughly only happen when coding RQG or its tools.
       # Already started servers need to be killed manually!
    }
-   foreach my $parm ($cut_start, $status_prefix,
+   foreach my $parm ($status_prefix,
                      $blacklist_statuses_ref, $blacklist_patterns_ref,
                      $whitelist_statuses_ref, $whitelist_patterns_ref ) {
       if (not defined $parm) {
@@ -716,9 +719,14 @@ sub calculate_verdict {
       # say("DEBUG: Auxiliary::getFileSlice got content : ->$content<-");
    }
 
-   # say("DEBUG: cut_start : ->$cut_start<-, status_prefix : ->$status_prefix<-");
+   my $cut_position;
+   $cut_position = index($content, Auxiliary::MATCHING_START);
+   if ($cut_position >= 0) {
+      $content = substr($content, $cut_position);
+      # say("DEBUG: cut_position : $cut_position");
+   }
 
-   my $cut_position = index($content, $cut_start);
+   $cut_position = index($content, Auxiliary::MATCHING_END);
    if ($cut_position >= 0) {
       $content = substr($content, 0, $cut_position);
       # say("DEBUG: cut_position : $cut_position");
@@ -739,7 +747,7 @@ sub calculate_verdict {
 
    # say("DEBUG: maybe_interest : $maybe_interest, maybe_match : $maybe_match");
    $p_match = Auxiliary::content_matching ($content, \@blacklist_patterns ,
-                                              'Blacklist text patterns', 1);
+                                           'Blacklist text patterns', 1);
    if ($p_match eq Auxiliary::MATCH_YES) {
       $maybe_match    = 0;
       $maybe_interest = 0;
@@ -750,7 +758,7 @@ sub calculate_verdict {
    # But there might be some interest to know if the whitelist stuff was hit too.
    # So we run it here in any case too.
    $p_match = Auxiliary::status_matching($content, \@whitelist_statuses   ,
-                                            $status_prefix, 'Whitelist statuses', 1);
+                                         $status_prefix, 'Whitelist statuses', 1);
    # Note: Hitting Auxiliary::MATCH_UNKNOWN is not acceptable because it would
    #       degenerate runs of the grammar simplifier.
    if ($p_match ne Auxiliary::MATCH_YES) {

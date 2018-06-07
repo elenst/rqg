@@ -360,7 +360,6 @@ if ( defined $help ) {
 }
 
 if (STATUS_OK != Auxiliary::check_normalize_set_black_white_lists (
-      ' PHASE: ' . Auxiliary::RQG_PHASE_FINISHED,
       ' The RQG run ended with status ', # $status_prefix,
       \@blacklist_statuses, \@blacklist_patterns,
       \@whitelist_statuses, \@whitelist_patterns)) {
@@ -371,6 +370,7 @@ if (STATUS_OK != Auxiliary::check_normalize_set_black_white_lists (
    safe_exit($status);
 }
 
+# FIXME: Make $workdir mandatory??
 if (not defined $workdir) {
    $workdir = Cwd::getcwd() . "/workdir_" . $$;
    say("INFO: The RQG workdir was not defined. Setting it to '$workdir' and removing+creating it.");
@@ -844,6 +844,8 @@ if ($genconfig) {
                                                  debug     => $debug
    );
 }
+
+say(Auxiliary::MATCHING_START);
 
 #
 # Start servers.
@@ -1537,6 +1539,7 @@ sub exit_test {
    # Report problems in case stopServers met trouble.
    stopServers($status);
 
+   say(Auxiliary::MATCHING_END);
    $return = Auxiliary::set_rqg_phase($workdir, Auxiliary::RQG_PHASE_ANALYZE);
 
    if (not defined $logfile) {
