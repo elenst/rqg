@@ -360,6 +360,7 @@ use constant  ER_MYROCKS_CANT_NOPAD_COLLATION                   => 4077;
 
 use constant  ER_SEQUENCE_RUN_OUT                               => 4084;
 use constant  ER_SEQUENCE_INVALID_DATA                          => 4085;
+use constant  ER_SEQUENCE_INVALID_TABLE_STRUCTURE               => 4086;
 use constant  ER_UNKNOWN_SEQUENCES                              => 4091;
 use constant  ER_UNKNOWN_VIEW                                   => 4092;
 use constant  ER_VERSIONING_REQUIRED                            => 4106;
@@ -546,6 +547,7 @@ my %err2type = (
     ER_SERVER_LOST_EXTENDED()                           => STATUS_SERVER_CRASHED,
     ER_SERVER_SHUTDOWN()                                => STATUS_SERVER_KILLED,
     ER_SEQUENCE_INVALID_DATA()                          => STATUS_SEMANTIC_ERROR,
+    ER_SEQUENCE_INVALID_TABLE_STRUCTURE()               => STATUS_SEMANTIC_ERROR,
     ER_SEQUENCE_RUN_OUT()                               => STATUS_SEMANTIC_ERROR,
     ER_SIGNAL_BAD_CONDITION_TYPE()                      => STATUS_SEMANTIC_ERROR,
     ER_SIGNAL_EXCEPTION()                               => STATUS_SEMANTIC_ERROR,
