@@ -522,7 +522,6 @@ use constant MATCH_NO              => 'match_no';
 use constant MATCH_NO_BUT_INTEREST => 'match_no_but_interest';
 
 
-my $cut_start;
 my $status_prefix;
 my @blacklist_statuses;
 my @blacklist_patterns,
@@ -615,7 +614,7 @@ sub check_normalize_set_black_white_lists {
    @whitelist_statuses = @{$whitelist_statuses_ref};
    @whitelist_patterns = @{$whitelist_patterns_ref};
    @blacklist_statuses = @{$blacklist_statuses_ref};
-   @whitelist_patterns = @{$whitelist_patterns_ref};
+   @blacklist_patterns = @{$blacklist_patterns_ref};
 
    my $failure_met = 0;
 
