@@ -1376,7 +1376,7 @@ sub getSchemaMetaData {
          my $count_row = $self->dbh()->selectrow_arrayref("SELECT COUNT(*) FROM $tbl");
          $table_rows{$tbl} = $count_row->[0];
       }
-      $res=>[$i]->[8] = $table_rows{$tbl};
+      $res->[$i]->[8] = $table_rows{$tbl};
    }
    return $res;
 

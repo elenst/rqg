@@ -23,6 +23,7 @@ package Auxiliary;
 #   lib/GenTest.pm, lib/DBServer/DBServer.pm, maybe more.
 #   There are various duplicate routines like sayFile, tmpdir, ....
 # - search for string (pid or whatever) after pattern before line end in some file
+# - move too MariaDB/MySQL specific properties/settings out
 #
 
 
@@ -244,6 +245,20 @@ sub check_rqg_infrastructure {
       return STATUS_FAILURE;
    }
    return STATUS_OK;
+}
+
+
+sub find_file_at_places {
+   my($basedirectory, $subdir_list_ref, $name) = @_;
+
+   foreach my $subdirectory (@$subdir_list_ref) {
+      my $path  = $basedirectory . "/" . $subdirectory . "/" . $name;
+      return $path if -f $path;
+   }
+   # In case we are here than we have nothing found.
+   say("DEBUG: We searched at various places below 'basedirectory' but '$name' was not found. " .
+          "Will return undef.");
+   return undef;
 }
 
 
@@ -591,9 +606,9 @@ sub check_normalize_set_black_white_lists {
 # - STATUS_FAILURE no success
 #
 
-   ($status_prefix,
-       my $blacklist_statuses_ref, my $blacklist_patterns_ref,
-       my $whitelist_statuses_ref, my $whitelist_patterns_ref) = @_;
+   my ($xstatus_prefix,
+       $blacklist_statuses_ref, $blacklist_patterns_ref,
+       $whitelist_statuses_ref, $whitelist_patterns_ref) = @_;
 
        # The $<black|white>list_<statuses|patterns> need to be references to the corresponding lists.
 
@@ -603,7 +618,7 @@ sub check_normalize_set_black_white_lists {
       # This accident could roughly only happen when coding RQG or its tools.
       # Already started servers need to be killed manually!
    }
-   foreach my $parm ($status_prefix,
+   foreach my $parm ($xstatus_prefix,
                      $blacklist_statuses_ref, $blacklist_patterns_ref,
                      $whitelist_statuses_ref, $whitelist_patterns_ref ) {
       if (not defined $parm) {
@@ -611,6 +626,7 @@ sub check_normalize_set_black_white_lists {
                        "One of the parameters is undef. But none is allowed to.");
       }
    }
+   $status_prefix = $xstatus_prefix;
    @whitelist_statuses = @{$whitelist_statuses_ref};
    @whitelist_patterns = @{$whitelist_patterns_ref};
    @blacklist_statuses = @{$blacklist_statuses_ref};
@@ -736,7 +752,7 @@ sub calculate_verdict {
    my $maybe_interest = 1;
 
    $p_match = Auxiliary::status_matching($content, \@blacklist_statuses   ,
-                                         $status_prefix, 'Blacklist statuses', 1);
+                                         $status_prefix, 'MATCHING: Blacklist statuses', 1);
    # Note: Hitting Auxiliary::MATCH_UNKNOWN would be not nice.
    #       But its acceptable compared to Auxiliary::MATCH_YES.
    if ($p_match eq Auxiliary::MATCH_YES) {
@@ -746,7 +762,7 @@ sub calculate_verdict {
 
    # say("DEBUG: maybe_interest : $maybe_interest, maybe_match : $maybe_match");
    $p_match = Auxiliary::content_matching ($content, \@blacklist_patterns ,
-                                           'Blacklist text patterns', 1);
+                                           'MATCHING: Blacklist text patterns', 1);
    if ($p_match eq Auxiliary::MATCH_YES) {
       $maybe_match    = 0;
       $maybe_interest = 0;
@@ -757,14 +773,14 @@ sub calculate_verdict {
    # But there might be some interest to know if the whitelist stuff was hit too.
    # So we run it here in any case too.
    $p_match = Auxiliary::status_matching($content, \@whitelist_statuses   ,
-                                         $status_prefix, 'Whitelist statuses', 1);
+                                         $status_prefix, 'MATCHING: Whitelist statuses', 1);
    # Note: Hitting Auxiliary::MATCH_UNKNOWN is not acceptable because it would
    #       degenerate runs of the grammar simplifier.
    if ($p_match ne Auxiliary::MATCH_YES) {
       $maybe_match    = 0;
    }
    $p_match = Auxiliary::content_matching ($content, \@whitelist_patterns ,
-                                           'Whitelist text patterns', 1);
+                                           'MATCHING: Whitelist text patterns', 1);
    if ($p_match ne Auxiliary::MATCH_YES and $p_match ne Auxiliary::MATCH_NO_LIST_EMPTY) {
       $maybe_match    = 0;
    }
@@ -1203,6 +1219,7 @@ sub input_to_list {
       # say("DEBUG: The input is surrounded by single quotes. Assume 'single quote protection' " .
       #     "and remove these quotes.");
       $single_quote_protection = 1;
+      # say("DEBUG: single_quote_protection met");
       $input[0] = substr($input[0], 1, length($input[0]) - 2);
       # print_list("DEBUG: input_to_list value after begin/end single quote removal", @input);
    } elsif (substr($input[0],  0, 1) eq "'" or substr($input[0], -1, 1) eq "'") {

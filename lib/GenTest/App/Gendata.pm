@@ -588,7 +588,7 @@ sub run {
                     } else {
                         $value = 'DEFAULT';
                     }
-                } elsif ($field->[FIELD_INDEX] eq 'primary key') {
+                } elsif (defined $field->[FIELD_INDEX] and $field->[FIELD_INDEX] eq 'primary key') {
                     if ($field->[FIELD_TYPE] =~ m{^(datetime|timestamp)$}sgio) {
     				$value = "FROM_UNIXTIME(UNIX_TIMESTAMP('2000-01-01') + $row_id)";
 	                } elsif ($field->[FIELD_TYPE] =~ m{date}sgio) {
@@ -622,7 +622,7 @@ sub run {
                         $quote = 1;
                     }
                     
-                    if (($field->[FIELD_NULLABILITY] eq 'not null') || ($self->[GD_NOTNULL])) {
+                    if ((defined $field->[FIELD_NULLABILITY] and $field->[FIELD_NULLABILITY] eq 'not null') || ($self->[GD_NOTNULL])) {
                         # Remove NULL from the list of allowed values
                         @possible_values = grep { lc($_) ne 'null' } @{$data_perms[$value_type]};
                     } else {

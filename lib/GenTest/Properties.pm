@@ -40,6 +40,7 @@ use strict;
 use Carp;
 use GenTest;
 use GenTest::Constants;
+use Auxiliary;
 
 use Data::Dumper;
 

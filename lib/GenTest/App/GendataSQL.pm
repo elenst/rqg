@@ -114,7 +114,10 @@ sub run {
    $executor->init();
 
    sub run_sql_cmd {
-      my ($sql_cmd) = @_;
+      my ($executor, $sql_cmd) = @_;
+      if (not defined $sql_cmd) {
+         Carp::confess("Error: SQL command to be executed is not defined.");
+      }
       # 1. The execute will write the SQL statement including errors to the output in case SQL
       #    tracing is enabled.
       # 2. EXECUTOR_FLAG_SILENT prevents to get error messages from Perl in case
@@ -132,11 +135,11 @@ sub run {
       } else {
          return STATUS_OK;
       }
-    }
+   }
 
    if($executor->type == DB_MYSQL) {
       my $sql_cmd = "SET SQL_MODE= CONCAT(\@\@sql_mode, ',NO_ENGINE_SUBSTITUTION')";
-      my $status = run_sql_cmd($sql_cmd);
+      my $status = run_sql_cmd($executor, $sql_cmd);
       if ($status) {
          return $bad_status;
       }
@@ -145,7 +148,7 @@ sub run {
    if ((defined $self->engine() and $self->engine() ne '') and
        ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE)) {
       my $sql_cmd = "SET DEFAULT_STORAGE_ENGINE='" . $self->engine() . "'";
-      my $status = run_sql_cmd($sql_cmd);
+      my $status = run_sql_cmd($executor, $sql_cmd);
       if ($status) {
          return $bad_status;
       }
@@ -158,13 +161,15 @@ sub run {
       say("ERROR: Will return STATUS_ENVIRONMENT_FAILURE.");
       return $bad_status;
    }
+
+
    while (my $line = <CONF>) {
       chomp $line;
       if( $line =~ m{^ *\#.*$} ) {
          # Do not try to execute comment lines.
          next;
       } else {
-         my $status = run_sql_cmd($line);
+         my $status = run_sql_cmd($executor, $line);
          if ($status) {
             return $bad_status;
          }

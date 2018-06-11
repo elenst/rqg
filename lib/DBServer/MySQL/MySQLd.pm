@@ -151,6 +151,11 @@ sub new {
         $self->serverType($self->[MYSQLD_MYSQLD]);
     }
 
+    if (not defined $self->serverType($self->[MYSQLD_MYSQLD])) {
+        say("ERROR: No fitting server binary in '$self->basedir' found.");
+        return undef;
+    }
+
     $self->[MYSQLD_BOOT_SQL] = [];
 
     $self->[MYSQLD_DUMPER] = $self->_find([$self->basedir],
