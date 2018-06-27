@@ -1,5 +1,6 @@
 # Copyright (C) 2008-2009 Sun Microsystems, Inc. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab.
+# Copyright (c) 2018, MariaDB Corporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -33,62 +34,61 @@ use Cwd;
 use List::Util qw(shuffle); # For some grammars
 use Time::HiRes qw(time);
 
-use constant GENERATOR_MAX_OCCURRENCES	=> 3500;
-use constant GENERATOR_MAX_LENGTH	=> 10000;
+use constant GENERATOR_MAX_OCCURRENCES  => 3500;
+use constant GENERATOR_MAX_LENGTH       => 10000;
 
 my $field_pos;
 my $cwd = cwd();
 
 sub new {
-        my $class = shift;
-	my $generator = $class->SUPER::new(@_);
+   my $class     = shift;
+   my $generator = $class->SUPER::new(@_);
 
-	if (not defined $generator->grammar()) {
-#		say("Loading grammar file '".$generator->grammarFile()."' ...");
-		$generator->[GENERATOR_GRAMMAR] = GenTest::Grammar->new(
-			grammar_file	=> $generator->grammarFile(),
-			grammar_string	=> $generator->grammarString()
-		);
-		return undef if not defined $generator->[GENERATOR_GRAMMAR];
-	}
+   if (not defined $generator->grammar()) {
+   #  say("DEBUG: Loading grammar file '" . $generator->grammarFile() . "' ...");
+      $generator->[GENERATOR_GRAMMAR] = GenTest::Grammar->new(
+            grammar_file    => $generator->grammarFile(),
+            grammar_string	=> $generator->grammarString()
+      );
+      return undef if not defined $generator->[GENERATOR_GRAMMAR];
+   }
 
-	if (not defined $generator->prng()) {
-		$generator->[GENERATOR_PRNG] = GenTest::Random->new(
-			seed => $generator->[GENERATOR_SEED] || 0,
-			varchar_length => $generator->[GENERATOR_VARCHAR_LENGTH]
-		);
-	}
-        
-    if (not defined $generator->maskLevel()) {
-        $generator->[GENERATOR_MASK_LEVEL] = 1;    
-    }
+   if (not defined $generator->prng()) {
+      $generator->[GENERATOR_PRNG] = GenTest::Random->new(
+            seed           => $generator->[GENERATOR_SEED] || 0,
+            varchar_length => $generator->[GENERATOR_VARCHAR_LENGTH]
+      );
+   }
 
-	$generator->[GENERATOR_SEQ_ID] = 0;
+   if (not defined $generator->maskLevel()) {
+      $generator->[GENERATOR_MASK_LEVEL] = 1;
+   }
 
-    if ($generator->mask() > 0) {
-        my $grammar = $generator->grammar();
-        my $top = $grammar->topGrammar($generator->maskLevel(),
-                                       "thread".$generator->threadId(),
-                                       "query");
-        my $maskedTop = $top->mask($generator->mask());
-        $generator->[GENERATOR_MASKED_GRAMMAR] = $grammar->patch($maskedTop);
-    }
+   $generator->[GENERATOR_SEQ_ID]    = 0;
+   $generator->[GENERATOR_RECONNECT] = 1;
 
-	return $generator;
+   if (defined $generator->mask() and $generator->mask() > 0) {
+      my $grammar = $generator->grammar();
+      my $top     = $grammar->topGrammar($generator->maskLevel(),
+                                         "thread" . $generator->threadId(),
+                                         "query");
+      my $maskedTop                          = $top->mask($generator->mask());
+      $generator->[GENERATOR_MASKED_GRAMMAR] = $grammar->patch($maskedTop);
+   }
+
+   return $generator;
 }
 
 sub globalFrame {
-    my ($self) = @_;
-    $self->[GENERATOR_GLOBAL_FRAME] = GenTest::Stack::StackFrame->new()
+   my ($self) = @_;
+   $self->[GENERATOR_GLOBAL_FRAME] = GenTest::Stack::StackFrame->new()
         if not defined $self->[GENERATOR_GLOBAL_FRAME];
-    return $self->[GENERATOR_GLOBAL_FRAME];
+   return $self->[GENERATOR_GLOBAL_FRAME];
 }
 
 sub participatingRules {
-	return $_[0]->[GENERATOR_PARTICIPATING_RULES];
+   return $_[0]->[GENERATOR_PARTICIPATING_RULES];
 }
-
-
 
 #
 # Generate a new query. We do this by iterating over the array containing grammar rules and expanding each grammar rule
@@ -116,7 +116,7 @@ sub next {
 	my $last_field;
 	my $last_table;
 	my $last_database;
-    
+
 	my $stack = GenTest::Stack::Stack->new();
 	my $global = $generator->globalFrame();
 
@@ -322,7 +322,7 @@ sub next {
 					# The generation of constructs such as `table _digit` => `table 5`
 
 					if (
-						(substr($orig_item, -1) eq '`') && 
+						(substr($orig_item, -1) eq '`') &&
 						(index($item, '`') == -1)
 					) {
 						$item = $item.'`';
@@ -341,25 +341,84 @@ sub next {
 	# If a temporary file has been left from a previous statement, unlink it.
 	#
 
-	unlink($generator->[GENERATOR_TMPNAM]) if defined $generator->[GENERATOR_TMPNAM];
-	$generator->[GENERATOR_TMPNAM] = undef;
+   unlink($generator->[GENERATOR_TMPNAM]) if defined $generator->[GENERATOR_TMPNAM];
+   $generator->[GENERATOR_TMPNAM] = undef;
 
-	my $starting_rule;
+   my $starting_rule;
 
-	# If this is our first query, we look for a rule named "threadN_init" or "query_init"
-	if ($generator->[GENERATOR_SEQ_ID] == 0) {
-		if (exists $grammar_rules->{"thread".$generator->threadId()."_init"}) {
-			$starting_rule = "thread".$generator->threadId()."_init";
-		} elsif (exists $grammar_rules->{"query_init"}) {
-			$starting_rule = "query_init";
-		}
-	}
+   if(0) {
+      say("DEBUG: In FromGrammar for " . $executors->[0]->role() .
+          " GENERATOR_SEQ_ID : " . $generator->[GENERATOR_SEQ_ID] .
+          " GENERATOR_RECONNECT : " . $generator->[GENERATOR_RECONNECT]);
+   }
+
+   # Design
+   # ======
+   # 1. "threadN_init" or "query_init" or  "thread_init"
+   #    Run this
+   #    - ONLY ONCE per test for
+   #      - creating objects required from the begin on
+   #        Example: SQL base tables
+   #        Hint: I recommend to use "gendata_sql" for that instead.
+   #      - setting Perl stuff
+   #      == All stuff which cannot get lost when being disconnected from the server.
+   #         Hint: Temporary tables get lost with the session!
+   #    - direct after getting a connection first time for the current executor
+   #    - before running other top-level rules
+   #         "*_connect", "thread<n>", "query" or "thread"
+   #    This does not need to prepare 100% of the required and/or optimal playground for running
+   #    queries generated from  "thread<n>", "query" or "thread" later.
+   # 2. "threadN_connect" or "query_connect" or  "thread_connect"
+   #    Run this
+   #    - ONCE per ANY connect for creating the required and/or optimal conditions for
+   #      running later a mass of queries generated from the top-level rules
+   #         "thread<n>", "query" or "thread"
+   #      Typical content is anything which would get lost after some disconnect like
+   #         SET @aux = 13; SET SESSION  lock_wait_timeout = 1;
+   #    - never before the first "threadN_init" or "query_init" or  "thread_init"
+   #      Bad example:
+   #      SET lock_wait_timeout = 1;
+   #      When running this direct after the first connect within the test and and before
+   #      "*_init" than the "*_init" has significant chances to suffer from locking timeouts
+   #      which is usually unwanted.
+   #    - before the first query generated from the top-level rules
+   #         "thread<n>", "query" or "thread"
+   # 3. "thread<n>", "query" or "thread"
+   #    Generate with this the mass of queries.
+   #    Some previous
+   #    - "threadN_init" or "query_init" or "thread_init
+   #      executed once per test run
+   #    - "threadN_connect" or "query_connect" or  "thread_connect"
+   #      executed after the first connect and any reconnect
+   #    should take care that the right environment for that mass of queries is met.
+   if ($generator->[GENERATOR_SEQ_ID] == 0) {
+      # This means that we have never run a top-level "*_init" rule.
+      # So do this now in case there is such a rule.
+      if (exists $grammar_rules->{"thread".$generator->threadId()."_init"}) {
+         $starting_rule = "thread".$generator->threadId()."_init";
+      } elsif (exists $grammar_rules->{"query_init"}) {
+         $starting_rule = "query_init";
+      }
+   } elsif ($generator->[GENERATOR_RECONNECT] == 1) {
+      # This means that we had just a connect and maybe a run of a  top-level "*_init" rule.
+      # So in case there is a "*_connect" than run it now.
+      if (exists $grammar_rules->{"thread".$generator->threadId()."_connect"}) {
+         $starting_rule = "thread".$generator->threadId()."_connect";
+      } elsif (exists $grammar_rules->{"thread_connect"}) {
+         $starting_rule = "thread_connect";
+      } elsif (exists $grammar_rules->{"query_connect"}) {
+         $starting_rule = "query_connect";
+      }
+      # say("DEBUG: FromGrammar Setting GENERATOR_RECONNECT to 0");
+      $generator->[GENERATOR_RECONNECT] = 0;
+   }
 
 	## Apply mask if any
 	$grammar = $generator->[GENERATOR_MASKED_GRAMMAR] if defined $generator->[GENERATOR_MASKED_GRAMMAR];
 	$grammar_rules = $grammar->rules();
 
-	# If no init starting rule, we look for rules named "threadN" or "query"
+   # FIXME: Couldn't we move that in some else part before the masking stuff?
+	# If no init starting rule, we look for rules named "threadN" or "query" or "thread"
 
 	if (not defined $starting_rule) {
 		if (exists $grammar_rules->{"thread".$generator->threadId()}) {
@@ -368,7 +427,7 @@ sub next {
 			$starting_rule = "query";
 		}
 	}
-    
+
 	my @sentence = expand(\%rule_counters,\%rule_invariants,($starting_rule));
 
 	$generator->[GENERATOR_SEQ_ID]++;
@@ -383,33 +442,33 @@ sub next {
 	$generator->[GENERATOR_PARTICIPATING_RULES] = [ keys %rule_counters ];
 
 	# If this is a BEGIN ... END block or alike, then send it to server without splitting.
-	# If the semicolon is inside a string literal, ignore it. 
+	# If the semicolon is inside a string literal, ignore it.
 	# Otherwise, split it into individual statements so that the error and the result set from each statement
 	# can be examined
 
 	if (
 		# Stored procedures of all sorts
-			( 
+			(
 				(index($sentence, 'CREATE') > -1 ) &&
-				(index($sentence, 'BEGIN') > -1 || index($sentence, 'END') > -1) 
+				(index($sentence, 'BEGIN') > -1 || index($sentence, 'END') > -1)
 			)
 		or
 		# MDEV-5317, anonymous blocks BEGIN NOT ATOMIC .. END
-			( 
+			(
 				(index($sentence, 'BEGIN') > -1 ) &&
 				(index($sentence, 'ATOMIC') > -1 ) &&
 				(index($sentence, 'END') > -1 )
 			)
 		or
 		# MDEV-5317, IF .. THEN .. [ELSE ..] END IF
-			( 
+			(
 				(index($sentence, 'IF') > -1 ) &&
 				(index($sentence, 'THEN') > -1 ) &&
 				(index($sentence, 'END') > -1 )
 			)
 		or
 		# MDEV-5317, CASE .. [WHEN .. THEN .. [WHEN .. THEN ..] [ELSE .. ]] END CASE
-			( 
+			(
 				(index($sentence, 'CASE') > -1 ) &&
 				(index($sentence, 'WHEN') > -1 ) &&
 				(index($sentence, 'THEN') > -1 ) &&
@@ -417,20 +476,20 @@ sub next {
 			)
 		or
 		# MDEV-5317, LOOP .. END LOOP
-			( 
+			(
 				(index($sentence, 'LOOP') > -1 ) &&
 				(index($sentence, 'END') > -1 )
 			)
 		or
 		# MDEV-5317, REPEAT .. UNTIL .. END REPEAT
-			( 
+			(
 				(index($sentence, 'REPEAT') > -1 ) &&
 				(index($sentence, 'UNTIL') > -1 ) &&
 				(index($sentence, 'END') > -1 )
 			)
 		or
 		# MDEV-5317, WHILE .. DO .. END WHILE
-			( 
+			(
 				(index($sentence, 'WHILE') > -1 ) &&
 				(index($sentence, 'DO') > -1 ) &&
 				(index($sentence, 'END') > -1 )
@@ -441,8 +500,8 @@ sub next {
 
 		my @sentences;
 
-		# We want to split the sentence into separate statements, but we do not want 
-		# to split literals if a semicolon happens to be inside. 
+		# We want to split the sentence into separate statements, but we do not want
+		# to split literals if a semicolon happens to be inside.
 		# I am sure it could be done much smarter; feel free to improve it.
 		# For now, we do the following:
 		# - store and mask all literals (inside single or double quote marks);
@@ -454,11 +513,11 @@ sub next {
 		if (index($sentence, "'") > -1 or index($sentence, '"') > -1) {
 			# Store literals in single quotes
 			my @singles = ( $sentence =~ /(?<!\\)(\'.*?(?<!\\)\')/g );
-			# Mask these literals 
+			# Mask these literals
 			$sentence =~ s/(?<!\\)\'.*?(?<!\\)\'/######SINGLES######/g;
 			# Store remaining literals in double quotes
 			my @doubles = ( $sentence =~ /(?<!\\)(\".*?(?<!\\)\")/g );
-			# Mask these literals 
+			# Mask these literals
 			$sentence =~ s/(?<!\\)\".*?(?<!\\)\"/######DOUBLES######/g;
 			# Replace remaining semicolons
 			$sentence =~ s/;/######SEMICOLON######/g;
@@ -480,7 +539,7 @@ sub next {
 		return \@sentences;
 	} else {
 		return [ $sentence ];
-	}
+    }
 }
 
 1;

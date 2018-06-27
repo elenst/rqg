@@ -1,4 +1,5 @@
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018 MariaDB Coporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -96,7 +97,7 @@ sub monitor_nonthreaded {
 
 	foreach my $process (@$processlist) {
 		if (
-			($process->[PROCESSLIST_PROCESS_INFO] ne '') &&
+			(defined $process->[PROCESSLIST_PROCESS_INFO] and $process->[PROCESSLIST_PROCESS_INFO] ne '') &&
 			($process->[PROCESSLIST_PROCESS_TIME] > QUERY_LIFETIME_THRESHOLD)
 		) {
 			$stalled_queries++;

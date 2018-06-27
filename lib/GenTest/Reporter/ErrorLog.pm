@@ -1,4 +1,5 @@
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018 MariaDB Coporration Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -37,19 +38,19 @@ sub report {
 
 sub nativeReport {
 
-	my $reporter = shift;
+   my $reporter = shift;
 
-	# master.err-old is created when logs are rotated due to SIGHUP
+   # master.err-old is created when logs are rotated due to SIGHUP
 
-	my $main_log = $reporter->serverVariable('log_error');
-    if ($main_log eq '') {
-        foreach my $errlog ('../log/master.err', '../mysql.err') {
-            if (-f $reporter->serverVariable('datadir').'/'.$errlog) {
-                $main_log = $reporter->serverVariable('datadir').'/'.$errlog;
-                last;
-            }
-        }
-    }
+   my $main_log = $reporter->serverVariable('log_error');
+   if ($main_log eq '') {
+      foreach my $errlog ('../log/master.err', '../mysql.err') {
+         if (-f $reporter->serverVariable('datadir').'/'.$errlog) {
+            $main_log = $reporter->serverVariable('datadir').'/'.$errlog;
+            last;
+         }
+      }
+   }
 
 	foreach my $log ( $main_log, $main_log.'-old' ) {
 		if ((-e $log) && (-s $log > 0)) {
@@ -65,7 +66,7 @@ sub nativeReport {
 		}
 	}
 	
-	return STATUS_OK;
+   return STATUS_OK;
 }
 
 sub callbackReport {

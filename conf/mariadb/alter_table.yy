@@ -12,6 +12,14 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
+#
+#  (ml) Some observations:
+#  1. The rule alt_table_name uses _table.
+#     In case the MetaData caching is used, and currently it is, by the threads than the premade
+#     tables will get attacked.
+#     CREATE OR REPLACE TABLE .... will destroy their content and layout.
+#     ==> I have removed _table from alt_table_name.
+#
 
 query_init_add:
     alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace ; alt_create_or_replace
@@ -42,6 +50,7 @@ alt_create:
 ;
 
 alt_rename_multi:
+  # (ml) This will be some physical or logical noop except the RENAME fails and is than non atomic.
   DROP TABLE IF EXISTS { 'tmp_rename_'.abs($$) } ; RENAME TABLE alt_table_name TO { 'tmp_rename_'.abs($$) }, { 'tmp_rename_'.abs($$) } TO { $my_last_table }
 ;
 
@@ -193,7 +202,7 @@ alt_lock_unlock_table:
 # Disabled due to MDEV-13553 and MDEV-12466
 #    FLUSH TABLE alt_table_name FOR EXPORT
     LOCK TABLE alt_table_name READ
-  | LOCK TABLE alt_table_name WRITE
+  | LOCK TABLE alt_template_table_name WRITE
   | SELECT * FROM alt_table_name FOR UPDATE
   | UNLOCK TABLES
   | UNLOCK TABLES
@@ -218,8 +227,16 @@ alt_truncate:
 alt_table_name:
     { $my_last_table = 't'.$prng->int(1,10) }
   | { $my_last_table = 't'.$prng->int(1,10) }
-  | _table { $my_last_table = $last_table; '' }
 ;
+
+alt_template_table_name:
+  # Use that in statements where the corresponding table will NOT get modified.
+  # Examples: CREATE TABLE t1 LIKE _table; CREATE TABLE t1 AS SELECT * FROM _table;
+    alt_table_name
+  | alt_table_name
+  | _table
+;
+
 
 alt_col_name:
     alt_int_col_name
@@ -396,7 +413,7 @@ alt_update:
   UPDATE alt_table_name SET alt_col_name = DEFAULT LIMIT 1;
 
 alt_insert_select:
-  INSERT INTO alt_table_name ( alt_col_name ) SELECT alt_col_name FROM alt_table_name
+  INSERT INTO alt_table_name ( alt_col_name ) SELECT alt_col_name FROM alt_template_table_name
 ;
 
 alt_insert_values:
@@ -479,7 +496,13 @@ alt_optimize:
 ;
 
 alt_algorithm:
-  | | , ALGORITHM=INPLACE | , ALGORITHM=COPY | , ALGORITHM=DEFAULT
+
+  |
+  | , ALGORITHM=INSTANT
+  | , ALGORITHM=NOCOPY
+  | , ALGORITHM=INPLACE
+  | , ALGORITHM=COPY
+  | , ALGORITHM=DEFAULT
 ;
 
 alt_lock:

@@ -1,5 +1,6 @@
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab.
+# Copyright (c) 2018, MariaDB Corporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -46,6 +47,9 @@ use GenTest::Constants;
 
 use constant EXECUTOR_DSN			=> 0;
 use constant EXECUTOR_DBH			=> 1;
+# GenTest/App/GenTest.pm:      Number of the server to run against
+# or
+# GenTest/Executor/Drizzle.pm: A string with whatever.
 use constant EXECUTOR_ID			=> 2;
 use constant EXECUTOR_RETURNED_ROW_COUNTS	=> 3;
 use constant EXECUTOR_AFFECTED_ROW_COUNTS	=> 4;
@@ -67,6 +71,9 @@ use constant EXECUTOR_HOST          => 19;
 use constant EXECUTOR_PORT          => 20;
 use constant EXECUTOR_END_TIME	    => 21;
 use constant EXECUTOR_CURRENT_USER	    => 22;
+# Used for better messages.
+# Gendata , GendataSimple, ... , Thread1, ...., Reporter....
+use constant EXECUTOR_ROLE	    => 23;
 
 use constant FETCH_METHOD_AUTO		=> 0;
 use constant FETCH_METHOD_STORE_RESULT	=> 1;
@@ -81,21 +88,22 @@ my %global_schema_cache;
 1;
 
 sub new {
-	my $class = shift;
-	
-	my $executor = $class->SUPER::new({
-		'dsn'	=> EXECUTOR_DSN,
-		'dbh'	=> EXECUTOR_DBH,
-		'channel' => EXECUTOR_CHANNEL,
-		'sqltrace' => EXECUTOR_SQLTRACE,
-		'no-err-filter' => EXECUTOR_NO_ERR_FILTER,
-		'fetch_method' => EXECUTOR_FETCH_METHOD,
-		'end_time' => EXECUTOR_END_TIME
-	}, @_);
+   my $class = shift;
 
-	$executor->[EXECUTOR_FETCH_METHOD] = FETCH_METHOD_AUTO if not defined $executor->[EXECUTOR_FETCH_METHOD];
-    
-	return $executor;
+   my $executor = $class->SUPER::new({
+        'dsn'            => EXECUTOR_DSN,
+        'dbh'            => EXECUTOR_DBH,
+        'channel'        => EXECUTOR_CHANNEL,
+        'sqltrace'       => EXECUTOR_SQLTRACE,
+        'no-err-filter'  => EXECUTOR_NO_ERR_FILTER,
+        'fetch_method'   => EXECUTOR_FETCH_METHOD,
+        'end_time'       => EXECUTOR_END_TIME,
+        'role'           => EXECUTOR_ROLE
+   }, @_);
+
+   $executor->[EXECUTOR_FETCH_METHOD] = FETCH_METHOD_AUTO if not defined $executor->[EXECUTOR_FETCH_METHOD];
+
+   return $executor;
 }
 
 sub newFromDSN {
@@ -117,7 +125,7 @@ sub newFromDSN {
 		require GenTest::Executor::Dummy;
 		return GenTest::Executor::Dummy->new(dsn => $dsn);
 	} else {
-		say("Unsupported dsn: $dsn");
+		say("ERROR: Unsupported dsn: $dsn. Will exit with status STATUS_ENVIRONMENT_FAILURE.");
 		exit(STATUS_ENVIRONMENT_FAILURE);
 	}
 }
@@ -168,6 +176,14 @@ sub setDbh {
 	$_[0]->[EXECUTOR_DBH] = $_[1];
 }
 
+sub role {
+	return $_[0]->[EXECUTOR_ROLE];
+}
+
+sub setRole {
+	$_[0]->[EXECUTOR_ROLE] = $_[1];
+}
+
 sub sqltrace {
     my ($self, $sqltrace) = @_;
     $self->[EXECUTOR_SQLTRACE] = $sqltrace if defined $sqltrace;
@@ -216,6 +232,10 @@ sub setConnectionId {
 	$_[0]->[EXECUTOR_CONNECTION_ID] = $_[1];
 }
 
+# FIXME: Maybe rather here and not in the MySQL Executor
+#        manage the role (Thread1, Reporter...)
+
+
 sub flags {
 	return $_[0]->[EXECUTOR_FLAGS] || 0;
 }
@@ -261,7 +281,7 @@ sub preprocess {
     my ($self, $query) = @_;
 
     my $id = $dbid[$self->type()];
-    
+
     # Keep if match (+)
 
     # print "... $id before: $query \n";
@@ -285,7 +305,7 @@ my %class2status = (
     "25" => STATUS_TRANSACTION_ERROR, # invalid transaction state
     "42" => STATUS_SYNTAX_ERROR    # syntax error or access rule
                                    # violation
-    
+
     );
 
 sub findStatus {
@@ -325,7 +345,7 @@ sub getCollationMetaData {
 
 sub cacheMetaData {
     my ($self, $redo) = @_;
-    
+
     my $meta = {};
 
     if ($redo or not exists $global_schema_cache{$self->dsn()}) {
@@ -402,7 +422,7 @@ sub metaTables {
         unless (scalar(keys %{$meta->{$schema}->{table}}) + scalar(keys %{$meta->{$schema}->{view}})) {
             # Give it another chance, maybe we created data after starting the test
             $self->cacheMetaData('redo');
-				$meta = $self->[EXECUTOR_SCHEMA_METADATA]; 
+				$meta = $self->[EXECUTOR_SCHEMA_METADATA];
         }
         my $tables = [sort ( keys %{$meta->{$schema}->{table}}, keys %{$meta->{$schema}->{view}} )];
         if (not defined $tables or $#$tables < 0) {
@@ -412,7 +432,7 @@ sub metaTables {
         $self->[EXECUTOR_META_CACHE]->{$cachekey} = $tables;
     }
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
-    
+
 }
 
 sub metaBaseTables {
@@ -432,7 +452,7 @@ sub metaBaseTables {
         $self->[EXECUTOR_META_CACHE]->{$cachekey} = $tables;
     }
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
-    
+
 }
 
 sub metaBigTables {
@@ -547,18 +567,18 @@ sub metaViews {
         $self->[EXECUTOR_META_CACHE]->{$cachekey} = $tables;
     }
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
-    
+
 }
 
 sub metaColumns {
     my ($self, $table, $schema) = @_;
     my $meta = $self->[EXECUTOR_SCHEMA_METADATA];
-    
+
     $schema = $self->defaultSchema if not defined $schema;
     $table = $self->metaTables($schema)->[0] if not defined $table;
-    
+
     my $cachekey="COL-$schema-$table";
-    
+
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
         my $cols;
         if ($meta->{$schema}->{table}->{$table}) {
@@ -568,7 +588,7 @@ sub metaColumns {
         } else {
             say "WARNING: Table '$table' in schema '$schema' has no columns";
             $cols = ['non_existing_column']
-        } 
+        }
         $self->[EXECUTOR_META_CACHE]->{$cachekey} = $cols;
     }
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
@@ -577,12 +597,12 @@ sub metaColumns {
 sub metaColumnsIndexType {
     my ($self, $indextype, $table, $schema) = @_;
     my $meta = $self->[EXECUTOR_SCHEMA_METADATA];
-    
+
     $schema = $self->defaultSchema if not defined $schema;
     $table = $self->metaTables($schema)->[0] if not defined $table;
-    
+
     my $cachekey="COL-$indextype-$schema-$table";
-    
+
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
         my $colref;
         if ($meta->{$schema}->{table}->{$table}) {
@@ -611,18 +631,18 @@ sub metaColumnsIndexType {
         $self->[EXECUTOR_META_CACHE]->{$cachekey} = $cols;
     }
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
-    
+
 }
 
 sub metaColumnsDataType {
     my ($self, $datatype, $table, $schema) = @_;
     my $meta = $self->[EXECUTOR_SCHEMA_METADATA];
-    
+
     $schema = $self->defaultSchema if not defined $schema;
     $table = $self->metaTables($schema)->[0] if not defined $table;
-    
+
     my $cachekey="COL-$datatype-$schema-$table";
-    
+
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
         my $colref;
         if ($meta->{$schema}->{table}->{$table}) {
@@ -643,18 +663,18 @@ sub metaColumnsDataType {
     }
 #    say("HERE: $datatype columns for $table in $schema: @{$self->[EXECUTOR_META_CACHE]->{$cachekey}}");
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
-    
+
 }
 
 sub metaColumnsDataIndexType {
     my ($self, $datatype, $indextype, $table, $schema) = @_;
     my $meta = $self->[EXECUTOR_SCHEMA_METADATA];
-    
+
     $schema = $self->defaultSchema if not defined $schema;
     $table = $self->metaTables($schema)->[0] if not defined $table;
-    
+
     my $cachekey="COL-$datatype-$indextype-$schema-$table";
-    
+
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
         my $colref;
         if ($meta->{$schema}->{table}->{$table}) {
@@ -685,23 +705,23 @@ sub metaColumnsDataIndexType {
             say "WARNING: Table/view '$table' in schema '$schema' has no '$indextype' columns (Might be caused by use of --views option in combination with grammars containing _field_indexed)";
             $cols_by_indextype = [ 'non_existing_column' ];
         }
-            
+
         my $cols = GenTest::intersect_arrays($cols_by_datatype,$cols_by_indextype);
         $self->[EXECUTOR_META_CACHE]->{$cachekey} = $cols;
     }
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
-    
+
 }
 
 sub metaColumnsDataTypeIndexTypeNot {
     my ($self, $datatype, $indextype, $table, $schema) = @_;
     my $meta = $self->[EXECUTOR_SCHEMA_METADATA];
-    
+
     $schema = $self->defaultSchema if not defined $schema;
     $table = $self->metaTables($schema)->[0] if not defined $table;
-    
+
     my $cachekey="COL-$datatype-$indextype-$schema-$table";
-    
+
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
         my $colref;
         if ($meta->{$schema}->{table}->{$table}) {
@@ -730,16 +750,16 @@ sub metaColumnsDataTypeIndexTypeNot {
         $self->[EXECUTOR_META_CACHE]->{$cachekey} = $cols;
     }
     return $self->[EXECUTOR_META_CACHE]->{$cachekey};
-    
+
 }
 
 sub metaColumnsIndexTypeNot {
     my ($self, $indextype, $table, $schema) = @_;
     my $meta = $self->[EXECUTOR_SCHEMA_METADATA];
-    
+
     $schema = $self->defaultSchema if not defined $schema;
     $table = $self->metaTables($schema)->[0] if not defined $table;
-    
+
     my $cachekey="COLNOT-$indextype-$schema-$table";
 
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
@@ -768,7 +788,7 @@ sub metaColumnsIndexTypeNot {
 
 sub metaCollations {
     my ($self) = @_;
-    
+
     my $cachekey="COLLATIONS";
 
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
@@ -781,9 +801,9 @@ sub metaCollations {
 
 sub metaCharactersets {
     my ($self) = @_;
-    
+
     my $cachekey="CHARSETS";
-    
+
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
         my $charsets = [values %{$self->[EXECUTOR_COLLATION_METADATA]}];
         croak "FATAL ERROR: No character sets defined" if not defined $charsets or $#$charsets < 0;
@@ -801,7 +821,7 @@ sub metaColumnInfo {
     $table = $self->metaTables($schema)->[0] if not defined $table;
 
     my $cachekey="COLINFO-$schema-$table";
-    
+
     if (not defined $self->[EXECUTOR_META_CACHE]->{$cachekey}) {
         my $cols = ();
         if ($meta->{$schema}->{table}->{$table}) {

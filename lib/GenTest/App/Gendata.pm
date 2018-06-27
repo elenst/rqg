@@ -1,5 +1,6 @@
 # Copyright (C) 2009, 2012 Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Monty Program Ab.
+# Copyright (c) 2018, MariaDB Corporation Ab
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -112,7 +113,7 @@ sub new {
 
 
 sub spec_file {
-return $_[0]->[GD_SPEC];
+   return $_[0]->[GD_SPEC];
 }
 
 
@@ -175,6 +176,8 @@ sub executor_id {
 sub run {
     my ($self) = @_;
 
+    say("INFO: Starting GenTest::App::Gendata");
+
     my $spec_file = $self->spec_file();
     
     my $prng = GenTest::Random->new(
@@ -183,6 +186,16 @@ sub run {
         );
 
     my $executor = GenTest::Executor->newFromDSN($self->dsn());
+    # Set the number to which server we will connect.
+    # This number is
+    # - used for more detailed messages only
+    # - not used for to which server to connect etc. There only the dsn rules.
+    # Hint:
+    # Server id reported: n ----- dsn(n-1) !
+    $executor->setId($self->server_id);
+    # If sqltrace enabled than trace even the SQL here.
+    $executor->sqltrace($self->sqltrace);
+    $executor->setRole("Gendata");
     $executor->init();
 
 #  
@@ -207,8 +220,10 @@ sub run {
     }
 
     $executor->execute("SET SQL_MODE= CONCAT(\@\@sql_mode,',NO_ENGINE_SUBSTITUTION')") if $executor->type == DB_MYSQL;
-    $executor->execute("SET DEFAULT_STORAGE_ENGINE='".$self->engine()."'") 
-        if $self->engine() ne '' and ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE);
+    if ((defined $self->engine() and $self->engine() ne '') and
+        ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE)) {
+       $executor->execute("SET DEFAULT_STORAGE_ENGINE= '" . $self->engine() . "'");
+    }
 
     if (defined $schemas) {
         push(@schema_perms, @$schemas);
@@ -238,6 +253,7 @@ sub run {
     if (not ($executor->type == DB_MYSQL or $executor->type == DB_DRIZZLE or $executor->type==DB_DUMMY)) {
         my @datetimestuff = grep(/date|time/,@{$fields->{types}});
         if ($#datetimestuff > -1) {
+           # FIXME: Replace that damned croak
             croak "Dates and times are severly broken. Cannot be used for other than MySQL/Drizzle";
         }
     }
@@ -470,14 +486,20 @@ sub run {
         my @table_copy = @$table;
         my @fields_copy = @fields;
         
-        if (uc($table->[TABLE_ENGINE]) eq 'FALCON') {
+        if (defined $table->[TABLE_ENGINE] and uc($table->[TABLE_ENGINE]) eq 'FALCON') {
             @fields_copy =  grep {
                 !($_->[FIELD_TYPE] =~ m{blob|text}io && $_->[FIELD_INDEX] ne '')
             } @fields ;
         }
         
-        say("Creating ".$executor->getName().
-            " table: $schema.$table_copy[TABLE_NAME]; engine: $table_copy[TABLE_ENGINE]; rows: $table_copy[TABLE_ROW] .");
+        my $message = "Creating " . $executor->getName() . 
+                      " table: $schema.$table_copy[TABLE_NAME]; ";
+        if (defined $table->[TABLE_ENGINE]) {
+           $message = $message . " engine: $table_copy[TABLE_ENGINE]; ";
+        } else {
+           $message = $message . " engine: <not set>; ";
+        }
+        say("$message rows: $table_copy[TABLE_ROW] .");
         
         if ($table_copy[TABLE_PK] ne '') {
             my $pk_field;
@@ -502,7 +524,7 @@ sub run {
  
         my @index_fields;
         if ($executor->type() == DB_MYSQL || $executor->type() == DB_DRIZZLE) {
-            @index_fields = grep { $_->[FIELD_INDEX_SQL] ne '' } @fields_copy;
+            @index_fields = grep { defined $_->[FIELD_INDEX_SQL] and $_->[FIELD_INDEX_SQL] ne '' } @fields_copy;
         } else {
             ## Just keep the primary keys.....
             @index_fields = grep { $_->[FIELD_INDEX_SQL] =~ m/primary/ } @fields_copy;
@@ -518,8 +540,7 @@ sub run {
 
         $executor->execute("CREATE TABLE `$table->[TABLE_NAME]` (\n".join(",\n/*Indices*/\n", grep { defined $_ } (@field_sqls, $index_sqls) ).") ".$table->[TABLE_SQL]);
         
-        if (not ($executor->type() == DB_MYSQL || 
-                 $executor->type() == DB_DRIZZLE)) {
+        if (not ($executor->type() == DB_MYSQL or $executor->type() == DB_DRIZZLE)) {
             @index_fields = grep { $_->[FIELD_INDEX_SQL] ne '' } @fields_copy;
             foreach my $idx (@index_fields) {
                 my $key_sql = $idx->[FIELD_INDEX_SQL];
@@ -573,7 +594,7 @@ sub run {
                     } else {
                         $value = 'DEFAULT';
                     }
-                } elsif ($field->[FIELD_INDEX] eq 'primary key') {
+                } elsif (defined $field->[FIELD_INDEX] and $field->[FIELD_INDEX] eq 'primary key') {
                     if ($field->[FIELD_TYPE] =~ m{^(datetime|timestamp)$}sgio) {
     				$value = "FROM_UNIXTIME(UNIX_TIMESTAMP('2000-01-01') + $row_id)";
 	                } elsif ($field->[FIELD_TYPE] =~ m{date}sgio) {
@@ -607,7 +628,7 @@ sub run {
                         $quote = 1;
                     }
                     
-                    if (($field->[FIELD_NULLABILITY] eq 'not null') || ($self->[GD_NOTNULL])) {
+                    if ((defined $field->[FIELD_NULLABILITY] and $field->[FIELD_NULLABILITY] eq 'not null') || ($self->[GD_NOTNULL])) {
                         # Remove NULL from the list of allowed values
                         @possible_values = grep { lc($_) ne 'null' } @{$data_perms[$value_type]};
                     } else {

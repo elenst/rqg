@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 # Copyright (C) 2008-2010 Sun Microsystems, Inc. All rights reserved.
+# Copyright (C) 2016 MariaDB Corporation
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -187,13 +188,13 @@ foreach my $trial (1..$config->trials) {
     my $start_time = Time::HiRes::time();
 
     my $runall =
-        "perl runall.pl ".
+        "perl runall-new.pl ".
         " $rqgoptions $mysqlopt ".
         "--grammar=".$sql_grammar." ".
         "--vardir=$vardir ".
         "--mask-level=$mask_level ".
         "--mask=$current_mask ".
-        "--seed=$current_seed >$current_rqg_log 2>&1";
+        "--seed=$current_seed > $current_rqg_log 2>&1";
 
     say($runall);
     my $runall_status = system($runall);

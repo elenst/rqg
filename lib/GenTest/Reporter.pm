@@ -1,4 +1,5 @@
 # Copyright (c) 2008,2012 Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018 MariaDB Corporation Ab.
 # Use is subject to license terms.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -54,6 +55,7 @@ use constant REPORTER_CUSTOM_ATTRIBUTES => 10;
 # REPORTER_START_TIME is when the data has been generated, and reporter was started
 # (more or less when the test flow started)
 use constant REPORTER_START_TIME        => 11; 
+use constant REPORTER_NAME              => 12;
 
 use constant REPORTER_TYPE_PERIODIC     => 2;
 use constant REPORTER_TYPE_DEADLOCK     => 4;
@@ -76,7 +78,8 @@ sub new {
 		test_end => REPORTER_TEST_END,
 		test_duration => REPORTER_TEST_DURATION,
 		debug_server => REPORTER_SERVER_DEBUG,
-		properties => REPORTER_PROPERTIES
+		properties => REPORTER_PROPERTIES,
+        name       => REPORTER_NAME
 	}, @_);
 
 	my $dbh = DBI->connect($reporter->dsn(), undef, undef, { mysql_multi_statements => 1, RaiseError => 0 , PrintError => 1 } );
@@ -257,6 +260,10 @@ sub customAttribute() {
 		$_[0]->[GenTest::Reporter::REPORTER_CUSTOM_ATTRIBUTES]->{$_[1]}=$_[2];
 	}
 	return $_[0]->[GenTest::Reporter::REPORTER_CUSTOM_ATTRIBUTES]->{$_[1]};
+}
+
+sub name {
+   return $_[0]->[REPORTER_NAME];
 }
 
 sub configure {

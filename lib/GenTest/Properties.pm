@@ -1,5 +1,6 @@
 # Copyright (c) 2008, 2011, Oracle and/or its affiliates. All rights
 # reserved.
+# Copyright (c) 2018 MariaDB Corporation Ab.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -39,6 +40,7 @@ use strict;
 use Carp;
 use GenTest;
 use GenTest::Constants;
+use Auxiliary;
 
 use Data::Dumper;
 
@@ -64,13 +66,18 @@ sub AUTOLOAD {
     my $name = our $AUTOLOAD;
     $name =~ s/.*:://;
     
-    ## Avoid catching DESTRY et.al. (no intercepted calls to methods
+    ## Avoid catching DESTROY et.al. (no intercepted calls to methods
     ## starting with an uppercase letter)
     return unless $name =~ /[^A-Z]/;
     
     if (defined $self->[PROPS_LEGAL_HASH]) {
-        croak("Illegal property '$name' caught by AUTOLOAD ") 
-            if not $self->[PROPS_LEGAL_HASH]->{$name};
+        if ( not $self->[PROPS_LEGAL_HASH]->{$name} ) {
+           Carp::confess("ERROR: Illegal property '$name' caught by GenTest::Properties::AUTOLOAD.\n" .
+               "Will exit.");
+           # return undef;
+        }
+    } else {
+        # FIXME: Do we need to handle something here?
     }
     
     $self->[PROPS_PROPS]->{$name} = $arg if defined $arg;
@@ -151,6 +158,7 @@ sub new {
     if (defined $props->[PROPS_LEGAL_HASH]) {
         foreach my $p (keys %{$props->[PROPS_PROPS]}) {
             if (not exists $props->[PROPS_LEGAL_HASH]->{$p}) {
+                Carp::cluck("DEBUG: Illegal property '$p' detected.");
                 push(@illegal,$p);
             }
         }
@@ -172,7 +180,7 @@ sub new {
 
     if (defined $message) {
         $props->_help();
-        croak($message);
+        Carp::confess($message);
     }
     
     return $props;
@@ -188,7 +196,7 @@ sub property {
     my ($self, $name, $arg) = @_;
 
     if (defined $self->[PROPS_LEGAL_HASH]) {
-        croak("Illegal property '$name' caught by AUTOLOAD ") 
+        Carp::confess("Illegal property '$name' caught by AUTOLOAD ") 
             if not $self->[PROPS_LEGAL_HASH]->{$name};
     }
     
@@ -202,7 +210,7 @@ sub unsetProperty {
     my ($self, $name) = @_;
 
     if (defined $self->[PROPS_LEGAL_HASH]) {
-        croak("Illegal property '$name' caught by AUTOLOAD ")
+        Carp::confess("ERROR: Illegal property '$name' caught by AUTOLOAD ")
             if not $self->[PROPS_LEGAL_HASH]->{$name};
     }
 
@@ -212,11 +220,11 @@ sub unsetProperty {
 ## Read properties from a given file
 sub _readProps {
     my ($file) = @_;
-    open(PFILE, $file) or croak "Unable to read properties file '$file': $!";
+    open(PFILE, $file) or Carp::confess "Unable to read properties file '$file': $!";
     read(PFILE, my $propfile, -s $file);
     close PFILE;
     my $props = eval($propfile);
-    croak "Unable to load $file: $@" if $@;
+    Carp::confess "Unable to load $file: $@" if $@;
     return $props;
 }
 
@@ -251,22 +259,23 @@ sub printProps {
 
 ## Internal print method
 sub _printProps {
-    my ($props,$indent) = @_;
-    $indent = 1 if not defined $indent;
-    my $x = join(" ", map {undef} (1..$indent*3));
-    foreach my $p (sort keys %$props) {
-        if (UNIVERSAL::isa($props->{$p},"HASH")) {
-            say ($x .$p." => ");
-            _printProps($props->{$p}, $indent+1);
-	} elsif  (UNIVERSAL::isa($props->{$p},"ARRAY")) {
-        say ($x .$p." => ['".join("', '",@{$props->{$p}})."']");
-        } else {
-            say ($x.$p." => ".$props->{$p});
-        }
-    }
+   my ($properties, $indent) = @_;
+   $indent = 1 if not defined $indent;
+   my $x = join(" ", map {""} (1..$indent*3));
+   foreach my $property (sort keys %$properties) {
+      if      (UNIVERSAL::isa($properties->{$property}, "HASH")) {
+         say ($x . $property . " => ");
+         _printProps($properties->{$property}, $indent + 1);
+      } elsif (UNIVERSAL::isa($properties->{$property}, "ARRAY")) {
+         my @uvl = Auxiliary::unified_value_list( @{$properties->{$property}});
+         say($x . $property . " => ['" . join("', '", @uvl) .  "']");
+      } else {
+         say($x . $property . " => " . $properties->{$property});
+      }
+   }
 }
 
-## Remove proerties set to defined
+## Remove properties set to defined
 sub _purgeProps {
     my ($props) = @_;
     my $purged = {};
@@ -276,7 +285,7 @@ sub _purgeProps {
     return $purged;
 }
 
-## Generate a option list from a hash. The hash may be tha name of a
+## Generate a option list from a hash. The hash may be the name of a
 ## property. The prefix may typically be '--' or '--mysqld=--' for
 ## Mysql and friends use.
 sub genOpt {
