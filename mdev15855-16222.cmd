@@ -1,0 +1,1 @@
+perl ./runall-new.pl --basedir=/data/bld/bb-10.3-release --vardir=/dev/shm/vardir3 --duration=350 --threads=1 --seed=1530434615 --reporters=Backtrace,ErrorLog,Deadlock  --views --grammar=./1.yy --mysqld=--log_output=FILE --mysqld=--max-statement-time=10 --mysqld=--lock-wait-timeout=5 --mysqld=--loose-innodb-lock-wait-timeout=3   --skip-gendata --gendata-advanced --vcols
