@@ -325,6 +325,7 @@ sub getCollationMetaData {
 
 sub cacheMetaData {
     my ($self, $redo) = @_;
+    return STATUS_OK;
     
     my $meta = {};
 

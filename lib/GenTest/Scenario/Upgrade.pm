@@ -121,7 +121,7 @@ sub run {
 
   $gentest= $self->prepareGentest(1,
     {
-      duration => int($self->getTestDuration * 2 / 3),
+      duration => int($self->getTestDuration / 5),
       dsn => [$old_server->dsn($self->getProperty('database'))],
       servers => [$old_server],
       gendata => $self->getProperty('gendata'),
@@ -140,7 +140,7 @@ sub run {
 
   $gentest= $self->prepareGentest(1,
     {
-      duration => int($self->getTestDuration * 2 / 3),
+      duration => int($self->getTestDuration / 5),
       dsn => [$old_server->dsn($self->getProperty('database'))],
       servers => [$old_server],
       'start-dirty' => 1,
@@ -252,7 +252,7 @@ sub run {
 
   $gentest= $self->prepareGentest(2,
     {
-      duration => int($self->getTestDuration / 3),
+      duration => int($self->getTestDuration * 4 / 5),
       dsn => [$new_server->dsn($self->getProperty('database'))],
       servers => [$new_server],
       'start-dirty' => 1,

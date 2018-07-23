@@ -70,7 +70,7 @@ use DBI;
 use Cwd;
 
 my $database = 'test';
-my $user = 'rqg';
+my $user = 'root';
 my @dsns;
 
 my ($gendata, @basedirs, @mysqld_options, @vardirs, $rpl_mode,
@@ -321,7 +321,7 @@ $vardirs[0] ||= $vardirs[1];
 # values[N] expand or override values[0] for the server N
 
 @{$mysqld_options[0]} = () if not defined $mysqld_options[0];
-push @{$mysqld_options[0]}, "--sql-mode=no_engine_substitution" if join(' ', @ARGV_saved) !~ m{sql-mode}io;
+#push @{$mysqld_options[0]}, "--sql-mode=no_engine_substitution" if join(' ', @ARGV_saved) !~ m{sql-mode}io;
 
 foreach my $i (1..3) {
     @{$mysqld_options[$i]} = ( defined $mysqld_options[$i] 

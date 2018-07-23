@@ -28,7 +28,7 @@ alt_query:
   | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter
   | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter | alt_alter
 # Disable with ASAN due to MDEV-13828
-  | alt_rename_multi
+#  | alt_rename_multi
   | alt_alter_partitioning
   | alt_flush
   | alt_optimize
