@@ -18,7 +18,7 @@ query_init_add:
   ; alt_create_or_replace_sequence ; alt_create_or_replace_sequence
 ;
  
-query_add:
+thread1_add:
   alt_query
 ;
 
