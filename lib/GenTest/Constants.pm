@@ -70,6 +70,7 @@ require Exporter;
 	STATUS_SERVER_DEADLOCKED
 	STATUS_VALGRIND_FAILURE
 	STATUS_ALARM
+  STATUS_INNODB_INDEX_CORRUPTION
 
 	ORACLE_ISSUE_STILL_REPEATABLE
 	ORACLE_ISSUE_NO_LONGER_REPEATABLE
@@ -123,14 +124,14 @@ use constant STATUS_POSSIBLE_FAILURE   => 60;
 
 # Higher-priority errors
 
-use constant STATUS_CRITICAL_FAILURE		=> 100;	# Boundary between critical and non-critical errors
+use constant STATUS_CRITICAL_FAILURE		=> 120;	# Boundary between critical and non-critical errors
 
 use constant STATUS_ENVIRONMENT_FAILURE		=> 110;	# A failure in the environment or the grammar file
 use constant STATUS_PERL_FAILURE		=> 255; # Perl died for some reason
 
 use constant STATUS_CUSTOM_OUTCOME		=> 36;	# Used for things such as signaling an EXPLAIN hit from the ExplainMatch Validator
 
-use constant STATUS_SERVER_CRASHED		=> 101;
+use constant STATUS_SERVER_CRASHED		=> 121;
 
 use constant STATUS_SERVER_KILLED		=> 102;	# Willfull killing of the server, will not be reported as a crash
 
@@ -141,7 +142,8 @@ use constant STATUS_DATABASE_CORRUPTION		=> 106;
 use constant STATUS_SERVER_DEADLOCKED		=> 107;
 use constant STATUS_BACKUP_FAILURE		=> 108;
 use constant STATUS_VALGRIND_FAILURE		=> 109;
-use constant STATUS_ALARM			=> 110; # A module, e.g. a Reporter, raises an alarm with critical severity
+use constant STATUS_ALARM			=> 122; # A module, e.g. a Reporter, raises an alarm with critical severity
+use constant STATUS_INNODB_INDEX_CORRUPTION => 123;
 
 use constant ORACLE_ISSUE_STILL_REPEATABLE	=> 2;
 use constant ORACLE_ISSUE_NO_LONGER_REPEATABLE	=> 3;
