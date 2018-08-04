@@ -50,7 +50,7 @@ sub monitor {
 
     say("Testing consistency of secondary indexes");
 
-    my $tables = $dbh->selectcol_arrayref("SELECT CONCAT('`',table_schema,'`.`',table_name,'`') FROM information_schema.tables WHERE engine='InnoDB'");
+    my $tables = $dbh->selectcol_arrayref("SELECT CONCAT('`',table_schema,'`.`',table_name,'`') FROM information_schema.tables WHERE engine='InnoDB' AND table_schema = 'test'");
 
     $dbh->do("SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED");
     foreach my $table (@$tables) {
@@ -64,10 +64,10 @@ sub monitor {
 
         while (my $key_hashref = $sth_keys->fetchrow_hashref()) {
             my $key_name = $key_hashref->{Key_name};
-            if ($key_name= 'PRIMARY') {
-                push @pk_columns, $key_hashref->{Column_name};
+            if ($key_name eq 'PRIMARY') {
+                push @pk_columns, '`'.$key_hashref->{Column_name}.'`';
             } else {
-                $secondary_keys{$key_name}= 1;
+                $secondary_keys{'`'.$key_name.'`'}= 1;
             }
         }
         unless (scalar(@pk_columns)) {
@@ -76,32 +76,62 @@ sub monitor {
         }
         my $pk_columns= join ',', @pk_columns;
 
-        say("Verifying table: $table");
+        say("Verifying table: $table, PK columns: $pk_columns, indexes: ".join ',', keys %secondary_keys);
 
         $dbh->do("LOCK TABLE $table READ");
-        my $pk_data= GenTest::Result->new(
-            data => $dbh->selectall_arrayref("SELECT $pk_columns FROM $table FORCE INDEX(PRIMARY) ORDER BY $pk_columns"));
+        my $pk_data= get_all_rows($dbh,"SELECT $pk_columns FROM $table FORCE INDEX(PRIMARY) ORDER BY $pk_columns");
+        next unless defined $pk_data;
         
+        KEY:
         foreach my $ind (keys %secondary_keys) {
-            my $ind_data= GenTest::Result->new(
-                data => $dbh->selectall_arrayref("SELECT $pk_columns FROM $table FORCE INDEX($ind) ORDER BY $pk_columns"));
+            my $ind_data= get_all_rows($dbh,"SELECT $pk_columns FROM $table FORCE INDEX($ind) ORDER BY $pk_columns");
+            next unless defined $ind_data;
             
             my $diff= GenTest::Comparator::dumpDiff($pk_data, $ind_data);
             if ($diff) {
-                sayError("Found difference for indexes PRIMARY and $ind: $diff");
+                sayError("$diff");
+                sayError("Found difference for indexes PRIMARY and $ind ^");
+                foreach (1..86000) {
+                  my $pk_data2= get_all_rows($dbh,"SELECT $pk_columns FROM $table FORCE INDEX(PRIMARY) ORDER BY $pk_columns");
+                  my $ind_data2= get_all_rows($dbh,"SELECT $pk_columns FROM $table FORCE INDEX($ind) ORDER BY $pk_columns");
+                    my $diff2= GenTest::Comparator::dumpDiff($pk_data2, $ind_data2);
+                    if ($diff2) {
+                      sayError("The difference is still there:\n$diff2");
+                    } else {
+                      sayError("The difference is not there anymore!");
+                      next KEY;
+                    }
+                    sleep(10);
+                }
+
                 return STATUS_INNODB_INDEX_CORRUPTION;
             } else {
-                say("Indexes PRIMARY and $ind produce identical data");
+                say("Indexes PRIMARY and $ind produced identical data");
             }
         }
         $dbh->do("UNLOCK TABLES");
     }
-    $last_run= time();
     return STATUS_OK;
 }
 
 sub type {
     return REPORTER_TYPE_PERIODIC;
+}
+
+sub get_all_rows {
+  my ($dbh, $stmt)= @_;
+  my $sth= $dbh->prepare($stmt);
+  if ($sth->err or $dbh->err) {
+    sayError("Prepare for $stmt failed: ". ($sth->err ? $sth->errstr : $dbh->errstr));
+    return undef;
+  }
+  $sth->execute;
+  if ($sth->err or $dbh->err) {
+    sayError("Execute for $stmt failed: ". ($sth->err ? $sth->errstr : $dbh->errstr));
+    return undef;
+  }
+  return GenTest::Result->new(
+            data => $sth->fetchall_arrayref);
 }
 
 1;
