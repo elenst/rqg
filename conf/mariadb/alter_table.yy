@@ -30,7 +30,7 @@ alt_query:
 # Disable with ASAN due to MDEV-13828
 #  | alt_rename_multi
   | alt_alter_partitioning
-  | alt_flush
+#  | alt_flush
   | alt_optimize
   | alt_lock_unlock_table
   | alt_transaction
@@ -107,13 +107,13 @@ alt_table_option:
   | DELAY_KEY_WRITE alt_eq_optional alt_zero_or_one
 # alt_eq_optional disabled due to MDEV-14859
 #  | ENCRYPTED alt_eq_optional alt_yes_or_no_no_no
-  | /*!100104 ENCRYPTED = alt_yes_or_no_no_no */
+#  | /*!100104 ENCRYPTED = alt_yes_or_no_no_no */
 # alt_eq_optional disabled due to MDEV-14861
 #  | ENCRYPTION_KEY_ID alt_eq_optional _digit
-  | /*!100104 ENCRYPTION_KEY_ID = _digit */
+#  | /*!100104 ENCRYPTION_KEY_ID = _digit */
 # alt_eq_optional disabled due to MDEV-14859
 #  | IETF_QUOTES alt_eq_optional alt_yes_or_no_no_no
-  | /*!100108 IETF_QUOTES = alt_yes_or_no_no_no */
+#  | /*!100108 IETF_QUOTES = alt_yes_or_no_no_no */
 #  | INDEX DIRECTORY [=] 'absolute path to directory'
 #  | INSERT_METHOD [=] { NO | FIRST | LAST }
   | KEY_BLOCK_SIZE alt_eq_optional alt_key_block_size
@@ -159,8 +159,8 @@ alt_character_set:
 
 alt_collation:
     latin1_bin | latin1_general_cs | latin1_general_ci
-  | utf8_bin | utf8_nopad_bin | utf8_general_ci
-  | utf8mb4_bin | utf8mb4_nopad_bin | utf8mb4_general_nopad_ci | utf8mb4_general_ci
+  | utf8_bin | utf8_general_ci
+  | utf8mb4_bin | utf8mb4_general_ci
 ;
 
 alt_eq_optional:
