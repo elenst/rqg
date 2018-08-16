@@ -304,16 +304,16 @@ sub gen_table {
                         random_invisible(),
                         random_compressed()
                     ],
-        col_blob => [   random_blob_type(),
-                        undef,
-                        undef,
-                        undef,
-                        $nullable = random_null(),
-                        ( $nullable eq 'NULL' ? undef : "''" ),
-                        undef,
-                        random_invisible(),
-                        random_compressed()
-                    ],
+#        col_blob => [   random_blob_type(),
+#                        undef,
+#                        undef,
+#                        undef,
+#                        $nullable = random_null(),
+#                        ( $nullable eq 'NULL' ? undef : "''" ),
+#                        undef,
+#                        random_invisible(),
+#                        random_compressed()
+#                    ],
         col_enum => [   random_enum_type(),
                         undef,
                         undef,
@@ -431,16 +431,16 @@ sub gen_table {
                                 random_invisible(),
                                 undef
                             ];
-        $columns{vcol_blob}= [  random_blob_type(),
-                                undef,
-                                undef,
-                                undef,
-                                undef,
-                                undef,
-                                'AS (col_blob) '.$self->random_or_predefined_vcol_kind(),
-                                random_invisible(),
-                                undef
-                            ];
+#        $columns{vcol_blob}= [  random_blob_type(),
+#                                undef,
+#                                undef,
+#                                undef,
+#                                undef,
+#                                undef,
+#                                'AS (col_blob) '.$self->random_or_predefined_vcol_kind(),
+#                                random_invisible(),
+#                                undef
+#                            ];
         $columns{vcol_enum}= [  random_enum_type(),
                                 undef,
                                 undef,
