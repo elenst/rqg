@@ -4,6 +4,7 @@ require 'conf/mariadb/combo.grammars';
 $combinations = [ $grammars,
   [
   '
+    --store-binaries
     --no-mask
     --queries=100M
     --duration=350
